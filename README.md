@@ -5,7 +5,7 @@ An overlay for Rocket League which displays the names/ranks of everybody in your
 rlbuddy uses a widget system, where each feature has its own widget which can be opened/closed, so you can customize it however you want! For example, if you don't use Spotify, you can just hide its widget, and it'll stay out of your way.
 
 - Shows ranks of everyone in your lobby and previous lobbies
-- Opens using a configurable hotkey
+- Opens using a configurable hotkey/button
 - Can be partially transparent!
 - Spotify and Discord integration
 - Sets up the stats api for you <3
@@ -40,9 +40,11 @@ Switch names aren't unique, so usually, just putting a player's name into tracke
 
 This widget lets you browse and view the past matches in this session, using the same interface as the current match widget.
 
-#### Hotkey
+#### Hotkeys
 
-The main way to open rlbuddy is to press and hold a hotkey, which will keep it open for the duration of the press (unless you focus it). By default, the key is `Alt`, but it can be changed or disabled through in the settings. The available hotkeys are:
+The main way to open rlbuddy is to press and hold a hotkey/controller button, which will keep it open for the duration of the press (unless you focus it). By default, the key is `Alt` and the button is `Select`, but it can be changed or disabled through in the settings. The available hotkeys are:
+
+**Keyboard**
 
 - Alt
 - LShift (left shift)
@@ -50,7 +52,14 @@ The main way to open rlbuddy is to press and hold a hotkey, which will keep it o
 - Tab
 - Super (Windows)
 
-Using a controller button is in development.
+**Gamepad**
+
+- Select
+- Start
+- Left bumper
+- Right bumper
+
+Dynamic selection coming soon!
 
 ### Integrations
 
