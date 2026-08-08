@@ -22,9 +22,7 @@ rlbuddy uses a widget system, where each feature has its own widget which can be
 
 This is the primary widget, showing your current lobby along with some of each player's stats (their score). It also uncensors each player's name and colors them with their team color. Your name is automatically guessed and highlighted.
 
-The three ranks under each player are their competitive 1s, 2s, and 3s ranks, and the ranks on the left are their rank in the current mode.
-
-> Mode detection is only based off the number of people in the lobby (eg. 6 players -> 3v3), so it can only display the 1s, 2s, or 3s rank. This is because the stats api unfortunately doesn't expose this information :(
+The three ranks under each player are their competitive 1s, 2s, and 3s ranks, with the icon to the left being their rank in the current mode.
 
 It also shows each player's platform, and allows you to open their profiles in TRN. For Switch players, the TRN page is only guaranteed to be valid if they're in a club.
 
