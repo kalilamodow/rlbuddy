@@ -164,7 +164,7 @@ impl SpotifyClient {
             ureq::get("https://api.spotify.com/v1/me/player/queue")
                 .header(
                     "Authorization",
-                    format!("Bearer {}", access_token_for_queue),
+                    format!("Bearer {access_token_for_queue}"),
                 )
                 .call()
                 .unwrap()
@@ -178,7 +178,7 @@ impl SpotifyClient {
             let r = ureq::get("https://api.spotify.com/v1/me/player")
                 .header(
                     "Authorization",
-                    format!("Bearer {}", access_token_for_state),
+                    format!("Bearer {access_token_for_state}"),
                 )
                 .call()
                 .unwrap();
@@ -304,18 +304,10 @@ pub struct GetQueueResponse {
 }
 
 #[derive(Debug)]
+#[derive(Default)]
 pub struct PlaybackState {
     pub currently_playing: Option<Track>,
     pub queue: Vec<Track>,
     pub context: Option<SpotifyUri>,
 }
 
-impl Default for PlaybackState {
-    fn default() -> Self {
-        PlaybackState {
-            currently_playing: None,
-            queue: Vec::new(),
-            context: None,
-        }
-    }
-}

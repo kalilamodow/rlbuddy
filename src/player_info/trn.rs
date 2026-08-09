@@ -213,7 +213,7 @@ pub type TrackerAPI = CachedHttpApi<PlayerKey, Result<ProfileData, TRNError>, Pr
 pub fn new_tracker_api(context: egui::Context) -> TrackerAPI {
     CachedHttpApi::new(
         context,
-        Box::new(|key| key.api_url()),
+        Box::new(PlayerKey::api_url),
         Arc::new(|r| {
             Some(match r {
                 ProfileResponse::Data(d) => Ok(d),

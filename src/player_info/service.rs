@@ -56,7 +56,7 @@ impl PlayerInfoService {
                         platform_id,
                     },
                     open: true,
-                })
+                });
             }
         }
     }

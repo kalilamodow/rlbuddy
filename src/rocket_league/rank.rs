@@ -58,11 +58,11 @@ pub enum Rank {
 }
 
 impl Rank {
-    pub fn as_str(&self) -> &'static str {
-        RANK_NAMES[*self as usize]
+    pub fn as_str(self) -> &'static str {
+        RANK_NAMES[self as usize]
     }
 
-    pub fn to_image(&self) -> egui::ImageSource<'static> {
+    pub fn to_image(self) -> egui::ImageSource<'static> {
         match self {
             Rank::Unranked => egui::include_image!("../../assets/Unranked_icon.webp"),
             Rank::Bronze1 => egui::include_image!("../../assets/Bronze1_rank_icon.webp"),
@@ -90,7 +90,7 @@ impl Rank {
         }
     }
 
-    pub fn to_color(&self) -> Color32 {
+    pub fn to_color(self) -> Color32 {
         match self {
             Rank::Unranked => Color32::DARK_GRAY,
             Rank::Bronze1 | Rank::Bronze2 | Rank::Bronze3 => Color32::BROWN,
@@ -139,6 +139,7 @@ impl FromStr for Rank {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let index = RANK_NAMES.iter().position(|rank| *rank == s).ok_or(())?;
+        #[allow(clippy::cast_possible_truncation)]
         Rank::try_from(index as u8).map_err(|_| ())
     }
 }

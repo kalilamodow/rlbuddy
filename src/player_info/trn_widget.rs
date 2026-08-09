@@ -113,7 +113,7 @@ impl<'a> TrackerWidget<'a> {
                         egui::Image::new(peak_rank.to_image())
                             .fit_to_exact_size(egui::vec2(20.0, 20.0)),
                     )
-                    .on_hover_text(format!("MMR: {}", peak_rating));
+                    .on_hover_text(format!("MMR: {peak_rating}"));
                 } else if let Some(peak_rating) = find_peak_rating(playlist.attributes.playlist_id)
                     && let Ok(mut peak_rank) =
                         Rank::from_str(&peak_rating.stats.peak_rating.metadata.name)
@@ -139,7 +139,7 @@ impl<'a> TrackerWidget<'a> {
     }
 }
 
-impl<'a> egui::Widget for TrackerWidget<'a> {
+impl egui::Widget for TrackerWidget<'_> {
     fn ui(self, ui: &mut egui::Ui) -> egui::Response {
         ui.vertical(|ui| {
             self.render_overview(ui);

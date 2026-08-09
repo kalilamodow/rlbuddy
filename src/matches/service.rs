@@ -148,8 +148,7 @@ impl MatchesService {
 
                     if current_match
                         .playlist
-                        .map(Playlist::is_singleplayer)
-                        .unwrap_or(true)
+                        .map_or(true, Playlist::is_singleplayer)
                     {
                         return;
                     }

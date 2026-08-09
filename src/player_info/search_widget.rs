@@ -48,7 +48,7 @@ impl egui::Widget for &mut PlayerSearchWidget {
 
             if ui.button("Search").clicked() {
                 self.sender.send(PlayerInfoServiceCommand::Open(
-                    self.selected_platform.clone(),
+                    self.selected_platform,
                     self.player_name.clone(),
                 ));
             }

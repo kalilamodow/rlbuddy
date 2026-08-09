@@ -35,7 +35,7 @@ impl<'a> MatchRenderer<'a> {
     fn render_header(&mut self, ui: &mut egui::Ui) -> egui::Response {
         ui.horizontal(|ui| {
             if let Some(playlist) = self.match_info.playlist {
-                ui.label(format!("{}", playlist));
+                ui.label(format!("{playlist}"));
 
                 if playlist.is_singleplayer() {
                     return;
@@ -140,14 +140,13 @@ impl<'a> MatchRenderer<'a> {
 
         center_label(ui, match_player.data.score.to_string());
 
-        if !matches!(match_player.data.platform, Platform::Bot) {
-            if ui.button("More").clicked() {
+        if !matches!(match_player.data.platform, Platform::Bot)
+            && ui.button("More").clicked() {
                 self.player_info_sender
                     .send(PlayerInfoServiceCommand::OpenPlayer(
                         match_player.data.clone(),
                     ));
             }
-        }
 
         ui.end_row();
     }
@@ -160,8 +159,7 @@ impl<'a> MatchRenderer<'a> {
         let playlist_to_show = self
             .match_info
             .playlist
-            .map(Playlist::in_ranked)
-            .flatten()
+            .and_then(Playlist::in_ranked)
             .or_else(|| Playlist::infer_from_player_count(self.match_info.players.len() as u8));
 
         let Some(playlist_to_show) = playlist_to_show else {
