@@ -25,6 +25,17 @@ struct StatsApiEvent {
     data: String,
 }
 
+#[derive(Debug, Deserialize, Clone)]
+#[serde(rename_all = "PascalCase")]
+pub struct PlayerStats {
+    pub score: u16,
+    pub goals: u8,
+    pub shots: u8,
+    pub assists: u8,
+    pub saves: u8,
+    pub touches: u8,
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 struct StatsApiPlayerData {
@@ -32,8 +43,9 @@ struct StatsApiPlayerData {
     /// "Platform identifier in the format Platform|Uid|Splitscreen (e.g. "Steam|123|0", "Epic|456|0")."
     primary_id: String,
     team_num: u8,
-    score: u16,
     shortcut: u8,
+    #[serde(flatten)]
+    stats: PlayerStats,
 }
 
 #[derive(Debug, Deserialize)]
@@ -122,7 +134,7 @@ pub struct PlayerData {
     pub platform: Platform,
     pub platform_id: String,
     pub team: Team,
-    pub score: u16,
+    pub stats: PlayerStats,
 }
 
 fn parse_stats_api_player(player: StatsApiPlayerData) -> Option<PlayerData> {
@@ -134,7 +146,7 @@ fn parse_stats_api_player(player: StatsApiPlayerData) -> Option<PlayerData> {
             platform,
             platform_id: player.primary_id,
             team: player.team_num.into(),
-            score: player.score,
+            stats: player.stats,
         })
     } else {
         None

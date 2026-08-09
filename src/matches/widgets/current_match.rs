@@ -9,6 +9,7 @@ use eframe::egui;
 pub struct CurrentMatchWidget {
     state: ReadonlyStateHandle<MatchesServiceState>,
     player_info_sender: Sender<PlayerInfoServiceCommand>,
+    opened_stats: Option<(String, String)>,
 }
 
 impl CurrentMatchWidget {
@@ -19,6 +20,7 @@ impl CurrentMatchWidget {
         CurrentMatchWidget {
             state,
             player_info_sender,
+            opened_stats: None,
         }
     }
 }
@@ -30,6 +32,7 @@ impl egui::Widget for &mut CurrentMatchWidget {
                 ui.add(MatchRenderer::new(
                     current_match,
                     None,
+                    &mut self.opened_stats,
                     &self.player_info_sender,
                 ));
             } else {

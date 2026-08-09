@@ -9,6 +9,7 @@ use std::{collections::HashMap, time::SystemTime};
 pub struct PastMatchesWidget {
     state: ReadonlyStateHandle<MatchesServiceState>,
     open: HashMap<SystemTime, bool>,
+    opened_stats: HashMap<SystemTime, Option<(String, String)>>, // display name, player id
     player_info_sender: Sender<PlayerInfoServiceCommand>,
 }
 
@@ -21,6 +22,7 @@ impl PastMatchesWidget {
             state,
             open: HashMap::new(),
             player_info_sender,
+            opened_stats: HashMap::new(),
         }
     }
 }
@@ -34,6 +36,7 @@ impl egui::Widget for &mut PastMatchesWidget {
                         ui.add(MatchRenderer::new(
                             prev_match,
                             Some(&mut self.open.entry(prev_match.started_at).or_insert(false)),
+                            self.opened_stats.entry(prev_match.started_at).or_default(),
                             &self.player_info_sender,
                         ))
                     });

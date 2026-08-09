@@ -16,6 +16,7 @@ use std::time::{Duration, SystemTime};
 pub struct MatchRenderer<'a> {
     match_info: &'a MatchInfo,
     is_open: Option<&'a mut bool>,
+    showing_stats_for: &'a mut Option<(String, String)>,
     player_info_sender: &'a Sender<PlayerInfoServiceCommand>,
 }
 
@@ -23,11 +24,13 @@ impl<'a> MatchRenderer<'a> {
     pub fn new(
         match_info: &'a MatchInfo,
         is_open: Option<&'a mut bool>,
+        showing_stats_for: &'a mut Option<(String, String)>,
         player_info_sender: &'a Sender<PlayerInfoServiceCommand>,
     ) -> MatchRenderer<'a> {
         MatchRenderer {
             match_info,
             is_open,
+            showing_stats_for,
             player_info_sender,
         }
     }
@@ -138,15 +141,33 @@ impl<'a> MatchRenderer<'a> {
             }
         });
 
-        center_label(ui, match_player.data.score.to_string());
+        center_label(ui, match_player.data.stats.score.to_string());
 
-        if !matches!(match_player.data.platform, Platform::Bot)
-            && ui.button("More").clicked() {
-                self.player_info_sender
-                    .send(PlayerInfoServiceCommand::OpenPlayer(
-                        match_player.data.clone(),
-                    ));
-            }
+        if ui
+            .add_enabled(
+                !matches!(match_player.data.platform, Platform::Bot),
+                egui::Button::new("Stats"),
+            )
+            .clicked()
+        {
+            *self.showing_stats_for = Some((
+                match_player.display_name().to_owned(),
+                match_player.data.platform_id.clone(),
+            ));
+        }
+
+        if ui
+            .add_enabled(
+                !matches!(match_player.data.platform, Platform::Bot),
+                egui::Button::new("More"),
+            )
+            .clicked()
+        {
+            self.player_info_sender
+                .send(PlayerInfoServiceCommand::OpenPlayer(
+                    match_player.data.clone(),
+                ));
+        }
 
         ui.end_row();
     }
@@ -232,6 +253,59 @@ impl<'a> MatchRenderer<'a> {
             }
         });
     }
+
+    fn render_stats_window(&self, ui: &mut egui::Ui, player: &(String, String)) -> bool {
+        let mut window_is_open = true;
+
+        let Some(player_details) = self
+            .match_info
+            .players
+            .iter()
+            .find(|p| p.data.platform_id == player.1)
+        else {
+            return false;
+        };
+
+        let window_title = format!("{}'s Stats", player.0);
+        egui::Window::new(&window_title)
+            .open(&mut window_is_open)
+            .collapsible(false)
+            .resizable(false)
+            .show(ui.ctx(), |ui| {
+                egui::Grid::new(&window_title)
+                    .spacing(egui::vec2(8.0, 8.0))
+                    .striped(true)
+                    .show(ui, |ui| {
+                        let stats = &player_details.data.stats;
+
+                        ui.strong("Score");
+                        center_label(ui, stats.score.to_string());
+                        ui.end_row();
+
+                        ui.strong("Goals");
+                        center_label(ui, stats.goals.to_string());
+                        ui.end_row();
+
+                        ui.strong("Assists");
+                        center_label(ui, stats.assists.to_string());
+                        ui.end_row();
+
+                        ui.strong("Saves");
+                        center_label(ui, stats.saves.to_string());
+                        ui.end_row();
+
+                        ui.strong("Shots");
+                        center_label(ui, stats.shots.to_string());
+                        ui.end_row();
+
+                        ui.strong("Touches");
+                        center_label(ui, stats.touches.to_string());
+                        ui.end_row();
+                    })
+            });
+
+        window_is_open
+    }
 }
 
 impl egui::Widget for MatchRenderer<'_> {
@@ -243,6 +317,13 @@ impl egui::Widget for MatchRenderer<'_> {
             return header_response;
         }
 
+        if let Some(player) = self.showing_stats_for.as_ref() {
+            let stay_open = self.render_stats_window(ui, player);
+            if !stay_open {
+                *self.showing_stats_for = None;
+            }
+        }
+
         egui::Grid::new(self.match_info.started_at)
             .spacing(egui::vec2(8.0, 12.0))
             .striped(true)
@@ -250,7 +331,8 @@ impl egui::Widget for MatchRenderer<'_> {
                 center_label(ui, bold_text("Rank"));
                 ui.label(bold_text("Player"));
                 center_label(ui, bold_text("Score"));
-                ui.label(""); // trn button
+                ui.label(""); // stats button
+                ui.label(""); // more button
 
                 ui.end_row();
 
@@ -337,5 +419,5 @@ fn bold_text(text: &str) -> egui::RichText {
 fn filter_useless_bots(players: &[MatchPlayer]) -> impl Iterator<Item = &MatchPlayer> {
     players
         .iter()
-        .filter(|p| p.data.platform != Platform::Bot || p.data.score != 0)
+        .filter(|p| p.data.platform != Platform::Bot || p.data.stats.score != 0)
 }
