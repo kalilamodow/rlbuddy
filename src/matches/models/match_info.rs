@@ -30,17 +30,17 @@ impl MatchPlayer {
     }
 
     pub fn trn_link(&self) -> Option<String> {
-        let (prefix, id) = self
-            .epic_name
-            .as_ref()
-            .map_or(match self.data.platform {
+        let (prefix, id) = self.epic_name.as_ref().map_or(
+            match self.data.platform {
                 Platform::Bot => return None,
                 Platform::Epic => ("epic", self.display_name()),
                 Platform::Switch => ("switch", self.display_name()),
                 Platform::PlayStation => ("psn", self.display_name()),
                 Platform::Xbox => ("xbl", self.display_name()),
                 Platform::Steam => ("steam", self.data.platform_id.split('|').nth(1).unwrap()),
-            }, |n| ("epic", n.as_str()));
+            },
+            |n| ("epic", n.as_str()),
+        );
 
         Some(format!(
             "https://rocketleague.tracker.network/rocket-league/profile/{prefix}/{id}/overview"

@@ -149,9 +149,10 @@ impl ControllerInputManager {
                         }
                     }
                     gilrs::EventType::ButtonReleased(button, _)
-                        if Some(button) == self.settings.read().button.to_gilrs_button() => {
-                            self.tx.send(false).unwrap();
-                        }
+                        if Some(button) == self.settings.read().button.to_gilrs_button() =>
+                    {
+                        self.tx.send(false).unwrap();
+                    }
                     _ => {}
                 }
             }

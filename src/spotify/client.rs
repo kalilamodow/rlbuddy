@@ -162,10 +162,7 @@ impl SpotifyClient {
         let access_token_for_queue = self.access_token.clone();
         let queue_thread = thread::spawn(move || {
             ureq::get("https://api.spotify.com/v1/me/player/queue")
-                .header(
-                    "Authorization",
-                    format!("Bearer {access_token_for_queue}"),
-                )
+                .header("Authorization", format!("Bearer {access_token_for_queue}"))
                 .call()
                 .unwrap()
                 .into_body()
@@ -176,10 +173,7 @@ impl SpotifyClient {
         let access_token_for_state = self.access_token.clone();
         let state_thread = thread::spawn(move || -> Option<PlaybackStateResponse> {
             let r = ureq::get("https://api.spotify.com/v1/me/player")
-                .header(
-                    "Authorization",
-                    format!("Bearer {access_token_for_state}"),
-                )
+                .header("Authorization", format!("Bearer {access_token_for_state}"))
                 .call()
                 .unwrap();
 
@@ -303,11 +297,9 @@ pub struct GetQueueResponse {
     pub queue: Vec<Track>,
 }
 
-#[derive(Debug)]
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct PlaybackState {
     pub currently_playing: Option<Track>,
     pub queue: Vec<Track>,
     pub context: Option<SpotifyUri>,
 }
-
