@@ -111,7 +111,7 @@ impl<'a> MatchRenderer<'a> {
                     }
                 };
 
-                ui.add(
+                let name_label = ui.add(
                     egui::Label::new(
                         bold_text(match_player.display_name())
                             .color(name_color)
@@ -119,12 +119,26 @@ impl<'a> MatchRenderer<'a> {
                     )
                     .sense(egui::Sense::CLICK)
                     .extend(),
-                )
-                .context_menu(|ui| {
+                );
+
+                name_label.context_menu(|ui| {
                     if ui.button("Copy player id").clicked() {
                         ui.ctx().copy_text(match_player.data.platform_id.clone());
                     }
                 });
+
+                if match_player.data.platform != Platform::Bot {
+                    if name_label.hovered() {
+                        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                    }
+
+                    if name_label.clicked() {
+                        self.player_info_sender
+                            .send(PlayerInfoServiceCommand::OpenPlayer(
+                                match_player.data.clone(),
+                            ));
+                    }
+                }
 
                 ui.label(
                     egui::RichText::new(match_player.data.platform.to_string())
@@ -142,7 +156,7 @@ impl<'a> MatchRenderer<'a> {
         if ui
             .add_enabled(
                 !matches!(match_player.data.platform, Platform::Bot),
-                egui::Button::new("Stats"),
+                egui::Button::new("More"),
             )
             .clicked()
         {
@@ -150,19 +164,6 @@ impl<'a> MatchRenderer<'a> {
                 match_player.display_name().to_owned(),
                 match_player.data.platform_id.clone(),
             ));
-        }
-
-        if ui
-            .add_enabled(
-                !matches!(match_player.data.platform, Platform::Bot),
-                egui::Button::new("More"),
-            )
-            .clicked()
-        {
-            self.player_info_sender
-                .send(PlayerInfoServiceCommand::OpenPlayer(
-                    match_player.data.clone(),
-                ));
         }
 
         ui.end_row();
@@ -327,7 +328,6 @@ impl egui::Widget for MatchRenderer<'_> {
                 center_label(ui, bold_text("Rank"));
                 ui.label(bold_text("Player"));
                 center_label(ui, bold_text("Score"));
-                ui.label(""); // stats button
                 ui.label(""); // more button
 
                 ui.end_row();
