@@ -1,3 +1,4 @@
+use super::super::{MatchInfo, MatchPlayer};
 use crate::{
     common::channel::Sender,
     matches::apis::PlayerSkillInformation,
@@ -5,9 +6,6 @@ use crate::{
     rocket_league::{Platform, Playlist, Rank, Team},
     stats_api::TeamScores,
 };
-
-use super::super::models::{MatchInfo, MatchPlayer};
-
 use eframe::egui::{self, Color32};
 use std::cmp::Ordering;
 use std::sync::Arc;
@@ -37,12 +35,10 @@ impl<'a> MatchRenderer<'a> {
 
     fn render_header(&mut self, ui: &mut egui::Ui) -> egui::Response {
         ui.horizontal(|ui| {
-            if let Some(playlist) = self.match_info.playlist {
-                ui.label(format!("{playlist}"));
+            ui.label(format!("{}", self.match_info.playlist));
 
-                if playlist.is_singleplayer() {
-                    return;
-                }
+            if self.match_info.playlist.is_singleplayer() {
+                return;
             }
 
             if let Some(finished) = &self.match_info.finish {
@@ -180,7 +176,7 @@ impl<'a> MatchRenderer<'a> {
         let playlist_to_show = self
             .match_info
             .playlist
-            .and_then(Playlist::in_ranked)
+            .in_ranked()
             .or_else(|| Playlist::infer_from_player_count(self.match_info.players.len() as u8));
 
         let Some(playlist_to_show) = playlist_to_show else {

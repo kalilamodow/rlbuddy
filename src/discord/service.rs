@@ -83,9 +83,7 @@ impl DiscordService {
     }
 
     pub fn update(&mut self) {
-        self.current = if let Some(current_match) = &self.matches_handle.read().current_match
-            && let Some(playlist) = current_match.playlist
-        {
+        self.current = if let Some(current_match) = &self.matches_handle.read().current_match {
             let (our_score, their_score) = match current_match.our_team {
                 Team::Blue => (current_match.score.blue, current_match.score.orange),
                 Team::Orange => (current_match.score.orange, current_match.score.blue),
@@ -94,8 +92,8 @@ impl DiscordService {
             GameState::InGame(MatchData {
                 team_score: our_score,
                 opp_score: their_score,
-                playlist,
-                arena: current_match.arena.unwrap_or_default(),
+                playlist: current_match.playlist,
+                arena: current_match.arena,
                 state: current_match.state.clone(),
             })
         } else {

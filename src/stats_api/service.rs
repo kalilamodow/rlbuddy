@@ -169,7 +169,7 @@ pub struct MatchUpdate {
     pub players: Vec<PlayerData>,
     pub arena: &'static str,
     pub state: MatchState,
-    pub playlist: Option<Playlist>,
+    pub playlist: Playlist,
 }
 
 pub enum RLEvent {
@@ -301,7 +301,7 @@ impl StatsApi {
                         .into_iter()
                         .filter_map(parse_stats_api_player)
                         .collect(),
-                    playlist: Playlist::try_from_primitive(data.game.playlist_id).ok(),
+                    playlist: Playlist::try_from_primitive(data.game.playlist_id).unwrap(),
                 }))
             }
             "MatchCreated" => {
