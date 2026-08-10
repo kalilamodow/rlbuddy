@@ -68,7 +68,8 @@ pub struct MatchInfo {
 }
 
 impl MatchInfo {
-    pub fn new(update: MatchUpdate, local_player_id: &Option<String>) -> Self {
+    pub fn new(mut update: MatchUpdate, local_player_id: &Option<String>) -> Self {
+        normalize_bot_player_ids(&mut update.players);
         Self {
             score: update.score,
             our_team: update
@@ -110,13 +111,7 @@ impl MatchInfo {
         self.max_active_players = self.max_active_players.max(updated.players.len());
         self.score = updated.score;
 
-        // bots all share the same id so replace it for comparisons
-        for player_or_bot_hmm in &mut updated.players {
-            if player_or_bot_hmm.platform == Platform::Bot {
-                player_or_bot_hmm.platform_id = player_or_bot_hmm.name.clone();
-            }
-        }
-
+        normalize_bot_player_ids(&mut updated.players);
         for player in &mut self.players {
             let updated_pos = updated
                 .players
@@ -190,4 +185,13 @@ impl MatchInfo {
 
 fn is_censored(name: &str) -> bool {
     !name.is_empty() && name.chars().all(|c| c == '*')
+}
+
+fn normalize_bot_player_ids(players: &mut [PlayerData]) {
+    // bots all share the same id so replace it for comparisons
+    for player_or_bot_hmm in players {
+        if player_or_bot_hmm.platform == Platform::Bot {
+            player_or_bot_hmm.platform_id = player_or_bot_hmm.name.clone();
+        }
+    }
 }
