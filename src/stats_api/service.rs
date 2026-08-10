@@ -33,7 +33,7 @@ pub struct PlayerStats {
     pub shots: u8,
     pub assists: u8,
     pub saves: u8,
-    pub touches: u8,
+    pub touches: u16,
 }
 
 #[derive(Debug, Deserialize)]
