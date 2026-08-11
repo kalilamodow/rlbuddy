@@ -2,7 +2,7 @@ use crate::common::{ThreadedReadWriteStateHandle, ThreadedReadonlyStateHandle};
 use gilrs::{Button, Gilrs};
 use rdev::Key;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashSet, sync::mpsc, thread, time};
+use std::{sync::mpsc, thread, time};
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SelectableHotkey {
@@ -40,8 +40,6 @@ impl SelectableHotkey {
 }
 
 struct KeyboardInputManager {
-    keys_pressed: HashSet<Key>,
-    was_open_before: bool,
     tx: mpsc::Sender<bool>,
     settings: ThreadedReadonlyStateHandle<HotkeySettings>,
 }
@@ -51,12 +49,7 @@ impl KeyboardInputManager {
         tx: mpsc::Sender<bool>,
         settings: ThreadedReadonlyStateHandle<HotkeySettings>,
     ) -> Self {
-        KeyboardInputManager {
-            keys_pressed: HashSet::new(),
-            was_open_before: false,
-            tx,
-            settings,
-        }
+        KeyboardInputManager { tx, settings }
     }
 
     pub fn listen(mut self) {
@@ -71,23 +64,13 @@ impl KeyboardInputManager {
         };
 
         match event.event_type {
-            rdev::EventType::KeyPress(key) => {
-                self.keys_pressed.insert(key);
-            }
-            rdev::EventType::KeyRelease(key) => {
-                self.keys_pressed.remove(&key);
-            }
-            _ => {}
-        }
-
-        if self.keys_pressed.contains(&hotkey) {
-            if !self.was_open_before {
-                self.was_open_before = true;
+            rdev::EventType::KeyPress(key) if hotkey == key => {
                 self.tx.send(true).unwrap();
             }
-        } else if self.was_open_before {
-            self.was_open_before = false;
-            self.tx.send(false).unwrap();
+            rdev::EventType::KeyRelease(key) if hotkey == key => {
+                self.tx.send(false).unwrap();
+            }
+            _ => {}
         }
     }
 }
