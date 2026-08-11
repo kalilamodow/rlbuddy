@@ -19,7 +19,7 @@ impl egui::Widget for &HotkeySettingsWidget {
         let mut settings = self.settings.write();
 
         ui.vertical_centered_justified(|ui| {
-            egui::ComboBox::from_label("Hotkey (kb)")
+            egui::ComboBox::from_label("Hotkey (keyboard)")
                 .selected_text(settings.key.as_str())
                 .show_ui(ui, |ui| {
                     for key in [
