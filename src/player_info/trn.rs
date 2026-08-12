@@ -201,7 +201,7 @@ impl From<PlayerData> for PlayerKey {
         Self {
             platform: value.platform,
             platform_id: match value.platform {
-                Platform::Steam => value.platform_id,
+                Platform::Steam => value.platform_id.split('|').nth(1).unwrap().to_string(),
                 _ => value.name,
             },
         }
