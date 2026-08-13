@@ -1,5 +1,8 @@
+use std::borrow::Cow;
+
 use crate::{
     common::{ReadonlyStateHandle, channel::Sender},
+    matches::service::MatchType,
     player_info::PlayerInfoServiceCommand,
 };
 
@@ -30,7 +33,7 @@ impl egui::Widget for &mut CurrentMatchWidget {
         ui.vertical(|ui| {
             if let Some(current_match) = &self.state.read().current_match {
                 ui.add(MatchRenderer::new(
-                    current_match,
+                    &MatchType::Session(Cow::Borrowed(current_match)),
                     None,
                     &mut self.opened_stats,
                     &self.player_info_sender,

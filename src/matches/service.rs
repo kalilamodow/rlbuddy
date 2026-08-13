@@ -2,15 +2,68 @@ use super::apis::{NameAPI, RankAPI};
 use super::{MatchInfo, MatchOverInfo};
 use crate::common::eventsource::EventReceiver;
 use crate::common::{ReadWriteStateHandle, ReadonlyStateHandle};
+use crate::matches::StrippedMatchInfo;
 use crate::matches::apis::{EpicIdAPI, new_epic_id_api, new_name_api, new_rank_api};
-use crate::stats_api::RLEvent;
+use crate::rocket_league::{Playlist, Team};
+use crate::stats_api::{RLEvent, TeamScores};
 use eframe::egui;
+use std::borrow::Cow;
 use std::time::SystemTime;
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
+pub enum MatchType<'a> {
+    Session(Cow<'a, MatchInfo>),
+    Old(Cow<'a, StrippedMatchInfo>),
+}
+
+impl<'a> MatchType<'_> {
+    pub fn playlist(&self) -> Playlist {
+        match self {
+            Self::Old(o) => o.playlist,
+            Self::Session(s) => s.playlist,
+        }
+    }
+
+    pub fn started_at(&self) -> SystemTime {
+        match self {
+            Self::Old(o) => o.start_time,
+            Self::Session(s) => s.started_at,
+        }
+    }
+
+    pub fn score(&self) -> &TeamScores {
+        match self {
+            Self::Old(o) => &o.score,
+            Self::Session(s) => &s.score,
+        }
+    }
+
+    pub fn our_team(&self) -> Team {
+        match self {
+            Self::Old(o) => o.our_team(),
+            Self::Session(s) => s.our_team,
+        }
+    }
+
+    pub fn is_over(&self) -> bool {
+        match self {
+            Self::Old(_) => true,
+            Self::Session(s) => s.finish.is_some(),
+        }
+    }
+
+    pub fn player_qty(&self) -> usize {
+        match self {
+            Self::Old(o) => o.players.len(),
+            Self::Session(s) => s.players.len(),
+        }
+    }
+}
+
+#[derive(Debug)]
 pub struct MatchesServiceState {
     pub current_match: Option<MatchInfo>,
-    pub prev_matches: Vec<MatchInfo>,
+    pub prev_matches: Vec<MatchType<'static>>,
 }
 
 pub struct MatchesService {
@@ -24,9 +77,19 @@ pub struct MatchesService {
 }
 
 impl MatchesService {
-    pub fn new(ctx: &egui::Context, stats_api: EventReceiver<RLEvent>) -> Self {
+    pub fn new(
+        ctx: &egui::Context,
+        stats_api: EventReceiver<RLEvent>,
+        prev_matches: Vec<StrippedMatchInfo>,
+    ) -> Self {
         MatchesService {
-            state: ReadWriteStateHandle::default(),
+            state: ReadWriteStateHandle::new(MatchesServiceState {
+                current_match: None,
+                prev_matches: prev_matches
+                    .into_iter()
+                    .map(|m| MatchType::Old(Cow::Owned(m)))
+                    .collect(),
+            }),
             stats_api,
             ctx: ctx.clone(),
             local_player_id: None,
@@ -76,7 +139,9 @@ impl MatchesService {
                         });
                     }
 
-                    state.prev_matches.push(current_match);
+                    state
+                        .prev_matches
+                        .push(MatchType::Session(Cow::Owned(current_match)));
                     self.ctx.request_repaint();
                 }
                 RLEvent::Update(ref update) => {
@@ -102,5 +167,17 @@ impl MatchesService {
                 _ => {}
             }
         }
+    }
+
+    pub fn stripped_history(&self) -> Vec<StrippedMatchInfo> {
+        self.state
+            .read()
+            .prev_matches
+            .iter()
+            .map(|m| match m {
+                MatchType::Session(sess) => StrippedMatchInfo::from(sess.clone().into_owned()),
+                MatchType::Old(old) => old.clone().into_owned(),
+            })
+            .collect()
     }
 }

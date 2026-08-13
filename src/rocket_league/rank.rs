@@ -2,6 +2,7 @@ use std::{fmt, str::FromStr};
 
 use eframe::egui::{self, Color32};
 use num_enum::{FromPrimitive, TryFromPrimitive};
+use serde::{Deserialize, Serialize};
 
 const RANK_NAMES: [&str; 23] = [
     "Unranked",
@@ -29,7 +30,7 @@ const RANK_NAMES: [&str; 23] = [
     "Supersonic Legend",
 ];
 
-#[derive(Debug, Clone, Copy, PartialEq, TryFromPrimitive)]
+#[derive(Debug, Clone, Copy, PartialEq, TryFromPrimitive, Serialize, Deserialize)]
 #[repr(u8)]
 pub enum Rank {
     Unranked,
@@ -144,7 +145,7 @@ impl FromStr for Rank {
     }
 }
 
-#[derive(Debug, FromPrimitive)]
+#[derive(Debug, Clone, FromPrimitive, Serialize, Deserialize)]
 #[repr(u8)]
 pub enum Division {
     #[num_enum(default)]

@@ -35,8 +35,10 @@ impl egui::Widget for &mut PastMatchesWidget {
                     ui.group(|ui| {
                         ui.add(MatchRenderer::new(
                             prev_match,
-                            Some(&mut self.open.entry(prev_match.started_at).or_insert(false)),
-                            self.opened_stats.entry(prev_match.started_at).or_default(),
+                            Some(&mut self.open.entry(prev_match.started_at()).or_insert(false)),
+                            self.opened_stats
+                                .entry(prev_match.started_at())
+                                .or_default(),
                             &self.player_info_sender,
                         ))
                     });

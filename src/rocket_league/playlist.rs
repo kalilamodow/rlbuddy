@@ -1,8 +1,9 @@
 use num_enum::TryFromPrimitive;
+use serde::{Deserialize, Serialize};
 use std::fmt;
 
 // combination of data scraped from PsyNet and https://bakkesplugins.com/wiki/bakkesmod-sdk/code-snippets/playlist-id
-#[derive(Debug, Copy, Clone, TryFromPrimitive, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, TryFromPrimitive, PartialEq, Eq, Serialize, Deserialize)]
 #[repr(u8)]
 pub enum Playlist {
     Casual = 0,

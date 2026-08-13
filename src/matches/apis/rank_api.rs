@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use eframe::egui;
 use num_enum::{TryFromPrimitive as _, TryFromPrimitiveError};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::{
     common::CachedHttpApi,
@@ -24,7 +24,7 @@ pub struct GetPlayerSkillsResponse {
     playlists: Vec<GetPlayerSkillsPlaylistData>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PlaylistSkillInformation {
     pub playlist: Playlist,
     pub rank: Rank,
@@ -56,7 +56,7 @@ impl PlaylistSkillInformation {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PlayerSkillInformation {
     playlists: Vec<PlaylistSkillInformation>,
 }

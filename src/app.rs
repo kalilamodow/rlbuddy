@@ -3,7 +3,7 @@ use crate::{
     common::eventsource::EventReceiver,
     discord,
     hotkey::{HotkeyService, HotkeySettings},
-    matches::{CurrentMatchWidget, MatchesService, PastMatchesWidget},
+    matches::{CurrentMatchWidget, MatchesService, PastMatchesWidget, StrippedMatchInfo},
     player_info::{PlayerInfoService, PlayerSearchWidget},
     settings::SettingsWidget,
     spotify::{SpotifySavedata, SpotifyService, SpotifyWidget},
@@ -69,6 +69,7 @@ struct AppData {
     rich_presence_settings: Option<discord::DiscordSettings>,
     spotify_data: Option<SpotifySavedata>,
     open_panels: Vec<Panel>,
+    matches: Vec<StrippedMatchInfo>,
 }
 
 impl Default for AppData {
@@ -79,6 +80,7 @@ impl Default for AppData {
             rich_presence_settings: None,
             spotify_data: None,
             open_panels: vec![Panel::CurrentMatch],
+            matches: Vec::new(),
         }
     }
 }
@@ -127,7 +129,8 @@ impl RlBuddyApp {
 
         let (overlay_tx, overlay_rx) = mpsc::channel();
         let mut stats_api_service = StatsApi::new();
-        let matches_service = MatchesService::new(&ctx, stats_api_service.subscribe());
+        let matches_service =
+            MatchesService::new(&ctx, stats_api_service.subscribe(), app_data.matches);
         let spotify_service =
             SpotifyService::new(app_data.spotify_data, stats_api_service.subscribe());
         let discord_service = discord::DiscordService::new(
@@ -225,6 +228,7 @@ impl eframe::App for RlBuddyApp {
             rich_presence_settings: Some(self.discord_service.settings_handle().read().clone()),
             spotify_data: Some(self.spotify_service.save()),
             open_panels: self.open_panels.clone(),
+            matches: self.matches_service.stripped_history(),
         };
         eframe::set_value(storage, eframe::APP_KEY, &data);
     }

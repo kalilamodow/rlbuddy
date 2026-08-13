@@ -1,5 +1,5 @@
 use num_enum::TryFromPrimitive;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::{
     cmp::Ordering,
     fmt,
@@ -89,7 +89,7 @@ struct UpdateStateEventData {
     game: StatsApiGameData,
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct TeamScores {
     pub blue: u8,
     pub orange: u8,

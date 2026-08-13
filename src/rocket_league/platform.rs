@@ -1,6 +1,8 @@
 use std::{fmt, str::FromStr};
 
-#[derive(Debug, PartialEq, Clone, Copy, Eq, Hash)]
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, PartialEq, Clone, Copy, Eq, Hash, Serialize, Deserialize)]
 pub enum Platform {
     Epic,
     Steam,

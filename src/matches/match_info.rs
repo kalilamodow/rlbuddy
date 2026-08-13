@@ -1,10 +1,12 @@
-use std::{sync::Arc, time::SystemTime};
-
 use crate::{
-    matches::apis::{EpicIdAPI, NameAPI, PlayerSkillInformation, RankAPI},
+    matches::apis::{
+        EpicIdAPI, NameAPI, PlayerSkillInformation, PlaylistSkillInformation, RankAPI,
+    },
     rocket_league::{Platform, Playlist, Team},
     stats_api::{MatchState, MatchUpdate, PlayerData, TeamScores},
 };
+use serde::{Deserialize, Serialize};
+use std::{sync::Arc, time::SystemTime};
 
 #[derive(Debug, Clone)]
 pub struct MatchPlayer {
@@ -72,12 +74,7 @@ impl MatchInfo {
         normalize_bot_player_ids(&mut update.players);
         Self {
             score: update.score,
-            our_team: update
-                .players
-                .iter()
-                .find(|p| Some(&p.platform_id) == local_player_id.as_ref())
-                .map(|p| p.team)
-                .unwrap_or(Team::Blue),
+            our_team: our_team(&update.players, local_player_id.as_ref()),
             finish: None,
             started_at: SystemTime::now(),
             max_active_players: update.players.len(),
@@ -192,6 +189,80 @@ fn normalize_bot_player_ids(players: &mut [PlayerData]) {
     for player_or_bot_hmm in players {
         if player_or_bot_hmm.platform == Platform::Bot {
             player_or_bot_hmm.platform_id = player_or_bot_hmm.name.clone();
+        }
+    }
+}
+
+fn our_team(players: &Vec<PlayerData>, local_player_id: Option<&String>) -> Team {
+    players
+        .iter()
+        .find(|p| Some(&p.platform_id) == local_player_id)
+        .map(|p| p.team)
+        .unwrap_or(Team::Blue)
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StrippedPlayer {
+    pub name: String,
+    pub player_id: String,
+    pub rank_in_mode: Option<PlaylistSkillInformation>,
+    pub is_local_player: bool,
+    pub team: Team,
+    pub platform: Platform,
+}
+
+impl StrippedPlayer {
+    fn from_player(value: MatchPlayer, playlist: Playlist) -> Self {
+        Self {
+            name: value.data.name,
+            player_id: value.data.platform_id,
+            is_local_player: value.is_local_player,
+            rank_in_mode: value.skill.and_then(|s| {
+                s.get_playlist(playlist.in_ranked().unwrap_or(playlist))
+                    .cloned()
+            }),
+            team: value.data.team,
+            platform: value.data.platform,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StrippedMatchInfo {
+    pub start_time: SystemTime,
+    pub end_time: SystemTime,
+    pub winner: Team,
+    pub score: TeamScores,
+    pub playlist: Playlist,
+    pub players: Vec<StrippedPlayer>,
+}
+
+impl StrippedMatchInfo {
+    pub fn our_team(&self) -> Team {
+        self.players
+            .iter()
+            .find(|p| p.is_local_player)
+            .map(|p| p.team)
+            .unwrap_or(Team::Blue)
+    }
+}
+
+impl From<MatchInfo> for StrippedMatchInfo {
+    fn from(value: MatchInfo) -> Self {
+        Self {
+            start_time: value.started_at,
+            end_time: value
+                .finish
+                .as_ref()
+                .map_or_else(|| SystemTime::now(), |f| f.timestamp),
+            winner: value.finish.and_then(|f| f.winner).unwrap_or(Team::Blue),
+            score: value.score,
+            playlist: value.playlist,
+            players: value
+                .players
+                .into_iter()
+                .map(|p| StrippedPlayer::from_player(p, value.playlist))
+                .collect(),
         }
     }
 }

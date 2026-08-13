@@ -1,7 +1,11 @@
-use super::super::{MatchInfo, MatchPlayer};
+use super::super::MatchPlayer;
 use crate::{
     common::channel::Sender,
-    matches::apis::PlayerSkillInformation,
+    matches::{
+        StrippedPlayer,
+        apis::{PlayerSkillInformation, PlaylistSkillInformation},
+        service::MatchType,
+    },
     player_info::PlayerInfoServiceCommand,
     rocket_league::{Platform, Playlist, Rank, Team},
     stats_api::TeamScores,
@@ -12,7 +16,7 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
 pub struct MatchRenderer<'a> {
-    match_info: &'a MatchInfo,
+    match_info: &'a MatchType<'a>,
     is_open: Option<&'a mut bool>,
     showing_stats_for: &'a mut Option<(String, String)>,
     player_info_sender: &'a Sender<PlayerInfoServiceCommand>,
@@ -20,7 +24,7 @@ pub struct MatchRenderer<'a> {
 
 impl<'a> MatchRenderer<'a> {
     pub fn new(
-        match_info: &'a MatchInfo,
+        match_info: &'a MatchType<'a>,
         is_open: Option<&'a mut bool>,
         showing_stats_for: &'a mut Option<(String, String)>,
         player_info_sender: &'a Sender<PlayerInfoServiceCommand>,
@@ -35,41 +39,50 @@ impl<'a> MatchRenderer<'a> {
 
     fn render_header(&mut self, ui: &mut egui::Ui) -> egui::Response {
         ui.horizontal(|ui| {
-            ui.label(format!("{}", self.match_info.playlist));
+            let playlist = match self.match_info {
+                MatchType::Old(o) => o.playlist,
+                MatchType::Session(s) => s.playlist,
+            };
 
-            if self.match_info.playlist.is_singleplayer() {
+            ui.label(format!("{}", playlist));
+
+            if playlist.is_singleplayer() {
                 return;
             }
 
-            if let Some(finished) = &self.match_info.finish {
-                if let Some(winner) = finished.winner.or_else(|| {
-                    match self
-                        .match_info
-                        .score
-                        .blue
-                        .cmp(&self.match_info.score.orange)
-                    {
-                        Ordering::Greater => Some(Team::Blue),
-                        Ordering::Less => Some(Team::Orange),
-                        Ordering::Equal => None,
-                    }
-                }) {
-                    ui.label(bold_text(if winner == self.match_info.our_team {
-                        "Win"
-                    } else {
-                        "Loss"
-                    }));
-                }
+            // if its an old match: use the old match winner
+            // otherwise if session match is finished:
+            //    try: get existing match winner
+            //    otherwise: calculate winner based on score
+            if let Some(winner) = match self.match_info {
+                MatchType::Old(o) => Some(o.winner),
+                MatchType::Session(s) => s.finish.as_ref().and_then(|f| {
+                    f.winner
+                        .or_else(|| match s.score.blue.cmp(&s.score.orange) {
+                            Ordering::Greater => Some(Team::Blue),
+                            Ordering::Less => Some(Team::Orange),
+                            Ordering::Equal => None,
+                        })
+                }),
+            } {
+                ui.label(bold_text(if winner == self.match_info.our_team() {
+                    "Win"
+                } else {
+                    "Loss"
+                }));
             } else {
                 ui.label("In progress");
             }
 
-            score_labels(ui, &self.match_info.score, self.match_info.our_team);
+            score_labels(ui, &self.match_info.score(), self.match_info.our_team());
 
-            if let Some(finished) = &self.match_info.finish {
+            if let Some(end_time) = match self.match_info {
+                MatchType::Old(o) => Some(o.end_time),
+                MatchType::Session(s) => s.finish.as_ref().map(|f| f.timestamp),
+            } {
                 let (text, refresh_in) = format_seconds(
                     SystemTime::now()
-                        .duration_since(finished.timestamp)
+                        .duration_since(end_time)
                         .unwrap()
                         .as_secs(),
                 );
@@ -91,7 +104,22 @@ impl<'a> MatchRenderer<'a> {
     fn render_player(&mut self, ui: &mut egui::Ui, match_player: &MatchPlayer) {
         // rank in this gamemode
         if let Some(skill) = &match_player.skill {
-            self.render_player_rank_cell(ui, skill);
+            let playlist_to_show =
+                self.match_info.playlist().in_ranked().or_else(|| {
+                    Playlist::infer_from_player_count(self.match_info.player_qty() as u8)
+                });
+
+            let Some(playlist_to_show) = playlist_to_show else {
+                center_label(ui, "-");
+                return;
+            };
+
+            let Some(rank) = skill.get_playlist(playlist_to_show) else {
+                center_label(ui, "-");
+                return;
+            };
+
+            self.render_player_rank_cell(ui, rank);
         } else {
             center_label(ui, "-");
         }
@@ -169,41 +197,73 @@ impl<'a> MatchRenderer<'a> {
         ui.end_row();
     }
 
-    fn render_player_rank_cell(
-        &mut self,
-        ui: &mut egui::Ui,
-        skill_info: &Arc<PlayerSkillInformation>,
-    ) {
-        let playlist_to_show = self
-            .match_info
-            .playlist
-            .in_ranked()
-            .or_else(|| Playlist::infer_from_player_count(self.match_info.players.len() as u8));
-
-        let Some(playlist_to_show) = playlist_to_show else {
+    fn render_stripped_player(&mut self, ui: &mut egui::Ui, player: &StrippedPlayer) {
+        if let Some(rank) = &player.rank_in_mode {
+            self.render_player_rank_cell(ui, rank);
+        } else {
             center_label(ui, "-");
-            return;
+        }
+
+        let name_color = if player.is_local_player {
+            ui.visuals().strong_text_color()
+        } else {
+            match player.team {
+                Team::Blue => Color32::from_rgb(64, 128, 255),
+                Team::Orange => Color32::ORANGE,
+            }
         };
 
-        let Some(rank) = skill_info.get_playlist(playlist_to_show) else {
-            center_label(ui, "-");
-            return;
-        };
+        let name_label = ui.add(
+            egui::Label::new(bold_text(&player.name).color(name_color).size(15.0))
+                .sense(egui::Sense::CLICK)
+                .extend(),
+        );
 
+        name_label.context_menu(|ui| {
+            if ui.button("Copy player id").clicked() {
+                ui.ctx().copy_text(player.player_id.clone());
+            }
+        });
+
+        if !matches!(player.platform, Platform::Bot) {
+            if name_label.hovered() {
+                ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+            }
+
+            if name_label.clicked() {
+                self.player_info_sender.send(PlayerInfoServiceCommand::Open(
+                    player.platform,
+                    match player.platform {
+                        Platform::Steam => player.player_id.split('|').nth(1).unwrap().to_string(),
+                        _ => player.name.clone(),
+                    },
+                ));
+            }
+        }
+
+        ui.label(
+            egui::RichText::new(player.platform.to_string()).color(ui.visuals().weak_text_color()),
+        );
+
+        ui.end_row();
+    }
+
+    fn render_player_rank_cell(&mut self, ui: &mut egui::Ui, rank: &PlaylistSkillInformation) {
         center_layout(ui, 28.0, |ui| {
             if rank.rank_is_estimate {
                 ui.add(
                     egui::Image::new(Rank::Unranked.to_image())
                         .fit_to_exact_size(egui::vec2(28.0, 28.0)),
                 )
-                .on_hover_text(format!("Unranked in {playlist_to_show}"))
+                .on_hover_text(format!("Unranked in {}", rank.playlist))
             } else {
                 ui.add(
                     egui::Image::new(rank.rank.to_image())
                         .fit_to_exact_size(egui::vec2(28.0, 28.0)),
                 )
                 .on_hover_text(format!(
-                    "{playlist_to_show} rank: {}{}",
+                    "{} rank: {}{}",
+                    rank.playlist,
                     rank.rank.as_str(),
                     rank.div
                 ))
@@ -254,8 +314,11 @@ impl<'a> MatchRenderer<'a> {
     fn render_stats_window(&self, ui: &mut egui::Ui, player: &(String, String)) -> bool {
         let mut window_is_open = true;
 
-        let Some(player_details) = self
-            .match_info
+        let MatchType::Session(match_info) = self.match_info else {
+            return false;
+        };
+
+        let Some(player_details) = match_info
             .players
             .iter()
             .find(|p| p.data.platform_id == player.1)
@@ -321,24 +384,33 @@ impl egui::Widget for MatchRenderer<'_> {
             }
         }
 
-        egui::Grid::new(self.match_info.started_at)
+        egui::Grid::new(self.match_info.started_at())
             .spacing(egui::vec2(8.0, 12.0))
             .striped(true)
             .show(ui, |ui| {
                 center_label(ui, bold_text("Rank"));
                 ui.label(bold_text("Player"));
-                center_label(ui, bold_text("Score"));
-                ui.label(""); // more button
+                if matches!(self.match_info, MatchType::Session(_)) {
+                    center_label(ui, bold_text("Score"));
+                    ui.label(""); // more button
+                }
 
                 ui.end_row();
 
-                if self.match_info.finish.is_some() {
-                    for player in filter_useless_bots(&self.match_info.players) {
-                        self.render_player(ui, player);
+                match self.match_info {
+                    MatchType::Old(o) => {
+                        for player in filter_useless_bots(&o.players, |p| p.platform, |_| 1) {
+                            self.render_stripped_player(ui, player);
+                        }
                     }
-                } else {
-                    for player in &self.match_info.players {
-                        self.render_player(ui, player);
+                    MatchType::Session(s) => {
+                        for player in filter_useless_bots(
+                            &s.players,
+                            |p| p.data.platform,
+                            |p| p.data.stats.score,
+                        ) {
+                            self.render_player(ui, player);
+                        }
                     }
                 }
             })
@@ -412,8 +484,12 @@ fn bold_text(text: &str) -> egui::RichText {
     egui::RichText::new(text).strong()
 }
 
-fn filter_useless_bots(players: &[MatchPlayer]) -> impl Iterator<Item = &MatchPlayer> {
+fn filter_useless_bots<T, GP: Fn(&T) -> Platform + 'static, GS: Fn(&T) -> u16 + 'static>(
+    players: &[T],
+    get_platform: GP,
+    get_score: GS,
+) -> impl Iterator<Item = &T> {
     players
         .iter()
-        .filter(|p| p.data.platform != Platform::Bot || p.data.stats.score != 0)
+        .filter(move |p| get_platform(p) != Platform::Bot || get_score(p) != 0)
 }
