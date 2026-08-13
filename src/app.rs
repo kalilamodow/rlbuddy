@@ -4,6 +4,7 @@ use crate::{
     discord,
     hotkey::{HotkeyService, HotkeySettings},
     matches::{CurrentMatchWidget, MatchesService, PastMatchesWidget, StrippedMatchInfo},
+    my_stats::{MyStatsWidget, MyStatsWidgetSettings},
     player_info::{PlayerInfoService, PlayerSearchWidget},
     settings::SettingsWidget,
     spotify::{SpotifySavedata, SpotifyService, SpotifyWidget},
@@ -18,6 +19,7 @@ use std::{sync::mpsc, time::Duration};
 enum Panel {
     CurrentMatch,
     PastMatches,
+    MyStats,
     Discord,
     Spotify,
     PlayerSearch,
@@ -33,6 +35,7 @@ impl std::fmt::Display for Panel {
             match self {
                 Panel::CurrentMatch => "Lobby",
                 Panel::PastMatches => "History",
+                Panel::MyStats => "My Stats",
                 Panel::Discord => "Discord",
                 Panel::Spotify => "Spotify",
                 Panel::PlayerSearch => "Player Search",
@@ -43,9 +46,10 @@ impl std::fmt::Display for Panel {
     }
 }
 
-const OPENABLE_PANELS: [Panel; 7] = [
+const OPENABLE_PANELS: [Panel; 8] = [
     Panel::CurrentMatch,
     Panel::Discord,
+    Panel::MyStats,
     Panel::Spotify,
     Panel::PastMatches,
     Panel::AutoSetup,
@@ -70,6 +74,7 @@ struct AppData {
     spotify_data: Option<SpotifySavedata>,
     open_panels: Vec<Panel>,
     matches: Vec<StrippedMatchInfo>,
+    my_stats_settings: Option<MyStatsWidgetSettings>,
 }
 
 impl Default for AppData {
@@ -81,6 +86,7 @@ impl Default for AppData {
             spotify_data: None,
             open_panels: vec![Panel::CurrentMatch],
             matches: Vec::new(),
+            my_stats_settings: None,
         }
     }
 }
@@ -105,6 +111,7 @@ pub struct RlBuddyApp {
     matches_service: MatchesService,
     current_match: CurrentMatchWidget,
     past_matches: PastMatchesWidget,
+    my_stats_widget: MyStatsWidget,
 
     player_info_service: PlayerInfoService,
     player_search_widget: PlayerSearchWidget,
@@ -165,6 +172,10 @@ impl RlBuddyApp {
             ),
             spotify_service,
 
+            my_stats_widget: MyStatsWidget::new(
+                matches_service.state_handle(),
+                app_data.my_stats_settings.unwrap_or_default(),
+            ),
             current_match: CurrentMatchWidget::new(
                 matches_service.state_handle(),
                 player_info_service.sender(),
@@ -229,6 +240,7 @@ impl eframe::App for RlBuddyApp {
             spotify_data: Some(self.spotify_service.save()),
             open_panels: self.open_panels.clone(),
             matches: self.matches_service.stripped_history(),
+            my_stats_settings: Some(self.my_stats_widget.clone_settings()),
         };
         eframe::set_value(storage, eframe::APP_KEY, &data);
     }
@@ -298,6 +310,7 @@ impl eframe::App for RlBuddyApp {
                             match panel {
                                 Panel::CurrentMatch => ui.add(&mut self.current_match),
                                 Panel::Discord => ui.add(&mut self.discord_widget),
+                                Panel::MyStats => ui.add(&mut self.my_stats_widget),
                                 Panel::Spotify => ui.add(&mut self.spotify_widget),
                                 Panel::PastMatches => ui.add(&mut self.past_matches),
                                 Panel::PlayerSearch => ui.add(&mut self.player_search_widget),

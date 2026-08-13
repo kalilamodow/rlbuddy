@@ -2,7 +2,7 @@ use super::super::MatchPlayer;
 use crate::{
     common::channel::Sender,
     matches::{
-        StrippedPlayer,
+        StrippedPlayer, StrippedPlayerType,
         apis::{PlayerSkillInformation, PlaylistSkillInformation},
         service::MatchType,
     },
@@ -204,7 +204,7 @@ impl<'a> MatchRenderer<'a> {
             center_label(ui, "-");
         }
 
-        let name_color = if player.is_local_player {
+        let name_color = if player.is_local_player() {
             ui.visuals().strong_text_color()
         } else {
             match player.team {
@@ -314,15 +314,22 @@ impl<'a> MatchRenderer<'a> {
     fn render_stats_window(&self, ui: &mut egui::Ui, player: &(String, String)) -> bool {
         let mut window_is_open = true;
 
-        let MatchType::Session(match_info) = self.match_info else {
-            return false;
-        };
-
-        let Some(player_details) = match_info
-            .players
-            .iter()
-            .find(|p| p.data.platform_id == player.1)
-        else {
+        let Some(stats) = (match self.match_info {
+            MatchType::Session(s) => s
+                .players
+                .iter()
+                .find(|p| p.data.platform_id == player.1)
+                .map(|p| &p.data.stats),
+            MatchType::Old(o) => o
+                .players
+                .iter()
+                .find(|p| p.player_id == player.1)
+                .and_then(|p| match &p.player_type {
+                    // stats are only there if its a local player
+                    StrippedPlayerType::LocalPlayer(stats) => Some(stats),
+                    StrippedPlayerType::RemotePlayer => None,
+                }),
+        }) else {
             return false;
         };
 
@@ -336,8 +343,6 @@ impl<'a> MatchRenderer<'a> {
                     .spacing(egui::vec2(8.0, 8.0))
                     .striped(true)
                     .show(ui, |ui| {
-                        let stats = &player_details.data.stats;
-
                         ui.strong("Score");
                         center_label(ui, stats.score.to_string());
                         ui.end_row();

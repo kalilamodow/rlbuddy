@@ -3,7 +3,7 @@ use crate::{
         EpicIdAPI, NameAPI, PlayerSkillInformation, PlaylistSkillInformation, RankAPI,
     },
     rocket_league::{Platform, Playlist, Team},
-    stats_api::{MatchState, MatchUpdate, PlayerData, TeamScores},
+    stats_api::{MatchState, MatchUpdate, PlayerData, PlayerStats, TeamScores},
 };
 use serde::{Deserialize, Serialize};
 use std::{sync::Arc, time::SystemTime};
@@ -202,11 +202,17 @@ fn our_team(players: &Vec<PlayerData>, local_player_id: Option<&String>) -> Team
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum StrippedPlayerType {
+    LocalPlayer(PlayerStats),
+    RemotePlayer,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StrippedPlayer {
     pub name: String,
     pub player_id: String,
     pub rank_in_mode: Option<PlaylistSkillInformation>,
-    pub is_local_player: bool,
+    pub player_type: StrippedPlayerType,
     pub team: Team,
     pub platform: Platform,
 }
@@ -216,7 +222,11 @@ impl StrippedPlayer {
         Self {
             name: value.data.name,
             player_id: value.data.platform_id,
-            is_local_player: value.is_local_player,
+            player_type: if value.is_local_player {
+                StrippedPlayerType::LocalPlayer(value.data.stats)
+            } else {
+                StrippedPlayerType::RemotePlayer
+            },
             rank_in_mode: value.skill.and_then(|s| {
                 s.get_playlist(playlist.in_ranked().unwrap_or(playlist))
                     .cloned()
@@ -224,6 +234,10 @@ impl StrippedPlayer {
             team: value.data.team,
             platform: value.data.platform,
         }
+    }
+
+    pub fn is_local_player(&self) -> bool {
+        matches!(self.player_type, StrippedPlayerType::LocalPlayer(_))
     }
 }
 
@@ -241,7 +255,7 @@ impl StrippedMatchInfo {
     pub fn our_team(&self) -> Team {
         self.players
             .iter()
-            .find(|p| p.is_local_player)
+            .find(|p| p.is_local_player())
             .map(|p| p.team)
             .unwrap_or(Team::Blue)
     }

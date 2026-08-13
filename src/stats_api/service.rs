@@ -25,7 +25,7 @@ struct StatsApiEvent {
     data: String,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "PascalCase")]
 pub struct PlayerStats {
     pub score: u16,

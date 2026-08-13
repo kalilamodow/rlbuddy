@@ -4,5 +4,5 @@ mod service;
 mod widgets;
 
 pub use match_info::*;
-pub use service::{MatchesService, MatchesServiceState};
+pub use service::*;
 pub use widgets::*;

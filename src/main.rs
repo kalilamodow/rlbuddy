@@ -6,6 +6,7 @@ mod common;
 mod discord;
 mod hotkey;
 mod matches;
+mod my_stats;
 mod player_info;
 mod rocket_league;
 mod settings;
@@ -19,12 +20,13 @@ fn main() -> eframe::Result {
         renderer: eframe::Renderer::Glow,
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([350.0, 600.0])
-            .with_transparent(true),
+            .with_transparent(true)
+            .with_title("rlbuddy (Not connected)"),
         ..Default::default()
     };
 
     eframe::run_native(
-        "rlbuddy (Not connected)",
+        "rlbuddy",
         gui_options,
         Box::new(|cc| {
             egui_extras::install_image_loaders(&cc.egui_ctx);
