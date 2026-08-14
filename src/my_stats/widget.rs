@@ -42,7 +42,7 @@ impl MyStatsWidget {
         let mut choosable_playlists: Vec<Playlist> = state
             .prev_matches
             .iter()
-            .map(|m| m.playlist())
+            .map(MatchType::playlist)
             .collect::<HashSet<_>>()
             .into_iter()
             .collect();
@@ -53,8 +53,7 @@ impl MyStatsWidget {
                 .selected_text(
                     self.settings
                         .selected_playlist
-                        .map(|p| p.as_str())
-                        .unwrap_or("None"),
+                        .map_or("None", Playlist::as_str),
                 )
                 .show_ui(ui, |ui| {
                     for playlist in choosable_playlists {
@@ -89,7 +88,7 @@ impl MyStatsWidget {
             .iter()
             .filter(|m| m.playlist() == selected_playlist)
             .filter(|m| !self.settings.session_only || matches!(m, MatchType::Session(_)))
-            .map(|m| {
+            .filter_map(|m| {
                 (match m {
                     MatchType::Old(o) => o
                         .players
@@ -110,10 +109,9 @@ impl MyStatsWidget {
                         .duration_since(UNIX_EPOCH)
                         .expect("its before 1970")
                         .as_secs_f64(),
-                    y: skill.mmr as f64,
+                    y: skill.mmr.into(),
                 })
             })
-            .flatten()
             .collect();
 
         if points.len() <= 1 {

@@ -70,11 +70,11 @@ pub struct MatchInfo {
 }
 
 impl MatchInfo {
-    pub fn new(mut update: MatchUpdate, local_player_id: &Option<String>) -> Self {
+    pub fn new(mut update: MatchUpdate, local_player_id: Option<&String>) -> Self {
         normalize_bot_player_ids(&mut update.players);
         Self {
             score: update.score,
-            our_team: our_team(&update.players, local_player_id.as_ref()),
+            our_team: our_team(&update.players, local_player_id),
             finish: None,
             started_at: SystemTime::now(),
             max_active_players: update.players.len(),
@@ -85,7 +85,7 @@ impl MatchInfo {
                 .players
                 .into_iter()
                 .map(|p| MatchPlayer {
-                    is_local_player: Some(&p.platform_id) == local_player_id.as_ref(),
+                    is_local_player: Some(&p.platform_id) == local_player_id,
                     left: false,
                     uncensored_name: None,
                     epic_name: None,
@@ -99,7 +99,7 @@ impl MatchInfo {
     pub fn update(
         &mut self,
         mut updated: MatchUpdate,
-        local_player_id: &Option<String>,
+        local_player_id: Option<&String>,
         rank_api: &RankAPI,
         epic_id_api: &EpicIdAPI,
         name_api: &NameAPI,
@@ -125,7 +125,7 @@ impl MatchInfo {
 
         for remaining_player in updated.players {
             self.players.push(MatchPlayer {
-                is_local_player: Some(&remaining_player.platform_id) == local_player_id.as_ref(),
+                is_local_player: Some(&remaining_player.platform_id) == local_player_id,
                 left: false,
                 uncensored_name: None,
                 epic_name: None,
@@ -193,12 +193,11 @@ fn normalize_bot_player_ids(players: &mut [PlayerData]) {
     }
 }
 
-fn our_team(players: &Vec<PlayerData>, local_player_id: Option<&String>) -> Team {
+fn our_team(players: &[PlayerData], local_player_id: Option<&String>) -> Team {
     players
         .iter()
         .find(|p| Some(&p.platform_id) == local_player_id)
-        .map(|p| p.team)
-        .unwrap_or(Team::Blue)
+        .map_or(Team::Blue, |p| p.team)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -256,8 +255,7 @@ impl StrippedMatchInfo {
         self.players
             .iter()
             .find(|p| p.is_local_player())
-            .map(|p| p.team)
-            .unwrap_or(Team::Blue)
+            .map_or(Team::Blue, |p| p.team)
     }
 }
 
@@ -268,7 +266,7 @@ impl From<MatchInfo> for StrippedMatchInfo {
             end_time: value
                 .finish
                 .as_ref()
-                .map_or_else(|| SystemTime::now(), |f| f.timestamp),
+                .map_or_else(SystemTime::now, |f| f.timestamp),
             winner: value.finish.and_then(|f| f.winner).unwrap_or(Team::Blue),
             score: value.score,
             playlist: value.playlist,

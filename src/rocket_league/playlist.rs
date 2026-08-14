@@ -165,7 +165,7 @@ impl Playlist {
         )
     }
 
-    pub fn infer_from_player_count(match_player_count: u8) -> Option<Self> {
+    pub fn infer_from_player_count(match_player_count: usize) -> Option<Self> {
         Some(match match_player_count {
             1 => Self::Training,
             2 => Self::Duel,

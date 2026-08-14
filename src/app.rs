@@ -144,7 +144,7 @@ impl RlBuddyApp {
             app_data.rich_presence_settings,
             matches_service.state_handle(),
         );
-        let hotkey_service = HotkeyService::new(overlay_tx.clone(), app_data.hotkey_settings);
+        let hotkey_service = HotkeyService::new(&overlay_tx, app_data.hotkey_settings);
         let player_info_service = PlayerInfoService::new(ctx.clone());
 
         let current_transparency = Rc::new(RefCell::new(app_data.transparency));

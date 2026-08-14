@@ -3,7 +3,7 @@ use std::time::Duration;
 fn pluralize_ago(count: u64, word: &str, suffix: &str, minimal: bool) -> String {
     format!(
         "{count}{}{word}{} {suffix}",
-        (!minimal).then_some(" ").unwrap_or_default(),
+        if minimal { "" } else { " " },
         if minimal || count == 1 { "" } else { "s" }
     )
 }

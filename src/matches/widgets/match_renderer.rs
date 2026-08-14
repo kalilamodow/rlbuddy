@@ -44,7 +44,7 @@ impl<'a> MatchRenderer<'a> {
                 MatchType::Session(s) => s.playlist,
             };
 
-            ui.label(format!("{}", playlist));
+            ui.label(format!("{playlist}"));
 
             if playlist.is_singleplayer() {
                 return;
@@ -74,7 +74,7 @@ impl<'a> MatchRenderer<'a> {
                 ui.label("In progress");
             }
 
-            score_labels(ui, &self.match_info.score(), self.match_info.our_team());
+            score_labels(ui, self.match_info.score(), self.match_info.our_team());
 
             if let Some(end_time) = match self.match_info {
                 MatchType::Old(o) => Some(o.end_time),
@@ -105,10 +105,11 @@ impl<'a> MatchRenderer<'a> {
     fn render_player(&mut self, ui: &mut egui::Ui, match_player: &MatchPlayer) {
         // rank in this gamemode
         if let Some(skill) = &match_player.skill {
-            let playlist_to_show =
-                self.match_info.playlist().in_ranked().or_else(|| {
-                    Playlist::infer_from_player_count(self.match_info.player_qty() as u8)
-                });
+            let playlist_to_show = self
+                .match_info
+                .playlist()
+                .in_ranked()
+                .or_else(|| Playlist::infer_from_player_count(self.match_info.player_qty()));
 
             let Some(playlist_to_show) = playlist_to_show else {
                 center_label(ui, "-");
@@ -120,7 +121,7 @@ impl<'a> MatchRenderer<'a> {
                 return;
             };
 
-            self.render_player_rank_cell(ui, rank);
+            render_player_rank_cell(ui, rank);
         } else {
             center_label(ui, "-");
         }
@@ -200,7 +201,7 @@ impl<'a> MatchRenderer<'a> {
 
     fn render_stripped_player(&mut self, ui: &mut egui::Ui, player: &StrippedPlayer) {
         if let Some(rank) = &player.rank_in_mode {
-            self.render_player_rank_cell(ui, rank);
+            render_player_rank_cell(ui, rank);
         } else {
             center_label(ui, "-");
         }
@@ -247,29 +248,6 @@ impl<'a> MatchRenderer<'a> {
         );
 
         ui.end_row();
-    }
-
-    fn render_player_rank_cell(&mut self, ui: &mut egui::Ui, rank: &PlaylistSkillInformation) {
-        center_layout(ui, 28.0, |ui| {
-            if rank.rank_is_estimate {
-                ui.add(
-                    egui::Image::new(Rank::Unranked.to_image())
-                        .fit_to_exact_size(egui::vec2(28.0, 28.0)),
-                )
-                .on_hover_text(format!("Unranked in {}", rank.playlist))
-            } else {
-                ui.add(
-                    egui::Image::new(rank.rank.to_image())
-                        .fit_to_exact_size(egui::vec2(28.0, 28.0)),
-                )
-                .on_hover_text(format!(
-                    "{} rank: {}{}",
-                    rank.playlist,
-                    rank.rank.as_str(),
-                    rank.div
-                ))
-            }
-        });
     }
 
     fn render_rank_list(ui: &mut egui::Ui, muted: bool, skill: &Arc<PlayerSkillInformation>) {
@@ -473,4 +451,24 @@ fn filter_useless_bots<T, GP: Fn(&T) -> Platform + 'static, GS: Fn(&T) -> u16 + 
     players
         .iter()
         .filter(move |p| get_platform(p) != Platform::Bot || get_score(p) != 0)
+}
+
+fn render_player_rank_cell(ui: &mut egui::Ui, rank: &PlaylistSkillInformation) {
+    center_layout(ui, 28.0, |ui| {
+        if rank.rank_is_estimate {
+            ui.add(
+                egui::Image::new(Rank::Unranked.to_image())
+                    .fit_to_exact_size(egui::vec2(28.0, 28.0)),
+            )
+            .on_hover_text(format!("Unranked in {}", rank.playlist))
+        } else {
+            ui.add(egui::Image::new(rank.rank.to_image()).fit_to_exact_size(egui::vec2(28.0, 28.0)))
+                .on_hover_text(format!(
+                    "{} rank: {}{}",
+                    rank.playlist,
+                    rank.rank.as_str(),
+                    rank.div
+                ))
+        }
+    });
 }

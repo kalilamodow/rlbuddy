@@ -16,7 +16,7 @@ pub enum MatchType<'a> {
     Old(Cow<'a, StrippedMatchInfo>),
 }
 
-impl<'a> MatchType<'_> {
+impl MatchType<'_> {
     pub fn playlist(&self) -> Playlist {
         match self {
             Self::Old(o) => o.playlist,
@@ -148,14 +148,16 @@ impl MatchesService {
                     if let Some(current_match) = state.current_match.as_mut() {
                         current_match.update(
                             update.clone(),
-                            &self.local_player_id,
+                            self.local_player_id.as_ref(),
                             &self.rank_api,
                             &self.epic_ids_api,
                             &self.names_api,
                         );
                     } else {
-                        state.current_match =
-                            Some(MatchInfo::new(update.clone(), &self.local_player_id));
+                        state.current_match = Some(MatchInfo::new(
+                            update.clone(),
+                            self.local_player_id.as_ref(),
+                        ));
                     }
 
                     drop(state);

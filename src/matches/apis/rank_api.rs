@@ -35,7 +35,7 @@ pub struct PlaylistSkillInformation {
 
 impl PlaylistSkillInformation {
     fn try_from_data(
-        value: GetPlayerSkillsPlaylistData,
+        value: &GetPlayerSkillsPlaylistData,
     ) -> Result<Self, TryFromPrimitiveError<Playlist>> {
         let actual_rank = Rank::try_from_primitive(value.tier).expect("Failed to convert rank");
         let use_estimate = actual_rank == Rank::Unranked;
@@ -73,7 +73,7 @@ impl From<GetPlayerSkillsResponse> for PlayerSkillInformation {
             playlists: value
                 .playlists
                 .into_iter()
-                .filter_map(|v| PlaylistSkillInformation::try_from_data(v).ok())
+                .filter_map(|v| PlaylistSkillInformation::try_from_data(&v).ok())
                 .collect(),
         }
     }
