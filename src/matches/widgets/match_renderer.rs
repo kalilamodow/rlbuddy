@@ -1,6 +1,6 @@
 use super::super::MatchPlayer;
 use crate::{
-    common::channel::Sender,
+    common::{channel::Sender, timefmt::format_seconds},
     matches::{
         StrippedPlayer, StrippedPlayerType,
         apis::{PlayerSkillInformation, PlaylistSkillInformation},
@@ -13,7 +13,7 @@ use crate::{
 use eframe::egui::{self, Color32};
 use std::cmp::Ordering;
 use std::sync::Arc;
-use std::time::{Duration, SystemTime};
+use std::time::SystemTime;
 
 pub struct MatchRenderer<'a> {
     match_info: &'a MatchType<'a>,
@@ -85,6 +85,7 @@ impl<'a> MatchRenderer<'a> {
                         .duration_since(end_time)
                         .unwrap()
                         .as_secs(),
+                    false,
                 );
 
                 ui.label(text);
@@ -439,31 +440,6 @@ fn score_labels(ui: &mut egui::Ui, scores: &TeamScores, priority: Team) {
             ui.label(blue_text);
         }
     });
-}
-
-fn pluralize_ago(count: u64, word: &str, suffix: &str) -> String {
-    format!(
-        "{count} {word}{} {suffix}",
-        if count == 1 { "" } else { "s" }
-    )
-}
-
-const ONE_SECOND: Duration = Duration::from_secs(1);
-const ONE_MINUTE: Duration = Duration::from_mins(1);
-
-pub fn format_seconds(seconds: u64) -> (String, Duration) {
-    match seconds {
-        ..60 => (pluralize_ago(seconds, "second", "ago"), ONE_SECOND),
-        60..3600 => (pluralize_ago(seconds / 60, "minute", "ago"), ONE_MINUTE),
-        3600.. => (
-            format!(
-                "{}{}",
-                pluralize_ago(seconds / 3600, "hour", ""),
-                pluralize_ago((seconds % 3600) / 60, "minute", "ago")
-            ),
-            ONE_MINUTE,
-        ),
-    }
 }
 
 fn center_layout<R>(
