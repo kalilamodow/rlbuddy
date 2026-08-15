@@ -10,7 +10,6 @@ mod my_stats;
 mod player_info;
 mod rocket_league;
 mod settings;
-mod spotify;
 mod stats_api;
 
 use eframe::egui;
