@@ -11,6 +11,14 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
+#[derive(Debug, Default)]
+pub struct PlayerAllTimeStats {
+    goals: u64,
+    assists: u64,
+    saves: u64,
+    shots: u64,
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct MyStatsWidgetSettings {
     pub session_only: bool,
@@ -149,12 +157,97 @@ impl MyStatsWidget {
                 ui.line(Line::new("MMR", PlotPoints::Borrowed(&points)));
             });
     }
+
+    fn render_win_loss(&mut self, ui: &mut egui::Ui) {
+        let state = self.matches_state.read();
+        let wins = state.prev_matches.iter().filter(|m| match m {
+            MatchType::Old(o) => o.winner == o.our_team(),
+            MatchType::Session(s) => s.finish.as_ref().and_then(|f| f.winner) == Some(m.our_team()),
+        });
+        let losses = state.prev_matches.iter().filter(|m| match m {
+            MatchType::Old(o) => o.winner != o.our_team(),
+            MatchType::Session(s) => s.finish.as_ref().and_then(|f| f.winner) != Some(m.our_team()),
+        });
+
+        let wins_qty = if self.settings.session_only {
+            wins.filter(|w| matches!(w, MatchType::Session(_))).count()
+        } else {
+            wins.count()
+        };
+
+        let losses_qty = if self.settings.session_only {
+            losses
+                .filter(|w| matches!(w, MatchType::Session(_)))
+                .count()
+        } else {
+            losses.count()
+        };
+
+        let total_games = wins_qty + losses_qty;
+
+        ui.horizontal(|ui| {
+            ui.strong("W/L");
+            if total_games == 0 {
+                ui.label("-");
+                return;
+            }
+            ui.label(format!(
+                "{wins_qty}/{losses_qty} ({}%)",
+                (wins_qty * 100 / total_games)
+            ));
+        });
+    }
+
+    fn render_stats(&mut self, ui: &mut egui::Ui) {
+        let state = self.matches_state.read();
+        let all_stats = state.prev_matches.iter().filter_map(|m| match m {
+            MatchType::Old(_) if self.settings.session_only => None,
+            MatchType::Session(s) => s
+                .players
+                .iter()
+                .find_map(|p| p.is_local_player.then(|| &p.data.stats)),
+            MatchType::Old(o) => o.players.iter().find_map(|p| match &p.player_type {
+                StrippedPlayerType::LocalPlayer(l) => Some(l),
+                StrippedPlayerType::RemotePlayer => None,
+            }),
+        });
+
+        let totals: PlayerAllTimeStats =
+            all_stats.fold(PlayerAllTimeStats::default(), |mut total, stats| {
+                total.goals += stats.goals as u64;
+                total.shots += stats.shots as u64;
+                total.assists += stats.assists as u64;
+                total.saves += stats.saves as u64;
+                total
+            });
+
+        ui.horizontal(|ui| {
+            ui.strong("Goals");
+            ui.label(totals.goals.to_string());
+
+            ui.strong("Assists");
+            ui.label(totals.assists.to_string());
+
+            ui.strong("Shots");
+            ui.label(totals.shots.to_string());
+
+            ui.strong("Saves");
+            ui.label(totals.saves.to_string());
+        });
+    }
 }
 
 impl egui::Widget for &mut MyStatsWidget {
     fn ui(self, ui: &mut egui::Ui) -> egui::Response {
         ui.vertical_centered_justified(|ui| {
             self.render_settings_header(ui);
+
+            ui.horizontal(|ui| {
+                self.render_win_loss(ui);
+                ui.add_space(2.0);
+                self.render_stats(ui);
+            });
+
             self.render_mmr_graph(ui);
         })
         .response
