@@ -33,7 +33,7 @@ features = ["webp"]
 
 [dependencies.windows]
 version = "0.62.2"
-features = ["Media_Control"]
+features = ["Media_Control", "Storage_Streams"]
 
 [build-dependencies]
 ureq = "3.3.0"

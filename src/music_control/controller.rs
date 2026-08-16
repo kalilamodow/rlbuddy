@@ -4,8 +4,13 @@ use std::{
     thread,
     time::Duration,
 };
-use windows::Media::Control::{
-    GlobalSystemMediaTransportControlsSession, GlobalSystemMediaTransportControlsSessionManager,
+use windows::{
+    Media::Control::{
+        GlobalSystemMediaTransportControlsSession,
+        GlobalSystemMediaTransportControlsSessionManager,
+        GlobalSystemMediaTransportControlsSessionMediaProperties,
+    },
+    Storage::Streams::DataReader,
 };
 
 fn request_manager() -> Option<GlobalSystemMediaTransportControlsSessionManager> {
@@ -35,12 +40,46 @@ pub enum PlaybackStatus {
 }
 
 #[derive(Debug)]
+pub struct ThumbnailInfo {
+    pub extension: String,
+    pub bytes: Arc<[u8]>,
+}
+
+impl ThumbnailInfo {
+    fn load_blocking(
+        props: &GlobalSystemMediaTransportControlsSessionMediaProperties,
+    ) -> windows::core::Result<Self> {
+        let stream = props.Thumbnail()?.OpenReadAsync()?.join()?;
+        let size = u32::try_from(stream.Size()?)?;
+
+        let input = stream.GetInputStreamAt(0)?;
+        let reader = DataReader::CreateDataReader(&input)?;
+        reader.LoadAsync(size)?.join()?;
+
+        let mut bytes = vec![0u8; size as usize];
+        reader.ReadBytes(&mut bytes)?;
+
+        Ok(Self {
+            extension: stream
+                .ContentType()?
+                .to_string()
+                .split('/')
+                .last()
+                .unwrap()
+                .to_owned(),
+            bytes: bytes.into(),
+        })
+    }
+}
+
+#[derive(Debug)]
 pub struct PlaybackInfo {
     pub track_name: Option<String>,
     pub artist: Option<String>,
     pub progress: Option<Duration>,
     pub song_length: Option<Duration>,
     pub status: Option<PlaybackStatus>,
+    pub thumbnail: Option<ThumbnailInfo>,
 }
 
 pub struct MediaController {
@@ -80,6 +119,7 @@ impl MediaController {
                     session.GetPlaybackInfo()?.PlaybackStatus()?.0,
                 )
                 .ok(),
+                thumbnail: ThumbnailInfo::load_blocking(&props).ok(),
             }));
 
             Ok(())
