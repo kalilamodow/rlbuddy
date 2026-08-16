@@ -1,8 +1,13 @@
 use num_enum::TryFromPrimitive;
-use std::{sync::Arc, thread, time::Duration};
+use std::{
+    sync::{Arc, Mutex},
+    thread,
+    time::Duration,
+};
 use windows::{
+    Foundation::TypedEventHandler,
     Media::Control::{
-        GlobalSystemMediaTransportControlsSession,
+        CurrentSessionChangedEventArgs, GlobalSystemMediaTransportControlsSession,
         GlobalSystemMediaTransportControlsSessionManager,
         GlobalSystemMediaTransportControlsSessionMediaProperties,
     },
@@ -79,26 +84,37 @@ pub struct PlaybackInfo {
 }
 
 pub struct MediaController {
-    manager: Arc<GlobalSystemMediaTransportControlsSessionManager>,
+    current_session: Arc<Mutex<Option<GlobalSystemMediaTransportControlsSession>>>,
 }
 
 impl MediaController {
     pub fn new() -> Self {
-        Self {
-            manager: Arc::new(request_manager().unwrap()),
-        }
+        let manager = request_manager().unwrap();
+        let current_session = Arc::new(Mutex::new(manager.GetCurrentSession().ok()));
+
+        let session_changer_ref = Arc::clone(&current_session);
+
+        manager
+            // rust cant infer the TypedEventHandler type automatically for some reason
+            .CurrentSessionChanged(&TypedEventHandler::<
+                GlobalSystemMediaTransportControlsSessionManager,
+                CurrentSessionChangedEventArgs,
+            >::new(move |new_manager, _| {
+                let mut session = session_changer_ref.lock().unwrap();
+                *session = new_manager.unwrap().GetCurrentSession().ok();
+
+                Ok(())
+            }))
+            .unwrap();
+
+        Self { current_session }
     }
 
     pub fn get_playback_info<F>(&self, callback: F)
     where
         F: FnOnce(Option<PlaybackInfo>) + Send + Sync + 'static,
     {
-        self.start(|manager| {
-            let Ok(session) = manager.GetCurrentSession() else {
-                callback(None);
-                return Ok(());
-            };
-
+        self.use_session(|session| {
             let props = session.TryGetMediaPropertiesAsync()?.join()?;
             let timeline = session.GetTimelineProperties().ok();
 
@@ -123,19 +139,19 @@ impl MediaController {
     }
 
     pub fn next(&self) {
-        self.use_session(GlobalSystemMediaTransportControlsSession::TrySkipNextAsync);
+        self.use_session_once(GlobalSystemMediaTransportControlsSession::TrySkipNextAsync);
     }
     pub fn previous(&self) {
-        self.use_session(GlobalSystemMediaTransportControlsSession::TrySkipPreviousAsync);
+        self.use_session_once(GlobalSystemMediaTransportControlsSession::TrySkipPreviousAsync);
     }
     pub fn play(&self) {
-        self.use_session(GlobalSystemMediaTransportControlsSession::TryPlayAsync);
+        self.use_session_once(GlobalSystemMediaTransportControlsSession::TryPlayAsync);
     }
     pub fn pause(&self) {
-        self.use_session(GlobalSystemMediaTransportControlsSession::TryPauseAsync);
+        self.use_session_once(GlobalSystemMediaTransportControlsSession::TryPauseAsync);
     }
 
-    fn use_session<F>(&self, func: F)
+    fn use_session_once<F>(&self, func: F)
     where
         F: FnOnce(
                 &GlobalSystemMediaTransportControlsSession,
@@ -144,21 +160,26 @@ impl MediaController {
             + Sync
             + 'static,
     {
-        self.start(|manager| {
-            let session = manager.GetCurrentSession()?;
-            func(&session)?.join()?;
-            Ok(())
-        });
+        self.use_session(|s| func(s)?.join().and_then(|_| Ok(())));
     }
 
-    fn start<F>(&self, func: F)
+    fn use_session<F>(&self, func: F)
     where
-        F: FnOnce(&GlobalSystemMediaTransportControlsSessionManager) -> windows::core::Result<()>
+        F: FnOnce(&GlobalSystemMediaTransportControlsSession) -> windows::core::Result<()>
             + Send
             + Sync
             + 'static,
     {
-        let manager = Arc::clone(&self.manager);
-        thread::spawn(move || -> windows::core::Result<()> { func(&*manager) });
+        let session = Arc::clone(&self.current_session);
+        thread::spawn(move || {
+            let session_guard = session.lock().unwrap();
+            let Some(session) = session_guard.as_ref() else {
+                return;
+            };
+
+            if let Err(error) = func(&session) {
+                eprintln!("winrt failure: {error:?}");
+            };
+        });
     }
 }
