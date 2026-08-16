@@ -44,6 +44,39 @@ impl MyStatsWidget {
         self.settings.clone()
     }
 
+    fn render_streak_header(&self, ui: &mut egui::Ui) {
+        let state = self.matches_state.read();
+        let session_matches = || {
+            state.prev_matches.iter().filter_map(|m| match m {
+                MatchType::Session(s) => Some(s),
+                MatchType::Old(_) => None,
+            })
+        };
+
+        let count = session_matches().count();
+        ui.horizontal(|ui| {
+            ui.strong(format!("{} matches", count));
+            if count < 1 {
+                return;
+            }
+
+            let won_last_match = session_matches().last().unwrap().is_win();
+            let streak = session_matches()
+                .rev()
+                .take_while(|m| m.is_win() == won_last_match)
+                .count();
+
+            ui.label(format!(
+                "{} {streak}",
+                if won_last_match { "🔥" } else { "❄️" }
+            ));
+
+            if !won_last_match && streak > 4 {
+                ui.label("<!> Consider taking a break");
+            }
+        });
+    }
+
     fn render_settings_header(&mut self, ui: &mut egui::Ui) {
         let state = self.matches_state.read();
         let mut choosable_playlists: Vec<Playlist> = state
@@ -160,7 +193,7 @@ impl MyStatsWidget {
             .count();
 
         ui.horizontal(|ui| {
-            ui.strong("W/L");
+            ui.label("W/L");
             if total_games == 0 {
                 ui.label("-");
                 return;
@@ -193,16 +226,16 @@ impl MyStatsWidget {
             });
 
         ui.horizontal(|ui| {
-            ui.strong("Goals");
+            ui.label("Goals:");
             ui.label(totals.goals.to_string());
 
-            ui.strong("Assists");
+            ui.label("Assists:");
             ui.label(totals.assists.to_string());
 
-            ui.strong("Shots");
+            ui.label("Shots:");
             ui.label(totals.shots.to_string());
 
-            ui.strong("Saves");
+            ui.label("Saves:");
             ui.label(totals.saves.to_string());
         });
     }
@@ -211,6 +244,7 @@ impl MyStatsWidget {
 impl egui::Widget for &mut MyStatsWidget {
     fn ui(self, ui: &mut egui::Ui) -> egui::Response {
         ui.vertical(|ui| {
+            self.render_streak_header(ui);
             ui.horizontal(|ui| {
                 self.render_stats(ui);
                 self.render_win_loss(ui);

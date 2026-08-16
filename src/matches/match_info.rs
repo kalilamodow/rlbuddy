@@ -178,6 +178,10 @@ impl MatchInfo {
             |c| is_censored(c.display_name()),
         );
     }
+
+    pub fn is_win(&self) -> bool {
+        self.finish.as_ref().and_then(|f| f.winner) == Some(self.our_team)
+    }
 }
 
 fn is_censored(name: &str) -> bool {
