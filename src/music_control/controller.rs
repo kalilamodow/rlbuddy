@@ -20,7 +20,7 @@ fn timespan_to_duration(
     timespan
         .ok()
         .and_then(|p| u64::try_from(p.Duration).ok())
-        .map(|d| Duration::from_micros(d))
+        .map(|d| Duration::from_micros(d.saturating_div(10)))
 }
 
 #[derive(Debug, TryFromPrimitive)]
