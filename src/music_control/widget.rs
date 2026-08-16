@@ -6,6 +6,7 @@ use crate::{
     },
 };
 use eframe::egui;
+use std::time::{Duration, SystemTime};
 
 fn handle_null_string<'a>(s: Option<&'a String>) -> &'a str {
     s.map_or("-", |s| s.as_str())
@@ -15,6 +16,7 @@ pub struct MusicControlWidget {
     state: ThreadedReadonlyStateHandle<MusicControlServiceState>,
     settings: ReadWriteStateHandle<MusicControlSettings>,
     commander: Sender<MusicControlCommand>,
+    last_progress: (SystemTime, Duration), // had progress Duration at time SystemTime
 }
 
 impl MusicControlWidget {
@@ -23,6 +25,7 @@ impl MusicControlWidget {
             state: service.state_handle(),
             settings: service.settings_handle(),
             commander: service.sender(),
+            last_progress: (SystemTime::now(), Duration::ZERO),
         }
     }
 
@@ -41,12 +44,25 @@ impl MusicControlWidget {
 
             ui.label(handle_null_string(currently_playing.artist.as_ref()));
 
-            if let Some(progress) = &currently_playing.progress
+            if let Some(progress) = currently_playing.progress
                 && let Some(song_length) = &currently_playing.song_length
             {
+                let real_progress =
+                    if matches!(currently_playing.status, Some(PlaybackStatus::Playing))
+                        && progress == self.last_progress.1
+                    {
+                        SystemTime::now()
+                            .duration_since(self.last_progress.0)
+                            .unwrap()
+                            + self.last_progress.1
+                    } else {
+                        self.last_progress = (SystemTime::now(), progress);
+                        progress
+                    };
+
                 ui.add_space(4.0);
                 ui.add(
-                    egui::ProgressBar::new(progress.as_secs_f32() / song_length.as_secs_f32())
+                    egui::ProgressBar::new(real_progress.as_secs_f32() / song_length.as_secs_f32())
                         .desired_height(6.0),
                 );
             }
