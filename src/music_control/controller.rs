@@ -1,6 +1,7 @@
 use std::{
     sync::{Arc, Mutex},
     thread,
+    time::Duration,
 };
 use windows::Media::Control::{
     GlobalSystemMediaTransportControlsSession, GlobalSystemMediaTransportControlsSessionManager,
@@ -12,10 +13,21 @@ fn request_manager() -> Option<GlobalSystemMediaTransportControlsSessionManager>
         .and_then(|a| a.join().ok())
 }
 
+fn timespan_to_duration(
+    timespan: windows::core::Result<windows::Foundation::TimeSpan>,
+) -> Option<Duration> {
+    timespan
+        .ok()
+        .and_then(|p| u64::try_from(p.Duration).ok())
+        .map(|d| Duration::from_micros(d))
+}
+
 #[derive(Debug)]
 pub struct PlaybackInfo {
     pub track_name: Option<String>,
     pub artist: Option<String>,
+    pub progress: Option<Duration>,
+    pub song_length: Option<Duration>,
 }
 
 pub struct MediaController {
@@ -40,10 +52,17 @@ impl MediaController {
             };
 
             let props = session.TryGetMediaPropertiesAsync()?.join()?;
+            let timeline = session.GetTimelineProperties().ok();
 
             callback(Some(PlaybackInfo {
                 track_name: props.Title().map(|t| t.to_string()).ok(),
                 artist: props.Artist().map(|t| t.to_string()).ok(),
+                progress: timeline
+                    .as_ref()
+                    .and_then(|time| timespan_to_duration(time.Position())),
+                song_length: timeline
+                    .as_ref()
+                    .and_then(|time| timespan_to_duration(time.EndTime())),
             }));
 
             Ok(())

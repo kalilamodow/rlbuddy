@@ -26,40 +26,38 @@ impl MusicControlWidget {
     }
 
     fn render_currently_playing(&mut self, ui: &mut egui::Ui) {
-        ui.horizontal(|ui| {
-            let mut has_song = true;
+        let state = self.state.read();
+        let Some(currently_playing) = state.playback_info.as_ref() else {
+            ui.label("No track currently playing");
+            return;
+        };
 
-            ui.vertical(|ui| {
-                let state = self.state.read();
-                let Some(currently_playing) = state.playback_info.as_ref() else {
-                    has_song = false;
-                    ui.label("No track currently playing");
-                    return;
-                };
+        ui.vertical(|ui| {
+            ui.label(
+                egui::RichText::new(handle_null_string(currently_playing.track_name.as_ref()))
+                    .size(16.0),
+            );
 
-                ui.small("Now playing:");
-                ui.label(
-                    egui::RichText::new(handle_null_string(currently_playing.track_name.as_ref()))
-                        .size(16.0),
-                );
+            ui.label(handle_null_string(currently_playing.artist.as_ref()));
 
-                ui.label(handle_null_string(currently_playing.artist.as_ref()));
-            });
-
-            ui.with_layout(egui::Layout::top_down(egui::Align::Max), |ui| {
-                if !has_song {
-                    return;
-                }
-
+            if let Some(progress) = &currently_playing.progress
+                && let Some(song_length) = &currently_playing.song_length
+            {
                 ui.add_space(4.0);
-                ui.horizontal(|ui| {
-                    if ui.button("Next").clicked() {
-                        self.commander.send(MusicControlCommand::Next);
-                    }
-                    if ui.button("Previous").clicked() {
-                        self.commander.send(MusicControlCommand::Previous);
-                    }
-                });
+                ui.add(
+                    egui::ProgressBar::new(progress.as_secs_f32() / song_length.as_secs_f32())
+                        .desired_height(6.0),
+                );
+            }
+
+            ui.add_space(2.0);
+            ui.horizontal(|ui| {
+                if ui.button("Previous").clicked() {
+                    self.commander.send(MusicControlCommand::Previous);
+                }
+                if ui.button("Next").clicked() {
+                    self.commander.send(MusicControlCommand::Next);
+                }
             });
         });
     }
