@@ -45,7 +45,12 @@ impl MusicControlWidget {
                 if let Some(thumbnail) = &currently_playing.thumbnail {
                     ui.add(
                         egui::Image::new(ImageSource::Bytes {
-                            uri: format!("bytes://thumbnail.{}", thumbnail.extension).into(),
+                            uri: format!(
+                                "bytes://{}.{}",
+                                handle_null_string(currently_playing.track_name.as_ref()),
+                                thumbnail.extension
+                            )
+                            .into(),
                             bytes: Bytes::Shared(thumbnail.bytes.clone()),
                         })
                         .corner_radius(egui::CornerRadius::same(4))
