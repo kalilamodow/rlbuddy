@@ -26,6 +26,10 @@ impl<T> Receiver<T> {
         }
     }
 
+    pub fn drain(&self) {
+        self.items.borrow_mut().clear();
+    }
+
     pub fn try_recv(&self) -> Option<T> {
         self.items.borrow_mut().pop_front()
     }

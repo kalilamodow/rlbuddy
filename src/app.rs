@@ -4,6 +4,7 @@ use crate::{
     discord,
     hotkey::{HotkeyService, HotkeySettings},
     matches::{CurrentMatchWidget, MatchesService, PastMatchesWidget, StrippedMatchInfo},
+    music_control::{self, MusicControlService, MusicControlSettings, MusicControlWidget},
     my_stats::{MyStatsWidget, MyStatsWidgetSettings},
     player_info::{PlayerInfoService, PlayerSearchWidget},
     settings::SettingsWidget,
@@ -18,6 +19,7 @@ use std::{sync::mpsc, time::Duration};
 enum Panel {
     CurrentMatch,
     PastMatches,
+    MusicControl,
     MyStats,
     Discord,
     PlayerSearch,
@@ -34,6 +36,7 @@ impl std::fmt::Display for Panel {
                 Panel::CurrentMatch => "Lobby",
                 Panel::PastMatches => "History",
                 Panel::MyStats => "My Stats",
+                Panel::MusicControl => "Music",
                 Panel::Discord => "Discord",
                 Panel::PlayerSearch => "Player Search",
                 Panel::AutoSetup => "Stats API Setup",
@@ -43,9 +46,10 @@ impl std::fmt::Display for Panel {
     }
 }
 
-const OPENABLE_PANELS: [Panel; 7] = [
+const OPENABLE_PANELS: [Panel; 8] = [
     Panel::CurrentMatch,
     Panel::Discord,
+    Panel::MusicControl,
     Panel::MyStats,
     Panel::PastMatches,
     Panel::AutoSetup,
@@ -70,6 +74,7 @@ struct AppData {
     open_panels: Vec<Panel>,
     matches: Vec<StrippedMatchInfo>,
     my_stats_settings: Option<MyStatsWidgetSettings>,
+    music_control_settings: Option<MusicControlSettings>,
 }
 
 impl Default for AppData {
@@ -80,6 +85,7 @@ impl Default for AppData {
             rich_presence_settings: None,
             open_panels: vec![Panel::CurrentMatch],
             matches: Vec::new(),
+            music_control_settings: None,
             my_stats_settings: None,
         }
     }
@@ -98,6 +104,9 @@ pub struct RlBuddyApp {
 
     discord_service: discord::DiscordService,
     discord_widget: discord::DiscordWidget,
+
+    music_control_service: music_control::MusicControlService,
+    music_control_widget: music_control::MusicControlWidget,
 
     matches_service: MatchesService,
     current_match: CurrentMatchWidget,
@@ -129,6 +138,10 @@ impl RlBuddyApp {
         let mut stats_api_service = StatsApi::new();
         let matches_service =
             MatchesService::new(&ctx, stats_api_service.subscribe(), app_data.matches);
+        let music_control_service = MusicControlService::new(
+            app_data.music_control_settings,
+            stats_api_service.subscribe(),
+        );
         let discord_service = discord::DiscordService::new(
             app_data.rich_presence_settings,
             matches_service.state_handle(),
@@ -153,6 +166,9 @@ impl RlBuddyApp {
                 discord_service.state_handle(),
             ),
             discord_service,
+
+            music_control_widget: MusicControlWidget::new(&music_control_service),
+            music_control_service,
 
             my_stats_widget: MyStatsWidget::new(
                 matches_service.state_handle(),
@@ -222,6 +238,9 @@ impl eframe::App for RlBuddyApp {
             open_panels: self.open_panels.clone(),
             matches: self.matches_service.stripped_history(),
             my_stats_settings: Some(self.my_stats_widget.clone_settings()),
+            music_control_settings: Some(
+                self.music_control_service.settings_handle().read().clone(),
+            ),
         };
         eframe::set_value(storage, eframe::APP_KEY, &data);
     }
@@ -292,6 +311,7 @@ impl eframe::App for RlBuddyApp {
                                 Panel::CurrentMatch => ui.add(&mut self.current_match),
                                 Panel::Discord => ui.add(&mut self.discord_widget),
                                 Panel::MyStats => ui.add(&mut self.my_stats_widget),
+                                Panel::MusicControl => ui.add(&mut self.music_control_widget),
                                 Panel::PastMatches => ui.add(&mut self.past_matches),
                                 Panel::PlayerSearch => ui.add(&mut self.player_search_widget),
                                 Panel::AutoSetup => ui.add(&mut self.auto_setup_widget),
@@ -320,6 +340,7 @@ impl eframe::App for RlBuddyApp {
         self.matches_service.update();
         self.player_info_service.update();
         self.discord_service.update();
+        self.music_control_service.update();
 
         while let Some(event) = self.stats_api_events.try_recv() {
             match *event {

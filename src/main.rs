@@ -6,6 +6,7 @@ mod common;
 mod discord;
 mod hotkey;
 mod matches;
+mod music_control;
 mod my_stats;
 mod player_info;
 mod rocket_league;

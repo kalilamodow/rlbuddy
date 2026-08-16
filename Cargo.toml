@@ -19,6 +19,7 @@ sha2 = "0.11.0"
 ureq = { version = "3.3.0", features = ["json"] }
 urlencoding = "2.1.3"
 webbrowser = "1.2.1"
+windows-future = "0.3.2"
 
 [dependencies.eframe]
 version = "0.34.3"
@@ -29,6 +30,10 @@ features = ["glow", "persistence"]
 version = "0.34.3"
 default-features = false
 features = ["webp"]
+
+[dependencies.windows]
+version = "0.62.2"
+features = ["Media_Control"]
 
 [build-dependencies]
 ureq = "3.3.0"

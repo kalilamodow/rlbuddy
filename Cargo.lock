@@ -2440,6 +2440,8 @@ dependencies = [
  "ureq",
  "urlencoding",
  "webbrowser",
+ "windows",
+ "windows-future",
 ]
 
 [[package]]

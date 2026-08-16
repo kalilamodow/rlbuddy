@@ -23,7 +23,7 @@ impl<T> ReadonlyStateHandle<T> {
     }
 }
 
-#[derive(Default, Clone)]
+#[derive(Default)]
 pub struct ReadWriteStateHandle<T> {
     state: Rc<RefCell<T>>,
 }
@@ -41,6 +41,14 @@ impl<T> ReadWriteStateHandle<T> {
 
     pub fn write(&self) -> RefMut<'_, T> {
         self.state.borrow_mut()
+    }
+}
+
+impl<T> Clone for ReadWriteStateHandle<T> {
+    fn clone(&self) -> Self {
+        Self {
+            state: Rc::clone(&self.state),
+        }
     }
 }
 
