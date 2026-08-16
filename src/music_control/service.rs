@@ -1,7 +1,3 @@
-use std::time::{Duration, SystemTime};
-
-use serde::{Deserialize, Serialize};
-
 use crate::{
     common::{
         ReadWriteStateHandle, ThreadedReadWriteStateHandle, ThreadedReadonlyStateHandle,
@@ -11,8 +7,8 @@ use crate::{
     music_control::controller::{MediaController, PlaybackInfo},
     stats_api::RLEvent,
 };
-
-const UPDATE_INTERVAL: Duration = Duration::from_secs(1);
+use serde::{Deserialize, Serialize};
+use std::sync::mpsc;
 
 #[derive(Debug)]
 pub enum MusicControlCommand {
@@ -38,24 +34,30 @@ pub struct MusicControlService {
     state: ThreadedReadWriteStateHandle<MusicControlServiceState>,
     command_receiver: Receiver<MusicControlCommand>,
     stats_api: EventReceiver<RLEvent>,
-    last_update: SystemTime,
+    playback_info_rx: mpsc::Receiver<Option<PlaybackInfo>>,
 }
 
 impl MusicControlService {
     pub fn new(savedata: Option<MusicControlSettings>, stats_api: EventReceiver<RLEvent>) -> Self {
+        let (playback_info_tx, playback_info_rx) = mpsc::channel();
+
         Self {
-            controller: MediaController::new(),
+            controller: MediaController::new(playback_info_tx),
             settings: ReadWriteStateHandle::new(savedata.unwrap_or_default()),
             state: ThreadedReadWriteStateHandle::default(),
             command_receiver: Receiver::new(),
             stats_api,
-            last_update: SystemTime::UNIX_EPOCH,
+            playback_info_rx,
         }
     }
 
     pub fn update(&mut self) {
         while let Some(cmd) = self.command_receiver.try_recv() {
             self.handle_command(cmd);
+        }
+
+        for new_info in self.playback_info_rx.try_iter() {
+            self.state.write().playback_info = new_info;
         }
 
         if self.settings.read().pause_for_anthems {
@@ -72,19 +74,6 @@ impl MusicControlService {
             }
         } else {
             self.stats_api.drain();
-        }
-
-        let now = SystemTime::now();
-        if now
-            .duration_since(self.last_update)
-            .is_ok_and(|d| d >= UPDATE_INTERVAL)
-        {
-            self.last_update = now;
-
-            let state = self.state.clone();
-            self.controller.get_playback_info(move |playback_info| {
-                state.write().playback_info = playback_info;
-            });
         }
     }
 
