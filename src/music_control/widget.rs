@@ -2,6 +2,7 @@ use crate::{
     common::{ReadWriteStateHandle, ThreadedReadonlyStateHandle, channel::Sender},
     music_control::{
         MusicControlCommand, MusicControlService, MusicControlServiceState, MusicControlSettings,
+        controller::PlaybackStatus,
     },
 };
 use eframe::egui;
@@ -58,6 +59,31 @@ impl MusicControlWidget {
                 if ui.button("Next").clicked() {
                     self.commander.send(MusicControlCommand::Next);
                 }
+
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
+                    let Some(status) = &currently_playing.status else {
+                        return;
+                    };
+
+                    if ui
+                        .button(match status {
+                            PlaybackStatus::Paused => "Play",
+                            PlaybackStatus::Playing => "Pause",
+                            _ => return,
+                        })
+                        .clicked()
+                    {
+                        match status {
+                            PlaybackStatus::Paused => {
+                                self.commander.send(MusicControlCommand::Play)
+                            }
+                            PlaybackStatus::Playing => {
+                                self.commander.send(MusicControlCommand::Pause)
+                            }
+                            _ => unreachable!("Button shouldn't exist right now"),
+                        }
+                    }
+                });
             });
         });
     }

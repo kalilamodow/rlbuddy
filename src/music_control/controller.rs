@@ -1,3 +1,4 @@
+use num_enum::TryFromPrimitive;
 use std::{
     sync::{Arc, Mutex},
     thread,
@@ -22,12 +23,24 @@ fn timespan_to_duration(
         .map(|d| Duration::from_micros(d))
 }
 
+#[derive(Debug, TryFromPrimitive)]
+#[repr(i32)]
+pub enum PlaybackStatus {
+    Closed = 0,
+    Opened = 1,
+    Changing = 2,
+    Stopped = 3,
+    Playing = 4,
+    Paused = 5,
+}
+
 #[derive(Debug)]
 pub struct PlaybackInfo {
     pub track_name: Option<String>,
     pub artist: Option<String>,
     pub progress: Option<Duration>,
     pub song_length: Option<Duration>,
+    pub status: Option<PlaybackStatus>,
 }
 
 pub struct MediaController {
@@ -63,6 +76,10 @@ impl MediaController {
                 song_length: timeline
                     .as_ref()
                     .and_then(|time| timespan_to_duration(time.EndTime())),
+                status: PlaybackStatus::try_from_primitive(
+                    session.GetPlaybackInfo()?.PlaybackStatus()?.0,
+                )
+                .ok(),
             }));
 
             Ok(())
@@ -76,7 +93,7 @@ impl MediaController {
         self.use_session(GlobalSystemMediaTransportControlsSession::TrySkipPreviousAsync);
     }
     pub fn play(&self) {
-        self.use_session(GlobalSystemMediaTransportControlsSession::TryPauseAsync);
+        self.use_session(GlobalSystemMediaTransportControlsSession::TryPlayAsync);
     }
     pub fn pause(&self) {
         self.use_session(GlobalSystemMediaTransportControlsSession::TryPauseAsync);

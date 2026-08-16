@@ -14,6 +14,7 @@ use crate::{
 
 const UPDATE_INTERVAL: Duration = Duration::from_secs(1);
 
+#[derive(Debug)]
 pub enum MusicControlCommand {
     Next,
     Previous,
