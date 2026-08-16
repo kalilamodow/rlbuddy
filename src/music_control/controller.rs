@@ -14,7 +14,8 @@ fn request_manager() -> Option<GlobalSystemMediaTransportControlsSessionManager>
 
 #[derive(Debug)]
 pub struct PlaybackInfo {
-    pub track_name: String,
+    pub track_name: Option<String>,
+    pub artist: Option<String>,
 }
 
 pub struct MediaController {
@@ -41,7 +42,8 @@ impl MediaController {
             let props = session.TryGetMediaPropertiesAsync()?.join()?;
 
             callback(Some(PlaybackInfo {
-                track_name: props.Title()?.to_string(),
+                track_name: props.Title().map(|t| t.to_string()).ok(),
+                artist: props.Artist().map(|t| t.to_string()).ok(),
             }));
 
             Ok(())

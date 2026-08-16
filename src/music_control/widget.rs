@@ -6,6 +6,10 @@ use crate::{
 };
 use eframe::egui;
 
+fn handle_null_string<'a>(s: Option<&'a String>) -> &'a str {
+    s.map_or("-", |s| s.as_str())
+}
+
 pub struct MusicControlWidget {
     state: ThreadedReadonlyStateHandle<MusicControlServiceState>,
     settings: ReadWriteStateHandle<MusicControlSettings>,
@@ -34,9 +38,12 @@ impl MusicControlWidget {
                 };
 
                 ui.small("Now playing:");
-                ui.label(egui::RichText::new(&currently_playing.track_name).size(16.0));
-                // ui.label(egui::RichText::new(&currently_playing.name).size(16.0));
-                // ui.label(&currently_playing.artists[0].name);
+                ui.label(
+                    egui::RichText::new(handle_null_string(currently_playing.track_name.as_ref()))
+                        .size(16.0),
+                );
+
+                ui.label(handle_null_string(currently_playing.artist.as_ref()));
             });
 
             ui.with_layout(egui::Layout::top_down(egui::Align::Max), |ui| {
