@@ -1,9 +1,5 @@
 use num_enum::TryFromPrimitive;
-use std::{
-    sync::{Arc, Mutex},
-    thread,
-    time::Duration,
-};
+use std::{sync::Arc, thread, time::Duration};
 use windows::{
     Media::Control::{
         GlobalSystemMediaTransportControlsSession,
@@ -83,13 +79,13 @@ pub struct PlaybackInfo {
 }
 
 pub struct MediaController {
-    manager: Arc<Mutex<Option<GlobalSystemMediaTransportControlsSessionManager>>>,
+    manager: Arc<GlobalSystemMediaTransportControlsSessionManager>,
 }
 
 impl MediaController {
     pub fn new() -> Self {
         Self {
-            manager: Arc::new(Mutex::new(request_manager())),
+            manager: Arc::new(request_manager().unwrap()),
         }
     }
 
@@ -163,17 +159,6 @@ impl MediaController {
             + 'static,
     {
         let manager = Arc::clone(&self.manager);
-        thread::spawn(move || -> windows::core::Result<()> {
-            let mut manager = manager.lock().unwrap();
-            if manager.is_none() {
-                *manager = request_manager();
-            };
-
-            if let Some(manager) = &*manager {
-                func(manager)
-            } else {
-                Err(windows::core::Error::empty())
-            }
-        });
+        thread::spawn(move || -> windows::core::Result<()> { func(&*manager) });
     }
 }
