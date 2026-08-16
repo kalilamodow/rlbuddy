@@ -5,9 +5,11 @@ An overlay for Rocket League which displays the names/ranks of everybody in your
 rlbuddy uses a widget system, where each feature has its own widget which can be opened/closed, so you can customize it however you want! For example, if you don't use Spotify, you can just hide its widget, and it'll stay out of your way.
 
 - Shows ranks of everyone in your lobby and previous lobbies
+- Can display information from Tracker, too if you want to know more
+- Customizable MMR graphs and stat tracking (W/L, etc.)
 - Opens using a configurable hotkey/button
 - Can be partially transparent!
-- Spotify and Discord integration
+- Local playback control and Discord integration
 - Sets up the stats api for you <3
 
 > My setup:
@@ -59,6 +61,12 @@ The main way to open rlbuddy is to press and hold a hotkey/controller button, wh
 
 Dynamic selection coming soon!
 
+#### Local music playback
+
+<!--<img src="readme-images/music.jpeg">-->
+
+rlbuddy allows a few playback controls and has an option to pause your music while player anthems are playing (during goal replays and the post-game scene). It asks Windows for this information, so anything you would see playing in the Action center will show up here, too.
+
 ### Integrations
 
 #### Discord
@@ -66,14 +74,6 @@ Dynamic selection coming soon!
 <img src="readme-images/discord.jpeg">
 
 rlbuddy shows your current status in Discord. You can disable this through the widget, or just hide the current score.
-
-#### Spotify
-
-<img src="readme-images/spotify.jpeg">
-
-rlbuddy allows a few playback controls and has an option to pause your music while player anthems are playing (during goal replays and the post-game scene).
-
-Unfortunately, due to [new annoying Spotify API restrictions](https://developer.spotify.com/blog/2026-02-06-update-on-developer-access-and-platform-security), there's a special setup process which does require Spotify premium.
 
 ### Other
 
