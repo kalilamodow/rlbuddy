@@ -1,6 +1,6 @@
 use crate::{
     common::{ReadonlyStateHandle, timefmt::format_seconds},
-    matches::{MatchType, MatchesServiceState, StrippedPlayerType},
+    matches::{MatchType, MatchesServiceState},
     rocket_league::Playlist,
 };
 use eframe::egui;
@@ -12,7 +12,7 @@ use std::{
 };
 
 #[derive(Debug, Default)]
-pub struct PlayerAllTimeStats {
+pub struct PlayerLongtimeStats {
     goals: u64,
     assists: u64,
     saves: u64,
@@ -21,7 +21,6 @@ pub struct PlayerAllTimeStats {
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct MyStatsWidgetSettings {
-    pub session_only: bool,
     pub selected_playlist: Option<Playlist>,
 }
 
@@ -72,10 +71,6 @@ impl MyStatsWidget {
                         );
                     }
                 });
-
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
-                ui.checkbox(&mut self.settings.session_only, "Session only");
-            });
         });
     }
 
@@ -95,34 +90,26 @@ impl MyStatsWidget {
             .prev_matches
             .iter()
             .filter(|m| m.playlist() == selected_playlist)
-            .filter(|m| !self.settings.session_only || matches!(m, MatchType::Session(_)))
-            .filter_map(|m| {
-                (match m {
-                    MatchType::Old(o) => o
-                        .players
-                        .iter()
-                        .find(|p| matches!(p.player_type, StrippedPlayerType::LocalPlayer(_)))
-                        .and_then(|p| p.rank_in_mode.as_ref()),
-                    MatchType::Session(s) => s
-                        .players
-                        .iter()
-                        .find(|p| p.is_local_player)
-                        .and_then(|p| p.skill.as_ref())
-                        .and_then(|sk| {
-                            sk.get_playlist(s.playlist.in_ranked().unwrap_or(s.playlist))
-                        }),
-                })
-                .map(|skill| PlotPoint {
-                    x: m.started_at()
-                        .duration_since(UNIX_EPOCH)
-                        .expect("its before 1970")
-                        .as_secs_f64(),
-                    y: skill.mmr.into(),
-                })
+            .filter_map(|m| match m {
+                MatchType::Old(_) => None,
+                MatchType::Session(s) => s
+                    .players
+                    .iter()
+                    .find(|p| p.is_local_player)
+                    .and_then(|p| p.skill.as_ref())
+                    .and_then(|sk| sk.get_playlist(s.playlist.in_ranked().unwrap_or(s.playlist)))
+                    .map(|skill| PlotPoint {
+                        x: m.started_at()
+                            .duration_since(UNIX_EPOCH)
+                            .expect("its before 1970")
+                            .as_secs_f64(),
+                        y: skill.mmr.into(),
+                    }),
             })
             .collect();
 
         if points.len() <= 1 {
+            ui.label("No points to graph");
             return;
         }
 
@@ -160,30 +147,17 @@ impl MyStatsWidget {
 
     fn render_win_loss(&mut self, ui: &mut egui::Ui) {
         let state = self.matches_state.read();
-        let wins = state.prev_matches.iter().filter(|m| match m {
-            MatchType::Old(o) => o.winner == o.our_team(),
-            MatchType::Session(s) => s.finish.as_ref().and_then(|f| f.winner) == Some(m.our_team()),
-        });
-        let losses = state.prev_matches.iter().filter(|m| match m {
-            MatchType::Old(o) => o.winner != o.our_team(),
-            MatchType::Session(s) => s.finish.as_ref().and_then(|f| f.winner) != Some(m.our_team()),
-        });
-
-        let wins_qty = if self.settings.session_only {
-            wins.filter(|w| matches!(w, MatchType::Session(_))).count()
-        } else {
-            wins.count()
+        let session_matches = || {
+            state.prev_matches.iter().filter_map(|m| match m {
+                MatchType::Session(s) => Some(s),
+                MatchType::Old(_) => None,
+            })
         };
 
-        let losses_qty = if self.settings.session_only {
-            losses
-                .filter(|w| matches!(w, MatchType::Session(_)))
-                .count()
-        } else {
-            losses.count()
-        };
-
-        let total_games = wins_qty + losses_qty;
+        let total_games = session_matches().count();
+        let wins = session_matches()
+            .filter(|s| s.finish.as_ref().and_then(|f| f.winner) == Some(s.our_team))
+            .count();
 
         ui.horizontal(|ui| {
             ui.strong("W/L");
@@ -192,8 +166,9 @@ impl MyStatsWidget {
                 return;
             }
             ui.label(format!(
-                "{wins_qty}/{losses_qty} ({}%)",
-                (wins_qty * 100 / total_games)
+                "{wins}/{} ({}%)",
+                total_games - wins,
+                (wins * 100 / total_games)
             ));
         });
     }
@@ -201,19 +176,15 @@ impl MyStatsWidget {
     fn render_stats(&mut self, ui: &mut egui::Ui) {
         let state = self.matches_state.read();
         let all_stats = state.prev_matches.iter().filter_map(|m| match m {
-            MatchType::Old(_) if self.settings.session_only => None,
             MatchType::Session(s) => s
                 .players
                 .iter()
                 .find_map(|p| p.is_local_player.then(|| &p.data.stats)),
-            MatchType::Old(o) => o.players.iter().find_map(|p| match &p.player_type {
-                StrippedPlayerType::LocalPlayer(l) => Some(l),
-                StrippedPlayerType::RemotePlayer => None,
-            }),
+            MatchType::Old(_) => None,
         });
 
-        let totals: PlayerAllTimeStats =
-            all_stats.fold(PlayerAllTimeStats::default(), |mut total, stats| {
+        let totals: PlayerLongtimeStats =
+            all_stats.fold(PlayerLongtimeStats::default(), |mut total, stats| {
                 total.goals += stats.goals as u64;
                 total.shots += stats.shots as u64;
                 total.assists += stats.assists as u64;
@@ -239,15 +210,15 @@ impl MyStatsWidget {
 
 impl egui::Widget for &mut MyStatsWidget {
     fn ui(self, ui: &mut egui::Ui) -> egui::Response {
-        ui.vertical_centered_justified(|ui| {
-            self.render_settings_header(ui);
-
+        ui.vertical(|ui| {
             ui.horizontal(|ui| {
-                self.render_win_loss(ui);
-                ui.add_space(2.0);
                 self.render_stats(ui);
+                self.render_win_loss(ui);
             });
 
+            ui.separator();
+
+            self.render_settings_header(ui);
             self.render_mmr_graph(ui);
         })
         .response

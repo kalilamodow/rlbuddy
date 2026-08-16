@@ -35,7 +35,7 @@ impl std::fmt::Display for Panel {
             match self {
                 Panel::CurrentMatch => "Lobby",
                 Panel::PastMatches => "History",
-                Panel::MyStats => "My Stats",
+                Panel::MyStats => "Session",
                 Panel::MusicControl => "Music",
                 Panel::Discord => "Discord",
                 Panel::PlayerSearch => "Player Search",
