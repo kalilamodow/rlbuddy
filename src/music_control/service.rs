@@ -49,7 +49,7 @@ impl MusicControlService {
             state: ThreadedReadWriteStateHandle::default(),
             command_receiver: Receiver::new(),
             stats_api,
-            last_update: SystemTime::now(),
+            last_update: SystemTime::UNIX_EPOCH,
         }
     }
 
