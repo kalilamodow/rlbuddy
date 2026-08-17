@@ -3,10 +3,11 @@ use crate::{
         ReadWriteStateHandle, ReadonlyStateHandle, channel::Sender, eventsource::EventReceiver,
     },
     matches::MatchesServiceState,
+    rocket_league::Playlist,
     stats_api::RLEvent,
     toast_alert::Toast,
 };
-use eframe::egui::{self, RichText};
+use eframe::egui;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Default, Serialize, Deserialize, Clone)]
@@ -44,9 +45,30 @@ impl MatchNotificatorService {
     }
 
     pub fn update(&self) {
+        let matches_state = self.matches_handle.read();
+        if matches_state
+            .current_match
+            .as_ref()
+            .is_some_and(|m| matches!(m.playlist, Playlist::Training))
+            && self.settings_handle.read().training_only
+        {
+            return;
+        }
+
         while let Some(event) = self.stats_api.try_recv() {
             match event.as_ref() {
-                // TODO: handle events
+                RLEvent::Goal {
+                    ball_speed,
+                    release_speed,
+                } => self.toasts.send(Toast::new(format!(
+                    "Nice shot! {ball_speed}km/h\nRelease: {release_speed}km/h"
+                ))),
+                RLEvent::CrossbarHit {
+                    impact_speed,
+                    release_speed,
+                } => self.toasts.send(Toast::new(format!(
+                    "Close one! {impact_speed}km/h\nRelease: {release_speed}km/h"
+                ))),
                 _ => {}
             }
         }
@@ -81,8 +103,7 @@ impl egui::Widget for &MatchNotificatorSettingsWidget {
 
                 c2.with_layout(egui::Layout::right_to_left(egui::Align::Min), |c2| {
                     if c2.small_button("Send test notification").clicked() {
-                        self.toasts
-                            .send(Toast::new(RichText::new(format!("{settings:?}"))));
+                        self.toasts.send(Toast::new(format!("{settings:?}")));
                     }
                 });
             });

@@ -1,11 +1,12 @@
 use crate::common::channel::{Receiver, Sender};
-use eframe::egui::{self, RichText};
+use eframe::egui;
 use std::time::{Duration, Instant};
 
 // how long to show for
 const SHOW_FOR: Duration = Duration::from_secs(3);
-// in between minimize and destroying window
-const CLOSE_DELAY: Duration = Duration::from_millis(10);
+// in between close and destroying window reference, egui poops itself if
+// we stop rendering the deferred viewport before it gets a chance to close normally
+const CLOSE_DELAY: Duration = Duration::from_secs(1);
 
 // from edge of screen
 const TOAST_OFFSET: f32 = 16.0;
@@ -14,13 +15,13 @@ const TOAST_HEIGHT: f32 = 75.0;
 
 #[derive(Debug, Clone)]
 pub struct Toast {
-    message: RichText,
+    message: String,
     created_at: Instant,
     closed_at: Option<Instant>,
 }
 
 impl Toast {
-    pub fn new(message: RichText) -> Self {
+    pub fn new(message: String) -> Self {
         Self {
             message,
             created_at: Instant::now(),
@@ -64,7 +65,8 @@ impl ToastAlertService {
                     monitor.x - TOAST_WIDTH - TOAST_OFFSET
                 });
 
-            self.ctx.show_viewport_immediate(
+            let text = toast.message.clone();
+            self.ctx.show_viewport_deferred(
                 egui::ViewportId::from_hash_of(toast.created_at),
                 egui::ViewportBuilder::default()
                     .with_always_on_top()
@@ -72,14 +74,14 @@ impl ToastAlertService {
                     .with_position(egui::pos2(toast_x, TOAST_OFFSET))
                     .with_decorations(false)
                     .with_mouse_passthrough(true),
-                |ui, _| {
+                move |ui, _| {
                     egui::CentralPanel::no_frame()
                         .frame(
                             egui::Frame::canvas(ui.style())
                                 .corner_radius(egui::CornerRadius::same(4)),
                         )
                         .show_inside(ui, |ui| {
-                            ui.label(toast.message.clone());
+                            ui.label(&text);
                         });
                 },
             );
@@ -103,10 +105,10 @@ impl ToastAlertService {
         });
 
         for toast in &mut self.active {
-            if now.duration_since(toast.created_at) >= SHOW_FOR {
+            if toast.closed_at.is_none() && now.duration_since(toast.created_at) >= SHOW_FOR {
                 self.ctx.send_viewport_cmd_to(
                     egui::ViewportId::from_hash_of(toast.created_at),
-                    egui::ViewportCommand::Minimized(true),
+                    egui::ViewportCommand::Close,
                 );
 
                 toast.closed_at = Some(Instant::now());

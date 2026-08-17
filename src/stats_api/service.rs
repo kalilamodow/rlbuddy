@@ -36,6 +36,26 @@ pub struct PlayerStats {
     pub touches: u16,
 }
 
+#[derive(Debug, Default, Serialize, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct StatsApiBallLastTouch {
+    speed: f32,
+}
+
+#[derive(Debug, Default, Serialize, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct StatsApiCrossbarHitEvent {
+    pub ball_speed: f32,
+    pub ball_last_touch: StatsApiBallLastTouch,
+}
+
+#[derive(Debug, Default, Serialize, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct StatsApiGoalScoredEvent {
+    pub goal_speed: f32,
+    pub ball_last_touch: StatsApiBallLastTouch,
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 struct StatsApiPlayerData {
@@ -178,6 +198,15 @@ pub enum RLEvent {
     MatchOver(Team), // winner
     MatchLeft,
 
+    CrossbarHit {
+        impact_speed: f32,
+        release_speed: f32,
+    },
+    Goal {
+        ball_speed: f32,
+        release_speed: f32,
+    },
+
     ReplayStart,
     ReplayDone,
 
@@ -271,7 +300,7 @@ impl StatsApi {
     }
 
     fn on_stats_api_event(&mut self, event: &StatsApiEvent) -> Option<RLEvent> {
-        match event.event.as_str() {
+        Some(match event.event.as_str() {
             "UpdateState" => {
                 let data: UpdateStateEventData = serde_json::from_str(&event.data).unwrap();
 
@@ -286,7 +315,7 @@ impl StatsApi {
                     }
                 }
 
-                Some(RLEvent::Update(MatchUpdate {
+                RLEvent::Update(MatchUpdate {
                     state: if data.game.replay {
                         MatchState::Replay
                     } else if data.game.overtime {
@@ -302,24 +331,38 @@ impl StatsApi {
                         .filter_map(parse_stats_api_player)
                         .collect(),
                     playlist: Playlist::try_from_primitive(data.game.playlist_id).unwrap(),
-                }))
+                })
             }
             "MatchCreated" => {
                 self.match_created_event_happened = true;
-                None
+                return None;
             }
             "CountdownBegin" if self.match_created_event_happened => {
                 self.match_created_event_happened = false;
-                Some(RLEvent::MatchStart)
+                RLEvent::MatchStart
             }
             "MatchEnded" => {
                 let data: MatchEndedEventData = serde_json::from_str(&event.data).unwrap();
-                Some(RLEvent::MatchOver(Team::from(data.winner_team_num)))
+                RLEvent::MatchOver(Team::from(data.winner_team_num))
             }
-            "MatchDestroyed" => Some(RLEvent::MatchLeft),
-            "GoalReplayStart" => Some(RLEvent::ReplayStart),
-            "GoalReplayEnd" => Some(RLEvent::ReplayDone),
-            _ => None,
-        }
+            "MatchDestroyed" => RLEvent::MatchLeft,
+            "GoalReplayStart" => RLEvent::ReplayStart,
+            "GoalReplayEnd" => RLEvent::ReplayDone,
+            "CrossbarHit" => {
+                let data: StatsApiCrossbarHitEvent = serde_json::from_str(&event.data).unwrap();
+                RLEvent::CrossbarHit {
+                    impact_speed: data.ball_speed,
+                    release_speed: data.ball_last_touch.speed,
+                }
+            }
+            "GoalScored" => {
+                let data: StatsApiGoalScoredEvent = serde_json::from_str(&event.data).unwrap();
+                RLEvent::Goal {
+                    ball_speed: data.goal_speed,
+                    release_speed: data.ball_last_touch.speed,
+                }
+            }
+            _ => return None,
+        })
     }
 }
