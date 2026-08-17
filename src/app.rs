@@ -9,6 +9,7 @@ use crate::{
     player_info::{PlayerInfoService, PlayerSearchWidget},
     settings::SettingsWidget,
     stats_api::{RLEvent, StatsApi},
+    toast_alert::{MatchNotificatorService, MatchNotificatorSettings, ToastAlertService},
 };
 use eframe::egui;
 use serde::{Deserialize, Serialize};
@@ -75,6 +76,7 @@ struct AppData {
     matches: Vec<StrippedMatchInfo>,
     my_stats_settings: Option<MyStatsWidgetSettings>,
     music_control_settings: Option<MusicControlSettings>,
+    match_notifications: Option<MatchNotificatorSettings>,
 }
 
 impl Default for AppData {
@@ -87,6 +89,7 @@ impl Default for AppData {
             matches: Vec::new(),
             music_control_settings: None,
             my_stats_settings: None,
+            match_notifications: None,
         }
     }
 }
@@ -116,6 +119,9 @@ pub struct RlBuddyApp {
     player_info_service: PlayerInfoService,
     player_search_widget: PlayerSearchWidget,
 
+    match_notificator_service: MatchNotificatorService,
+    toast_service: ToastAlertService,
+
     hotkey_service: HotkeyService,
     auto_setup_widget: AutoSetupWidget,
     settings_widget: SettingsWidget,
@@ -136,8 +142,15 @@ impl RlBuddyApp {
 
         let (overlay_tx, overlay_rx) = mpsc::channel();
         let mut stats_api_service = StatsApi::new();
+        let toast_service = ToastAlertService::new(ctx.clone());
         let matches_service =
             MatchesService::new(&ctx, stats_api_service.subscribe(), app_data.matches);
+        let match_notificator_service = MatchNotificatorService::new(
+            app_data.match_notifications,
+            matches_service.state_handle(),
+            stats_api_service.subscribe(),
+            toast_service.sender(),
+        );
         let music_control_service = MusicControlService::new(
             app_data.music_control_settings,
             stats_api_service.subscribe(),
@@ -151,15 +164,17 @@ impl RlBuddyApp {
 
         let current_transparency = Rc::new(RefCell::new(app_data.transparency));
         RlBuddyApp {
-            settings_widget: SettingsWidget::new(&hotkey_service, Rc::clone(&current_transparency)),
+            settings_widget: SettingsWidget::new(
+                &hotkey_service,
+                &match_notificator_service,
+                &toast_service,
+                Rc::clone(&current_transparency),
+            ),
 
             overlay_tx,
             overlay_rx,
             current_transparency,
             prev_hide_pos: None,
-
-            stats_api_events: stats_api_service.subscribe(),
-            stats_api_service,
 
             discord_widget: discord::DiscordWidget::new(
                 discord_service.settings_handle(),
@@ -182,12 +197,17 @@ impl RlBuddyApp {
                 matches_service.state_handle(),
                 player_info_service.sender(),
             ),
+            match_notificator_service,
             matches_service,
+
+            stats_api_events: stats_api_service.subscribe(),
+            stats_api_service,
 
             hotkey_service,
             player_search_widget: PlayerSearchWidget::new(player_info_service.sender()),
             player_info_service,
 
+            toast_service,
             auto_setup_widget: AutoSetupWidget::new(),
             open_panels: app_data.open_panels,
         }
@@ -240,6 +260,12 @@ impl eframe::App for RlBuddyApp {
             my_stats_settings: Some(self.my_stats_widget.clone_settings()),
             music_control_settings: Some(
                 self.music_control_service.settings_handle().read().clone(),
+            ),
+            match_notifications: Some(
+                self.match_notificator_service
+                    .settings_handle()
+                    .read()
+                    .clone(),
             ),
         };
         eframe::set_value(storage, eframe::APP_KEY, &data);
@@ -341,6 +367,8 @@ impl eframe::App for RlBuddyApp {
         self.player_info_service.update();
         self.discord_service.update();
         self.music_control_service.update();
+        self.match_notificator_service.update();
+        self.toast_service.update();
 
         while let Some(event) = self.stats_api_events.try_recv() {
             match *event {

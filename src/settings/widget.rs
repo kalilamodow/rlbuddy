@@ -5,12 +5,14 @@ use eframe::egui;
 use crate::{
     hotkey::{HotkeyService, HotkeySettingsWidget},
     settings::app_settings::AppSettingsWidget,
+    toast_alert::{MatchNotificatorService, MatchNotificatorSettingsWidget, ToastAlertService},
 };
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 enum Panel {
     HotkeySettings,
     AppSettings,
+    MatchNotificator,
 }
 
 impl std::fmt::Display for Panel {
@@ -21,23 +23,38 @@ impl std::fmt::Display for Panel {
             match self {
                 Panel::HotkeySettings => "Keybind",
                 Panel::AppSettings => "App",
+                Panel::MatchNotificator => "Toast",
             }
         )
     }
 }
 
-const ALL_PANELS: [Panel; 2] = [Panel::HotkeySettings, Panel::AppSettings];
+const ALL_PANELS: [Panel; 3] = [
+    Panel::HotkeySettings,
+    Panel::AppSettings,
+    Panel::MatchNotificator,
+];
 
 pub struct SettingsWidget {
     hotkey: HotkeySettingsWidget,
     app: AppSettingsWidget,
+    notificator: MatchNotificatorSettingsWidget,
 }
 
 impl SettingsWidget {
-    pub fn new(hotkey_service: &HotkeyService, transparency: Rc<RefCell<u8>>) -> Self {
+    pub fn new(
+        hotkey_service: &HotkeyService,
+        match_notificator_service: &MatchNotificatorService,
+        toast_service: &ToastAlertService,
+        transparency: Rc<RefCell<u8>>,
+    ) -> Self {
         Self {
             hotkey: HotkeySettingsWidget::new(hotkey_service.settings_handle()),
             app: AppSettingsWidget::new(transparency),
+            notificator: MatchNotificatorSettingsWidget::new(
+                &match_notificator_service,
+                toast_service.sender(),
+            ),
         }
     }
 }
@@ -54,6 +71,7 @@ impl egui::Widget for &mut SettingsWidget {
                     match panel {
                         Panel::HotkeySettings => ui.add(&self.hotkey),
                         Panel::AppSettings => ui.add(&self.app),
+                        Panel::MatchNotificator => ui.add(&self.notificator),
                     };
                 });
             }
