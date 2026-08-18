@@ -81,7 +81,9 @@ impl ToastAlertService {
                                 .corner_radius(egui::CornerRadius::same(4)),
                         )
                         .show_inside(ui, |ui| {
-                            ui.label(&text);
+                            ui.centered_and_justified(|ui| {
+                                ui.label(egui::RichText::new(&text).line_height(Some(20.0)))
+                            })
                         });
                 },
             );
