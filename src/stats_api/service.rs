@@ -38,7 +38,8 @@ pub struct PlayerStats {
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
-pub struct StatsApiBallLastTouchPlayer {
+// name, shortcut, team
+pub struct StatsApiPlayerTargetData {
     pub shortcut: u8,
 }
 
@@ -46,7 +47,7 @@ pub struct StatsApiBallLastTouchPlayer {
 #[serde(rename_all = "PascalCase")]
 pub struct StatsApiBallLastTouch {
     pub speed: f32,
-    pub player: StatsApiBallLastTouchPlayer,
+    pub player: StatsApiPlayerTargetData,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -60,6 +61,7 @@ pub struct StatsApiCrossbarHitEvent {
 #[serde(rename_all = "PascalCase")]
 pub struct StatsApiGoalScoredEvent {
     pub goal_speed: f32,
+    pub scorer: StatsApiPlayerTargetData,
     pub ball_last_touch: StatsApiBallLastTouch,
 }
 
@@ -79,12 +81,6 @@ struct StatsApiPlayerData {
 #[serde(rename_all = "PascalCase")]
 struct StatsApiTeamData {
     score: u8,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "PascalCase")]
-struct StatsApiPlayerTargetData {
-    shortcut: u8,
 }
 
 #[derive(Debug, Deserialize)]
@@ -371,8 +367,7 @@ impl StatsApi {
                 RLEvent::Goal {
                     ball_speed: data.goal_speed,
                     release_speed: data.ball_last_touch.speed,
-                    is_ours: Some(data.ball_last_touch.player.shortcut)
-                        == self.local_player_shortcut,
+                    is_ours: Some(data.scorer.shortcut) == self.local_player_shortcut,
                 }
             }
             _ => return None,
