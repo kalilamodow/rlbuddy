@@ -71,7 +71,7 @@ impl egui::Widget for &mut SettingsWidget {
                     match panel {
                         Panel::HotkeySettings => ui.add(&self.hotkey),
                         Panel::AppSettings => ui.add(&self.app),
-                        Panel::MatchNotificator => ui.add(&self.notificator),
+                        Panel::MatchNotificator => ui.add(&mut self.notificator),
                     };
                 });
             }

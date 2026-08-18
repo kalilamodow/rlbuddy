@@ -80,6 +80,7 @@ impl MatchNotificatorService {
 pub struct MatchNotificatorSettingsWidget {
     settings_handle: ReadWriteStateHandle<MatchNotificatorSettings>,
     toasts: Sender<Toast>,
+    test_toast_text: String,
 }
 
 impl MatchNotificatorSettingsWidget {
@@ -87,11 +88,12 @@ impl MatchNotificatorSettingsWidget {
         Self {
             settings_handle: service.settings_handle(),
             toasts,
+            test_toast_text: "Test notification content".into(),
         }
     }
 }
 
-impl egui::Widget for &MatchNotificatorSettingsWidget {
+impl egui::Widget for &mut MatchNotificatorSettingsWidget {
     fn ui(self, ui: &mut egui::Ui) -> egui::Response {
         ui.vertical(|ui| {
             let mut settings = self.settings_handle.write();
@@ -103,9 +105,10 @@ impl egui::Widget for &MatchNotificatorSettingsWidget {
                 c1.checkbox(&mut settings.disable_goal_speed, "Disable goal speed");
                 c1.checkbox(&mut settings.training_only, "Training only");
 
-                c2.with_layout(egui::Layout::right_to_left(egui::Align::Min), |c2| {
+                c2.with_layout(egui::Layout::top_down(egui::Align::Max), |c2| {
+                    c2.add(egui::TextEdit::multiline(&mut self.test_toast_text));
                     if c2.small_button("Send test notification").clicked() {
-                        self.toasts.send(Toast::new(format!("{settings:?}")));
+                        self.toasts.send(Toast::new(self.test_toast_text.clone()));
                     }
                 });
             });
