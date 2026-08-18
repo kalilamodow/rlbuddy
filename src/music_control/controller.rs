@@ -149,6 +149,8 @@ impl PlaybackInfo {
 }
 
 pub struct MediaController {
+    #[allow(unused)] // needs to stay alive or the CurrentSessionChanged listener will drop
+    manager: GlobalSystemMediaTransportControlsSessionManager,
     current_session: Arc<Mutex<Option<GlobalSystemMediaTransportControlsSession>>>,
 }
 
@@ -182,7 +184,10 @@ impl MediaController {
             }))
             .unwrap();
 
-        Self { current_session }
+        Self {
+            manager,
+            current_session,
+        }
     }
 
     pub fn next(&self) {
