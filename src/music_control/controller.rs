@@ -161,6 +161,8 @@ impl MediaController {
         let current_session = manager.GetCurrentSession().ok();
         if let Some(current_session) = &current_session {
             PlaybackInfo::listen_from_session(current_session, &playback_info_sender);
+        } else {
+            let _ = playback_info_sender.send(None);
         }
 
         let current_session = Arc::new(Mutex::new(current_session));
@@ -178,6 +180,8 @@ impl MediaController {
 
                 if let Some(new_session) = session.as_ref() {
                     PlaybackInfo::listen_from_session(new_session, &playback_info_sender);
+                } else {
+                    let _ = playback_info_sender.send(None);
                 }
 
                 Ok(())
