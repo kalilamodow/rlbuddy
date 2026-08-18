@@ -60,13 +60,15 @@ impl MatchNotificatorService {
                 RLEvent::Goal {
                     ball_speed,
                     release_speed,
-                } => self.toasts.send(Toast::new(format!(
+                    is_ours,
+                } if *is_ours => self.toasts.send(Toast::new(format!(
                     "Nice shot! {ball_speed}km/h\nRelease: {release_speed}km/h"
                 ))),
                 RLEvent::CrossbarHit {
                     impact_speed,
                     release_speed,
-                } => self.toasts.send(Toast::new(format!(
+                    is_ours,
+                } if *is_ours => self.toasts.send(Toast::new(format!(
                     "Close one! {impact_speed}km/h\nRelease: {release_speed}km/h"
                 ))),
                 _ => {}

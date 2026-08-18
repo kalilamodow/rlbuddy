@@ -38,8 +38,15 @@ pub struct PlayerStats {
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
+pub struct StatsApiBallLastTouchPlayer {
+    pub shortcut: u8,
+}
+
+#[derive(Debug, Default, Serialize, Deserialize)]
+#[serde(rename_all = "PascalCase")]
 pub struct StatsApiBallLastTouch {
-    speed: f32,
+    pub speed: f32,
+    pub player: StatsApiBallLastTouchPlayer,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -201,10 +208,12 @@ pub enum RLEvent {
     CrossbarHit {
         impact_speed: f32,
         release_speed: f32,
+        is_ours: bool,
     },
     Goal {
         ball_speed: f32,
         release_speed: f32,
+        is_ours: bool,
     },
 
     ReplayStart,
@@ -224,7 +233,7 @@ enum ApiUpdate {
 
 pub struct StatsApi {
     event_rx: mpsc::Receiver<ApiUpdate>,
-    local_player_id_event_emitted_yet: bool,
+    local_player_shortcut: Option<u8>,
     match_created_event_happened: bool,
     publisher: EventSource<RLEvent>,
 }
@@ -275,7 +284,7 @@ impl StatsApi {
 
         StatsApi {
             event_rx,
-            local_player_id_event_emitted_yet: false,
+            local_player_shortcut: None,
             match_created_event_happened: false,
             publisher: EventSource::new(),
         }
@@ -304,13 +313,13 @@ impl StatsApi {
             "UpdateState" => {
                 let data: UpdateStateEventData = serde_json::from_str(&event.data).unwrap();
 
-                if !self.local_player_id_event_emitted_yet
+                if self.local_player_shortcut.is_none()
                     && let Some(game_target) = data.game.target.as_ref()
                 {
                     let target_shortcut = game_target.shortcut;
                     let our_player = data.players.iter().find(|p| p.shortcut == target_shortcut);
                     if let Some(player) = our_player {
-                        self.local_player_id_event_emitted_yet = true;
+                        self.local_player_shortcut = Some(player.shortcut);
                         return Some(RLEvent::OurPlayerId(player.primary_id.clone()));
                     }
                 }
@@ -353,6 +362,8 @@ impl StatsApi {
                 RLEvent::CrossbarHit {
                     impact_speed: data.ball_speed,
                     release_speed: data.ball_last_touch.speed,
+                    is_ours: Some(data.ball_last_touch.player.shortcut)
+                        == self.local_player_shortcut,
                 }
             }
             "GoalScored" => {
@@ -360,6 +371,8 @@ impl StatsApi {
                 RLEvent::Goal {
                     ball_speed: data.goal_speed,
                     release_speed: data.ball_last_touch.speed,
+                    is_ours: Some(data.ball_last_touch.player.shortcut)
+                        == self.local_player_shortcut,
                 }
             }
             _ => return None,
