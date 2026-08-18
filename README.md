@@ -1,3 +1,5 @@
+# note: readme is very out of date, it will be updated soon though
+
 # rlbuddy
 
 An overlay for Rocket League which displays the names/ranks of everybody in your lobby without tabbing out, and a lot of other stuff too!
