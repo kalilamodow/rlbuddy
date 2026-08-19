@@ -377,7 +377,7 @@ impl eframe::App for RlBuddyApp {
                     "rlbuddy (connected)".to_string(),
                 )),
                 RLEvent::Disconnected => ctx.send_viewport_cmd(egui::ViewportCommand::Title(
-                    "rlbuddy (not connected".to_string(),
+                    "rlbuddy (not connected)".to_string(),
                 )),
                 RLEvent::MatchStart => self.pop_up(),
                 _ => {}
