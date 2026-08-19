@@ -158,6 +158,7 @@ impl RlBuddyApp {
         let discord_service = discord::DiscordService::new(
             app_data.rich_presence_settings,
             matches_service.state_handle(),
+            stats_api_service.subscribe(),
         );
         let hotkey_service = HotkeyService::new(&overlay_tx, app_data.hotkey_settings);
         let player_info_service = PlayerInfoService::new(ctx.clone());

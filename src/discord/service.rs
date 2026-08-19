@@ -1,9 +1,9 @@
 use super::rpc::{PresenceData, RichPresenceController};
 use crate::{
-    common::{ReadWriteStateHandle, ReadonlyStateHandle},
+    common::{ReadWriteStateHandle, ReadonlyStateHandle, eventsource::EventReceiver},
     matches::MatchesServiceState,
     rocket_league::{Playlist, Team},
-    stats_api::MatchState,
+    stats_api::{MatchState, RLEvent},
 };
 use serde::{Deserialize, Serialize};
 
@@ -66,12 +66,15 @@ pub struct DiscordService {
     controller: RichPresenceController,
     current: GameState,
     matches_handle: ReadonlyStateHandle<MatchesServiceState>,
+    stats_api: EventReceiver<RLEvent>,
+    is_rl_open: bool,
 }
 
 impl DiscordService {
     pub fn new(
         settings: Option<DiscordSettings>,
         matches_handle: ReadonlyStateHandle<MatchesServiceState>,
+        stats_api: EventReceiver<RLEvent>,
     ) -> Self {
         DiscordService {
             state: ReadWriteStateHandle::new(DiscordServiceState::default()),
@@ -79,10 +82,20 @@ impl DiscordService {
             controller: RichPresenceController::new(),
             current: GameState::Lobby,
             matches_handle,
+            stats_api,
+            is_rl_open: false,
         }
     }
 
     pub fn update(&mut self) {
+        while let Some(event) = self.stats_api.try_recv() {
+            match event.as_ref() {
+                RLEvent::Connected => self.is_rl_open = true,
+                RLEvent::Disconnected => self.is_rl_open = false,
+                _ => {}
+            }
+        }
+
         self.current = if let Some(current_match) = &self.matches_handle.read().current_match {
             let (our_score, their_score) = match current_match.our_team {
                 Team::Blue => (current_match.score.blue, current_match.score.orange),
@@ -107,7 +120,7 @@ impl DiscordService {
     fn send_current(&mut self) {
         let settings = self.settings.read();
 
-        if settings.disable {
+        if settings.disable || !self.is_rl_open {
             self.controller.ensure_disconnected();
             return;
         }
