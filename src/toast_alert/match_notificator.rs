@@ -46,11 +46,12 @@ impl MatchNotificatorService {
 
     pub fn update(&self) {
         let matches_state = self.matches_handle.read();
-        if matches_state
-            .current_match
-            .as_ref()
-            .is_some_and(|m| matches!(m.playlist, Playlist::Training))
-            && self.settings_handle.read().training_only
+
+        if self.settings_handle.read().training_only
+            && matches_state
+                .current_match
+                .as_ref()
+                .is_some_and(|m| !matches!(m.playlist, Playlist::Training))
         {
             return;
         }
