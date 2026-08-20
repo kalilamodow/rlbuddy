@@ -290,6 +290,71 @@ impl<'a> MatchRenderer<'a> {
         });
     }
 
+    fn render_match_mmr_info(&self, ui: &mut egui::Ui) {
+        let (avg_mmr, local_mmr) = match self.match_info {
+            MatchType::Old(o) => (
+                o.players
+                    .iter()
+                    .filter_map(|p| p.rank_in_mode.as_ref().map(|r| r.mmr))
+                    .sum::<i16>()
+                    / i16::try_from(
+                        o.players
+                            .iter()
+                            .filter(|p| p.rank_in_mode.is_some())
+                            .count(),
+                    )
+                    .unwrap_or(1),
+                o.players
+                    .iter()
+                    .find(|p| p.is_local_player())
+                    .and_then(|p| p.rank_in_mode.as_ref())
+                    .map(|r| r.mmr),
+            ),
+            MatchType::Session(s) => (
+                s.players
+                    .iter()
+                    .filter_map(|p| {
+                        p.skill
+                            .as_ref()
+                            .and_then(|sk| sk.get_playlist(self.match_info.playlist()))
+                            .map(|sk| sk.mmr)
+                    })
+                    .sum::<i16>()
+                    / i16::try_from(
+                        s.players
+                            .iter()
+                            .filter(|p| {
+                                p.skill.as_ref().is_some_and(|sk| {
+                                    sk.get_playlist(self.match_info.playlist()).is_some()
+                                })
+                            })
+                            .count(),
+                    )
+                    .unwrap_or(1),
+                s.players.iter().find(|p| p.is_local_player).and_then(|p| {
+                    p.skill
+                        .as_ref()
+                        .and_then(|sk| sk.get_playlist(self.match_info.playlist()))
+                        .map(|sk| sk.mmr)
+                }),
+            ),
+        };
+
+        ui.horizontal(|ui| {
+            ui.label(format!("Lobby average: {avg_mmr}"));
+            if let Some(local_mmr) = local_mmr {
+                ui.label(format!("Yours: {local_mmr}"));
+                let diff = local_mmr - avg_mmr;
+
+                match local_mmr.cmp(&avg_mmr) {
+                    Ordering::Greater => ui.colored_label(egui::Color32::GREEN, format!("+{diff}")),
+                    Ordering::Less => ui.colored_label(egui::Color32::RED, format!("{diff}")),
+                    Ordering::Equal => ui.label("+0"),
+                };
+            }
+        });
+    }
+
     fn render_stats_window(&self, ui: &mut egui::Ui, player: &(String, String)) -> bool {
         let mut window_is_open = true;
 
@@ -368,37 +433,42 @@ impl egui::Widget for MatchRenderer<'_> {
             }
         }
 
-        egui::Grid::new(self.match_info.started_at())
-            .spacing(egui::vec2(8.0, 12.0))
-            .striped(true)
-            .show(ui, |ui| {
-                center_label(ui, bold_text("Rank"));
-                ui.label(bold_text("Player"));
-                if matches!(self.match_info, MatchType::Session(_)) {
-                    center_label(ui, bold_text("Score"));
-                    ui.label(""); // more button
-                }
+        ui.vertical(|ui| {
+            egui::Grid::new(self.match_info.started_at())
+                .spacing(egui::vec2(8.0, 12.0))
+                .striped(true)
+                .show(ui, |ui| {
+                    center_label(ui, bold_text("Rank"));
+                    ui.label(bold_text("Player"));
+                    if matches!(self.match_info, MatchType::Session(_)) {
+                        center_label(ui, bold_text("Score"));
+                        ui.label(""); // more button
+                    }
 
-                ui.end_row();
+                    ui.end_row();
 
-                match self.match_info {
-                    MatchType::Old(o) => {
-                        for player in filter_useless_bots(&o.players, |p| p.platform, |_| 1) {
-                            self.render_stripped_player(ui, player);
+                    match self.match_info {
+                        MatchType::Old(o) => {
+                            for player in filter_useless_bots(&o.players, |p| p.platform, |_| 1) {
+                                self.render_stripped_player(ui, player);
+                            }
+                        }
+                        MatchType::Session(s) => {
+                            for player in filter_useless_bots(
+                                &s.players,
+                                |p| p.data.platform,
+                                |p| p.data.stats.score,
+                            ) {
+                                self.render_player(ui, player);
+                            }
                         }
                     }
-                    MatchType::Session(s) => {
-                        for player in filter_useless_bots(
-                            &s.players,
-                            |p| p.data.platform,
-                            |p| p.data.stats.score,
-                        ) {
-                            self.render_player(ui, player);
-                        }
-                    }
-                }
-            })
-            .response
+                });
+
+            ui.add_space(4.0);
+            self.render_match_mmr_info(ui);
+        })
+        .response
     }
 }
 
