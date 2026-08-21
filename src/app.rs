@@ -13,7 +13,7 @@ use crate::{
 };
 use eframe::egui;
 use serde::{Deserialize, Serialize};
-use std::{cell::RefCell, rc::Rc, thread};
+use std::{cell::RefCell, fs, path::PathBuf, rc::Rc, thread};
 use std::{sync::mpsc, time::Duration};
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, Serialize, Deserialize)]
@@ -132,13 +132,13 @@ impl RlBuddyApp {
         let ctx = cc.egui_ctx.clone();
         egui_system_fonts::set_auto(&ctx, egui_system_fonts::FontStyle::Sans);
 
-        let app_data = if let Some(storage) = cc.storage
-            && let Some(existing_state) = eframe::get_value::<AppData>(storage, eframe::APP_KEY)
-        {
-            existing_state
-        } else {
-            AppData::default()
-        };
+        let app_data: AppData = data_file()
+            .and_then(|file| {
+                let _ = fs::create_dir_all(file.parent()?);
+                let string = fs::read_to_string(file).ok()?;
+                serde_json::from_str(&string).ok()
+            })
+            .unwrap_or_default();
 
         let (overlay_tx, overlay_rx) = mpsc::channel();
         let mut stats_api_service = StatsApi::new();
@@ -248,10 +248,12 @@ impl RlBuddyApp {
             tx.send(false).unwrap();
         });
     }
-}
 
-impl eframe::App for RlBuddyApp {
-    fn save(&mut self, storage: &mut dyn eframe::Storage) {
+    fn on_close(&self) {
+        let Some(file) = data_file() else {
+            return;
+        };
+
         let data = AppData {
             transparency: *self.current_transparency.borrow(),
             hotkey_settings: Some(self.hotkey_service.settings_handle().read().clone()),
@@ -269,9 +271,22 @@ impl eframe::App for RlBuddyApp {
                     .clone(),
             ),
         };
-        eframe::set_value(storage, eframe::APP_KEY, &data);
-    }
 
+        let to_write = match serde_json::to_string(&data) {
+            Ok(dih) => dih,
+            Err(error) => {
+                eprintln!("Failed to serialize savedata: {error}");
+                return;
+            }
+        };
+
+        if let Err(error) = fs::write(file, to_write) {
+            eprintln!("Error while writing savedata: {error}");
+        }
+    }
+}
+
+impl eframe::App for RlBuddyApp {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         visuals_with_transparency(ui.visuals_mut(), *self.current_transparency.borrow());
 
@@ -393,9 +408,19 @@ impl eframe::App for RlBuddyApp {
         }
 
         ctx.request_repaint_after(Duration::from_millis(10));
+
+        if ctx.input(|i| i.viewport().close_requested()) {
+            self.on_close();
+        }
     }
 
     fn clear_color(&self, _visuals: &egui::Visuals) -> [f32; 4] {
         egui::Rgba::TRANSPARENT.to_array()
     }
+}
+
+fn data_file() -> Option<PathBuf> {
+    std::env::var("APPDATA")
+        .map(|roaming| PathBuf::from(roaming).join("rlbuddy/data.json"))
+        .ok()
 }

@@ -24,7 +24,7 @@ windows-future = "0.3.2"
 [dependencies.eframe]
 version = "0.34.3"
 default-features = false
-features = ["glow", "persistence"]
+features = ["glow"]
 
 [dependencies.egui_extras]
 version = "0.34.3"
