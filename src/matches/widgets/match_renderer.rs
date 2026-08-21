@@ -37,6 +37,14 @@ impl<'a> MatchRenderer<'a> {
         }
     }
 
+    fn ranked_playlist(&self) -> Playlist {
+        self.match_info
+            .playlist()
+            .in_ranked()
+            .or_else(|| Playlist::infer_from_player_count(self.match_info.player_qty()))
+            .unwrap_or_else(|| self.match_info.playlist())
+    }
+
     fn render_header(&mut self, ui: &mut egui::Ui) -> egui::Response {
         ui.horizontal(|ui| {
             let playlist = match self.match_info {
@@ -105,12 +113,7 @@ impl<'a> MatchRenderer<'a> {
     fn render_player(&mut self, ui: &mut egui::Ui, match_player: &MatchPlayer) {
         // rank in this gamemode
         if let Some(player_skills) = &match_player.skill
-            && let Some(rank) = self
-                .match_info
-                .playlist()
-                .in_ranked()
-                .or_else(|| Playlist::infer_from_player_count(self.match_info.player_qty()))
-                .and_then(|playlist_to_show| player_skills.get_playlist(playlist_to_show))
+            && let Some(rank) = player_skills.get_playlist(self.ranked_playlist())
         {
             render_player_rank_cell(ui, rank);
         } else {
@@ -308,7 +311,7 @@ impl<'a> MatchRenderer<'a> {
                     .filter_map(|p| {
                         p.skill
                             .as_ref()
-                            .and_then(|sk| sk.get_playlist(self.match_info.playlist()))
+                            .and_then(|sk| sk.get_playlist(self.ranked_playlist()))
                             .map(|sk| sk.mmr)
                     })
                     .sum::<i16>()
@@ -317,7 +320,7 @@ impl<'a> MatchRenderer<'a> {
                             .iter()
                             .filter(|p| {
                                 p.skill.as_ref().is_some_and(|sk| {
-                                    sk.get_playlist(self.match_info.playlist()).is_some()
+                                    sk.get_playlist(self.ranked_playlist()).is_some()
                                 })
                             })
                             .count()
@@ -327,7 +330,7 @@ impl<'a> MatchRenderer<'a> {
                 s.players.iter().find(|p| p.is_local_player).and_then(|p| {
                     p.skill
                         .as_ref()
-                        .and_then(|sk| sk.get_playlist(self.match_info.playlist()))
+                        .and_then(|sk| sk.get_playlist(self.ranked_playlist()))
                         .map(|sk| sk.mmr)
                 }),
             ),
