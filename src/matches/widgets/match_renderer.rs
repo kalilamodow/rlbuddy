@@ -301,7 +301,8 @@ impl<'a> MatchRenderer<'a> {
                         o.players
                             .iter()
                             .filter(|p| p.rank_in_mode.is_some())
-                            .count(),
+                            .count()
+                            .max(1),
                     )
                     .unwrap_or(1),
                 o.players
@@ -328,7 +329,8 @@ impl<'a> MatchRenderer<'a> {
                                     sk.get_playlist(self.match_info.playlist()).is_some()
                                 })
                             })
-                            .count(),
+                            .count()
+                            .max(1),
                     )
                     .unwrap_or(1),
                 s.players.iter().find(|p| p.is_local_player).and_then(|p| {
