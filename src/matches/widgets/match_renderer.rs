@@ -104,23 +104,14 @@ impl<'a> MatchRenderer<'a> {
 
     fn render_player(&mut self, ui: &mut egui::Ui, match_player: &MatchPlayer) {
         // rank in this gamemode
-        if let Some(skill) = &match_player.skill {
-            let playlist_to_show = self
+        if let Some(player_skills) = &match_player.skill
+            && let Some(rank) = self
                 .match_info
                 .playlist()
                 .in_ranked()
-                .or_else(|| Playlist::infer_from_player_count(self.match_info.player_qty()));
-
-            let Some(playlist_to_show) = playlist_to_show else {
-                center_label(ui, "-");
-                return;
-            };
-
-            let Some(rank) = skill.get_playlist(playlist_to_show) else {
-                center_label(ui, "-");
-                return;
-            };
-
+                .or_else(|| Playlist::infer_from_player_count(self.match_info.player_qty()))
+                .and_then(|playlist_to_show| player_skills.get_playlist(playlist_to_show))
+        {
             render_player_rank_cell(ui, rank);
         } else {
             center_label(ui, "-");
