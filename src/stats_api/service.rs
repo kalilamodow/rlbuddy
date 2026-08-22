@@ -17,11 +17,10 @@ use crate::{
 };
 
 #[derive(Debug, Deserialize)]
-struct StatsApiEvent {
-    #[serde(rename = "Event")]
+#[serde(rename_all = "PascalCase")]
+struct RawStatsApiEvent {
     event: String,
     /// data is a json string
-    #[serde(rename = "Data")]
     data: String,
 }
 
@@ -227,6 +226,42 @@ enum ApiUpdate {
     Event(StatsApiEvent),
 }
 
+enum StatsApiEvent {
+    UpdateState(UpdateStateEventData),
+    MatchCreated,
+    MatchEnded(MatchEndedEventData),
+    MatchDestroyed,
+    CountdownBegin,
+    GoalReplayStart,
+    GoalReplayEnd,
+    CrossbarHit(StatsApiCrossbarHitEvent),
+    GoalScored(StatsApiGoalScoredEvent),
+}
+
+impl TryFrom<RawStatsApiEvent> for StatsApiEvent {
+    type Error = ();
+
+    fn try_from(RawStatsApiEvent { event, data }: RawStatsApiEvent) -> Result<Self, Self::Error> {
+        fn parse_data<'a, T: serde::Deserialize<'a>>(data: &'a String) -> Result<T, ()> {
+            serde_json::from_str(data).map_err(|_| ())
+        }
+
+        Ok(match event.as_str() {
+            "UpdateState" => Self::UpdateState(parse_data(&data)?),
+            "MatchCreated" => Self::MatchCreated,
+            "MatchEnded" => Self::MatchEnded(parse_data(&data)?),
+            "MatchDestroyed" => Self::MatchDestroyed,
+            "CountdownBegin" => Self::CountdownBegin,
+            "GoalReplayStart" => Self::GoalReplayStart,
+            "GoalReplayEnd" => Self::GoalReplayEnd,
+            "CrossbarHit" => Self::CrossbarHit(parse_data(&data)?),
+            "GoalScored" => Self::GoalScored(parse_data(&data)?),
+
+            _ => return Err(()),
+        })
+    }
+}
+
 pub struct StatsApi {
     event_rx: mpsc::Receiver<ApiUpdate>,
     local_player_shortcut: Option<u8>,
@@ -256,12 +291,16 @@ impl StatsApi {
                 let deserializer = serde_json::Deserializer::from_reader(reader);
 
                 for event in deserializer.into_iter() {
-                    let event = match event {
+                    let raw_event: RawStatsApiEvent = match event {
                         Ok(e) => e,
                         Err(error) => {
                             println!("deserialize error: {error:?}");
                             continue;
                         }
+                    };
+
+                    let Ok(event) = raw_event.try_into() else {
+                        continue;
                     };
 
                     if event_tx.send(ApiUpdate::Event(event)).is_err() {
@@ -295,7 +334,7 @@ impl StatsApi {
             let rl_event = match event {
                 ApiUpdate::Connected => Some(RLEvent::Connected),
                 ApiUpdate::Disconnected => Some(RLEvent::Disconnected),
-                ApiUpdate::Event(evt) => self.on_stats_api_event(&evt),
+                ApiUpdate::Event(evt) => self.on_stats_api_event(evt),
             };
 
             if let Some(e) = rl_event {
@@ -304,11 +343,9 @@ impl StatsApi {
         }
     }
 
-    fn on_stats_api_event(&mut self, event: &StatsApiEvent) -> Option<RLEvent> {
-        Some(match event.event.as_str() {
-            "UpdateState" => {
-                let data: UpdateStateEventData = serde_json::from_str(&event.data).unwrap();
-
+    fn on_stats_api_event(&mut self, event: StatsApiEvent) -> Option<RLEvent> {
+        Some(match event {
+            StatsApiEvent::UpdateState(data) => {
                 if self.local_player_shortcut.is_none()
                     && let Some(game_target) = data.game.target.as_ref()
                 {
@@ -338,38 +375,28 @@ impl StatsApi {
                     playlist: Playlist::try_from_primitive(data.game.playlist_id).unwrap(),
                 })
             }
-            "MatchCreated" => {
+            StatsApiEvent::MatchCreated => {
                 self.match_created_event_happened = true;
                 return None;
             }
-            "CountdownBegin" if self.match_created_event_happened => {
+            StatsApiEvent::CountdownBegin if self.match_created_event_happened => {
                 self.match_created_event_happened = false;
                 RLEvent::MatchStart
             }
-            "MatchEnded" => {
-                let data: MatchEndedEventData = serde_json::from_str(&event.data).unwrap();
-                RLEvent::MatchOver(Team::from(data.winner_team_num))
-            }
-            "MatchDestroyed" => RLEvent::MatchLeft,
-            "GoalReplayStart" => RLEvent::ReplayStart,
-            "GoalReplayEnd" => RLEvent::ReplayDone,
-            "CrossbarHit" => {
-                let data: StatsApiCrossbarHitEvent = serde_json::from_str(&event.data).unwrap();
-                RLEvent::CrossbarHit {
-                    impact_speed: data.ball_speed,
-                    release_speed: data.ball_last_touch.speed,
-                    is_ours: Some(data.ball_last_touch.player.shortcut)
-                        == self.local_player_shortcut,
-                }
-            }
-            "GoalScored" => {
-                let data: StatsApiGoalScoredEvent = serde_json::from_str(&event.data).unwrap();
-                RLEvent::Goal {
-                    ball_speed: data.goal_speed,
-                    release_speed: data.ball_last_touch.speed,
-                    is_ours: Some(data.scorer.shortcut) == self.local_player_shortcut,
-                }
-            }
+            StatsApiEvent::MatchEnded(data) => RLEvent::MatchOver(Team::from(data.winner_team_num)),
+            StatsApiEvent::MatchDestroyed => RLEvent::MatchLeft,
+            StatsApiEvent::GoalReplayStart => RLEvent::ReplayStart,
+            StatsApiEvent::GoalReplayEnd => RLEvent::ReplayDone,
+            StatsApiEvent::CrossbarHit(data) => RLEvent::CrossbarHit {
+                impact_speed: data.ball_speed,
+                release_speed: data.ball_last_touch.speed,
+                is_ours: Some(data.ball_last_touch.player.shortcut) == self.local_player_shortcut,
+            },
+            StatsApiEvent::GoalScored(data) => RLEvent::Goal {
+                ball_speed: data.goal_speed,
+                release_speed: data.ball_last_touch.speed,
+                is_ours: Some(data.scorer.shortcut) == self.local_player_shortcut,
+            },
             _ => return None,
         })
     }
