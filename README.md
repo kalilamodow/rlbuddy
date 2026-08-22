@@ -1,5 +1,9 @@
 # note: readme is very out of date, it will be updated soon though
 
+download: [link to latest prerelease](https://github.com/kalilamodow/rlbuddy/releases/latest), click Assets and download rlbuddy.exe
+
+there's no set schedule for releases right now, it's basically whenever I get a stable binary
+
 # rlbuddy
 
 An overlay for Rocket League which displays the names/ranks of everybody in your lobby without tabbing out, and a lot of other stuff too!
