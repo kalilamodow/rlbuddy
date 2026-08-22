@@ -215,6 +215,11 @@ impl RlBuddyApp {
     }
 
     fn show(&mut self, ctx: &egui::Context) {
+        // if not minimized, dont bother
+        if ctx.input(|i| !i.viewport().minimized.unwrap_or_default()) {
+            return;
+        }
+
         self.prev_hide_pos = ctx.input(|i| {
             i.viewport()
                 .outer_rect
