@@ -1,8 +1,8 @@
 use super::super::MatchPlayer;
 use crate::{
-    common::{channel::Sender, timefmt::format_seconds},
+    common::{ReadonlyStateHandle, channel::Sender, timefmt::format_seconds},
     matches::{
-        StrippedPlayer, StrippedPlayerType,
+        MatchesServiceState, StrippedPlayer, StrippedPlayerType,
         apis::{PlayerSkillInformation, PlaylistSkillInformation},
         service::MatchType,
     },
@@ -15,11 +15,17 @@ use std::cmp::Ordering;
 use std::sync::Arc;
 use std::time::SystemTime;
 
+pub enum BuddyStatsOption<'a> {
+    Yes(&'a ReadonlyStateHandle<MatchesServiceState>),
+    No,
+}
+
 pub struct MatchRenderer<'a> {
     match_info: &'a MatchType<'a>,
     is_open: Option<&'a mut bool>,
     showing_stats_for: &'a mut Option<(String, String)>,
     player_info_sender: &'a Sender<PlayerInfoServiceCommand>,
+    buddy_stats: BuddyStatsOption<'a>,
 }
 
 impl<'a> MatchRenderer<'a> {
@@ -28,12 +34,14 @@ impl<'a> MatchRenderer<'a> {
         is_open: Option<&'a mut bool>,
         showing_stats_for: &'a mut Option<(String, String)>,
         player_info_sender: &'a Sender<PlayerInfoServiceCommand>,
+        buddy_stats: BuddyStatsOption<'a>,
     ) -> MatchRenderer<'a> {
         MatchRenderer {
             match_info,
             is_open,
             showing_stats_for,
             player_info_sender,
+            buddy_stats,
         }
     }
 
@@ -164,6 +172,8 @@ impl<'a> MatchRenderer<'a> {
                     }
                 }
 
+                self.show_buddy_stat_icon_maybe(ui, match_player);
+
                 ui.label(
                     egui::RichText::new(match_player.data.platform.to_string())
                         .color(ui.visuals().weak_text_color()),
@@ -191,6 +201,127 @@ impl<'a> MatchRenderer<'a> {
         }
 
         ui.end_row();
+    }
+
+    fn show_buddy_stat_icon_maybe(&self, ui: &mut egui::Ui, other_player: &MatchPlayer) {
+        if other_player.is_local_player {
+            return;
+        }
+
+        let BuddyStatsOption::Yes(match_service_state) = self.buddy_stats else {
+            return;
+        };
+
+        let prev_matches = &match_service_state.read().prev_matches;
+
+        // first game together HAS GUARD CLAUSE
+        {
+            let has_played_together = prev_matches.iter().any(|m| match m {
+                MatchType::Old(o) => o
+                    .players
+                    .iter()
+                    .any(|p| p.player_id == other_player.data.platform_id),
+                MatchType::Session(s) => s
+                    .players
+                    .iter()
+                    .any(|p| p.data.platform_id == other_player.data.platform_id),
+            });
+
+            if !has_played_together {
+                ui.label("🌱")
+                    .on_hover_text(format!("This is your first game together!"));
+                return;
+            }
+        }
+
+        // games won together
+        {
+            let games_won_together = prev_matches
+                .iter()
+                .filter(|m| match m {
+                    MatchType::Old(o) => {
+                        o.winner == m.our_team()
+                            && o.players.iter().any(|p| {
+                                p.player_id == other_player.data.platform_id
+                                    && p.team == m.our_team()
+                            })
+                    }
+                    MatchType::Session(s) => {
+                        s.finish
+                            .as_ref()
+                            .is_some_and(|f| f.winner == Some(m.our_team()))
+                            && s.players.iter().any(|p| {
+                                p.data.platform_id == other_player.data.platform_id
+                                    && p.data.team == m.our_team()
+                            })
+                    }
+                })
+                .count();
+
+            if games_won_together > 0 {
+                let icon = match games_won_together {
+                    0..3 => '😎',
+                    3..6 => '✨',
+                    6..10 => '🫂',
+                    10.. => '🥰',
+                };
+
+                ui.label(format!("{icon} {games_won_together}"))
+                    .on_hover_text(format!("{games_won_together} game(s) won together!"));
+            }
+        }
+
+        // games played against eachother
+        {
+            let (wins, losses): (usize, usize) = prev_matches
+                .iter()
+                .filter_map(|m| match m {
+                    MatchType::Old(o) => {
+                        if o.players.iter().any(|p| {
+                            p.player_id == other_player.data.platform_id && p.team != m.our_team()
+                        }) {
+                            Some(if o.winner == o.our_team() {
+                                (1, 0)
+                            } else {
+                                (0, 1)
+                            })
+                        } else {
+                            None
+                        }
+                    }
+                    MatchType::Session(s) => {
+                        if s.players.iter().any(|p| {
+                            p.data.platform_id == other_player.data.platform_id
+                                && p.data.team != m.our_team()
+                        }) && let Some(winner) = s.finish.as_ref().map(|f| f.winner)
+                        {
+                            Some(if winner == Some(m.our_team()) {
+                                (1, 0)
+                            } else {
+                                (0, 1)
+                            })
+                        } else {
+                            None
+                        }
+                    }
+                })
+                // fold is so cool
+                .fold((0, 0), |(wins, losses), (w, l)| (wins + w, losses + l));
+
+            let games_against_eachother = wins + losses;
+
+            if games_against_eachother > 0 {
+                let icon = match games_against_eachother {
+                    ..4 => '⚔',
+                    4.. => '🩸',
+                };
+
+                ui.label(format!("{icon} {wins}-{losses}"))
+                    .on_hover_text(format!(
+                        "{games_against_eachother} game(s) against eachother. (W/L: {wins}/{losses})"
+                    ));
+            }
+        }
     }
 
     fn render_stripped_player(&mut self, ui: &mut egui::Ui, player: &StrippedPlayer) {

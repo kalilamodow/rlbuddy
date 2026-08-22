@@ -1,13 +1,11 @@
-use std::borrow::Cow;
-
+use super::{super::service::MatchesServiceState, match_renderer::MatchRenderer};
 use crate::{
     common::{ReadonlyStateHandle, channel::Sender},
-    matches::service::MatchType,
+    matches::{service::MatchType, widgets::match_renderer::BuddyStatsOption},
     player_info::PlayerInfoServiceCommand,
 };
-
-use super::{super::service::MatchesServiceState, match_renderer::MatchRenderer};
 use eframe::egui;
+use std::borrow::Cow;
 
 pub struct CurrentMatchWidget {
     state: ReadonlyStateHandle<MatchesServiceState>,
@@ -37,6 +35,7 @@ impl egui::Widget for &mut CurrentMatchWidget {
                     None,
                     &mut self.opened_stats,
                     &self.player_info_sender,
+                    BuddyStatsOption::Yes(&self.state),
                 ));
             } else {
                 ui.label("Not in a match");

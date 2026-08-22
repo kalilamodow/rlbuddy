@@ -1,6 +1,7 @@
 use super::{super::service::MatchesServiceState, match_renderer::MatchRenderer};
 use crate::{
     common::{ReadonlyStateHandle, channel::Sender},
+    matches::widgets::match_renderer::BuddyStatsOption,
     player_info::PlayerInfoServiceCommand,
 };
 use eframe::egui;
@@ -40,6 +41,7 @@ impl egui::Widget for &mut PastMatchesWidget {
                                 .entry(prev_match.started_at())
                                 .or_default(),
                             &self.player_info_sender,
+                            BuddyStatsOption::No,
                         ))
                     });
                 }
