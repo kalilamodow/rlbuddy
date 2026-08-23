@@ -83,6 +83,7 @@ impl MyStatsWidget {
             .prev_matches
             .iter()
             .map(MatchType::playlist)
+            .filter_map(Playlist::in_ranked)
             .collect::<HashSet<_>>()
             .into_iter()
             .collect();
