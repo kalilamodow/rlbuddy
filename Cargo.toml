@@ -31,6 +31,10 @@ version = "0.34.3"
 default-features = false
 features = ["webp"]
 
+[dependencies.emath]
+version = "0.34.3"
+features = ["serde"]
+
 [dependencies.windows]
 version = "0.62.2"
 features = ["Media_Control", "Storage_Streams"]

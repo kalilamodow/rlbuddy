@@ -11,7 +11,7 @@ use crate::{
     stats_api::{RLEvent, StatsApi},
     toast_alert::{MatchNotificatorService, MatchNotificatorSettings, ToastAlertService},
 };
-use eframe::egui;
+use eframe::egui::{self, Rect, ViewportCommand};
 use serde::{Deserialize, Serialize};
 use std::{cell::RefCell, fs, path::PathBuf, rc::Rc, thread};
 use std::{sync::mpsc, time::Duration};
@@ -77,6 +77,7 @@ struct AppData {
     my_stats_settings: Option<MyStatsWidgetSettings>,
     music_control_settings: Option<MusicControlSettings>,
     match_notifications: Option<MatchNotificatorSettings>,
+    saved_window_dimensions: Option<(egui::Pos2, egui::Vec2)>, // outer pos, inner size
 }
 
 impl Default for AppData {
@@ -90,6 +91,7 @@ impl Default for AppData {
             music_control_settings: None,
             my_stats_settings: None,
             match_notifications: None,
+            saved_window_dimensions: None,
         }
     }
 }
@@ -139,6 +141,11 @@ impl RlBuddyApp {
                 serde_json::from_str(&string).ok()
             })
             .unwrap_or_default();
+
+        if let Some(remembered_dimensions) = app_data.saved_window_dimensions {
+            ctx.send_viewport_cmd(ViewportCommand::OuterPosition(remembered_dimensions.0));
+            ctx.send_viewport_cmd(ViewportCommand::InnerSize(remembered_dimensions.1));
+        }
 
         let (overlay_tx, overlay_rx) = mpsc::channel();
         let mut stats_api_service = StatsApi::new();
@@ -254,7 +261,7 @@ impl RlBuddyApp {
         });
     }
 
-    fn on_close(&self) {
+    fn on_close(&self, ctx: &egui::Context) {
         let Some(file) = data_file() else {
             return;
         };
@@ -275,6 +282,13 @@ impl RlBuddyApp {
                     .read()
                     .clone(),
             ),
+            saved_window_dimensions: ctx.input(|i| {
+                i.viewport().outer_rect.and_then(|outer| {
+                    i.viewport()
+                        .inner_rect
+                        .map(|inner| (outer.left_top(), inner.size()))
+                })
+            }),
         };
 
         let to_write = match serde_json::to_string(&data) {
@@ -415,7 +429,7 @@ impl eframe::App for RlBuddyApp {
         ctx.request_repaint_after(Duration::from_millis(10));
 
         if ctx.input(|i| i.viewport().close_requested()) {
-            self.on_close();
+            self.on_close(ctx);
         }
     }
 

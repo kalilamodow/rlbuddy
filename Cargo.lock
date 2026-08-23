@@ -749,6 +749,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b53f0d33a479321da6b0caa71366c9f67e8a2c149762d90bdc0d16e601ee8ecb"
 dependencies = [
  "bytemuck",
+ "serde",
 ]
 
 [[package]]
@@ -2393,6 +2394,7 @@ dependencies = [
  "egui-system-fonts",
  "egui_extras",
  "egui_plot",
+ "emath",
  "gilrs",
  "num_enum",
  "rand",
