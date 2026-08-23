@@ -27,13 +27,13 @@ pub struct MatchNotificatorService {
 
 impl MatchNotificatorService {
     pub fn new(
-        settings: Option<MatchNotificatorSettings>,
+        settings: MatchNotificatorSettings,
         matches_handle: ReadonlyStateHandle<MatchesServiceState>,
         stats_api: EventReceiver<RLEvent>,
         toasts: Sender<Toast>,
     ) -> Self {
         Self {
-            settings_handle: ReadWriteStateHandle::new(settings.unwrap_or_default()),
+            settings_handle: ReadWriteStateHandle::new(settings),
             matches_handle,
             stats_api,
             toasts,

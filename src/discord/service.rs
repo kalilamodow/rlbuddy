@@ -72,13 +72,13 @@ pub struct DiscordService {
 
 impl DiscordService {
     pub fn new(
-        settings: Option<DiscordSettings>,
+        settings: DiscordSettings,
         matches_handle: ReadonlyStateHandle<MatchesServiceState>,
         stats_api: EventReceiver<RLEvent>,
     ) -> Self {
         DiscordService {
             state: ReadWriteStateHandle::new(DiscordServiceState::default()),
-            settings: ReadWriteStateHandle::new(settings.unwrap_or_default()),
+            settings: ReadWriteStateHandle::new(settings),
             controller: RichPresenceController::new(),
             current: GameState::Lobby,
             matches_handle,

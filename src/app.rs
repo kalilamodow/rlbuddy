@@ -13,7 +13,13 @@ use crate::{
 };
 use eframe::egui::{self, ViewportCommand};
 use serde::{Deserialize, Serialize};
-use std::{cell::RefCell, fs, path::PathBuf, rc::Rc, thread};
+use std::{
+    cell::RefCell,
+    fs,
+    path::{Path, PathBuf},
+    rc::Rc,
+    thread,
+};
 use std::{sync::mpsc, time::Duration};
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, Serialize, Deserialize)]
@@ -58,6 +64,29 @@ const OPENABLE_PANELS: [Panel; 8] = [
     Panel::Settings,
 ];
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct OpenPanelList(Vec<Panel>);
+
+impl Default for OpenPanelList {
+    fn default() -> Self {
+        Self(vec![Panel::CurrentMatch, Panel::AutoSetup])
+    }
+}
+
+impl std::ops::Deref for OpenPanelList {
+    type Target = Vec<Panel>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl std::ops::DerefMut for OpenPanelList {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
 fn visuals_with_transparency(visuals: &mut egui::Visuals, transparency: u8) {
     visuals.panel_fill = egui::Color32::from_rgba_unmultiplied(
         visuals.panel_fill.r(),
@@ -67,31 +96,99 @@ fn visuals_with_transparency(visuals: &mut egui::Visuals, transparency: u8) {
     );
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Default, Deserialize, Serialize)]
+struct AppSettings {
+    pub transparency: u8,
+}
+
+#[derive(Debug, Default)]
 struct AppData {
-    transparency: u8,
-    hotkey_settings: Option<HotkeySettings>,
-    rich_presence_settings: Option<discord::DiscordSettings>,
-    open_panels: Vec<Panel>,
+    app_settings: AppSettings,
+    hotkey_settings: HotkeySettings,
+    rich_presence_settings: discord::DiscordSettings,
+    open_panels: OpenPanelList,
     matches: Vec<StrippedMatchInfo>,
-    my_stats_settings: Option<MyStatsWidgetSettings>,
-    music_control_settings: Option<MusicControlSettings>,
-    match_notifications: Option<MatchNotificatorSettings>,
+    my_stats_settings: MyStatsWidgetSettings,
+    music_control_settings: MusicControlSettings,
+    match_notification_settings: MatchNotificatorSettings,
     saved_window_dimensions: Option<(egui::Pos2, egui::Vec2)>, // outer pos, inner size
 }
 
-impl Default for AppData {
-    fn default() -> Self {
-        AppData {
-            transparency: 25,
-            hotkey_settings: None,
-            rich_presence_settings: None,
-            open_panels: vec![Panel::CurrentMatch, Panel::AutoSetup],
-            matches: Vec::new(),
-            music_control_settings: None,
-            my_stats_settings: None,
-            match_notifications: None,
-            saved_window_dimensions: None,
+impl AppData {
+    fn load() -> Self {
+        let Some(data_dir) = data_dir() else {
+            return Self::default();
+        };
+
+        Self {
+            app_settings: Self::load_setting(&data_dir, "app_settings"),
+            hotkey_settings: Self::load_setting(&data_dir, "hotkey_settings"),
+            rich_presence_settings: Self::load_setting(&data_dir, "drpc_settings"),
+            open_panels: Self::load_setting(&data_dir, "open_panel_list"),
+            matches: Self::load_setting(&data_dir, "matches"),
+            my_stats_settings: Self::load_setting(&data_dir, "my_stats_settings"),
+            music_control_settings: Self::load_setting(&data_dir, "music_control_settings"),
+            match_notification_settings: Self::load_setting(
+                &data_dir,
+                "match_notifications_settings",
+            ),
+            saved_window_dimensions: Self::load_setting(&data_dir, "saved_window_dimensions"),
+        }
+    }
+
+    fn load_setting<T>(data_dir: &Path, name: &str) -> T
+    where
+        T: serde::de::DeserializeOwned + Default,
+    {
+        let Ok(string) = fs::read_to_string(data_dir.join(format!("{name}.json"))) else {
+            return T::default();
+        };
+
+        serde_json::from_str(&string).unwrap_or_default()
+    }
+
+    fn save(self) {
+        let Some(data_dir) = data_dir() else {
+            return;
+        };
+
+        Self::write_setting(&data_dir, "app_settings", self.app_settings);
+        Self::write_setting(&data_dir, "hotkey_settings", self.hotkey_settings);
+        Self::write_setting(&data_dir, "drpc_settings", self.rich_presence_settings);
+        Self::write_setting(&data_dir, "open_panel_list", self.open_panels);
+        Self::write_setting(&data_dir, "matches", self.matches);
+        Self::write_setting(&data_dir, "my_stats_settings", self.my_stats_settings);
+        Self::write_setting(
+            &data_dir,
+            "music_control_settings",
+            self.music_control_settings,
+        );
+        Self::write_setting(
+            &data_dir,
+            "match_notifications_settings",
+            self.match_notification_settings,
+        );
+        Self::write_setting(
+            &data_dir,
+            "saved_window_dimensions",
+            self.saved_window_dimensions,
+        );
+    }
+
+    fn write_setting<T>(data_dir: &Path, name: &str, new: T)
+    where
+        T: serde::Serialize + Default,
+    {
+        let string = match serde_json::to_string(&new) {
+            Ok(wtv) => wtv,
+            Err(e) => {
+                eprintln!("Failed to serialize settings for {name}: {e:?}");
+                return;
+            }
+        };
+
+        if let Err(error) = fs::write(data_dir.join(format!("{name}.json")), string) {
+            eprintln!("Failed to write settings for {name}: {error:?}");
         }
     }
 }
@@ -102,7 +199,7 @@ pub struct RlBuddyApp {
     overlay_tx: mpsc::Sender<bool>,
     overlay_rx: mpsc::Receiver<bool>,
     prev_hide_pos: Option<egui::Pos2>,
-    open_panels: Vec<Panel>,
+    open_panels: OpenPanelList,
 
     stats_api_events: EventReceiver<RLEvent>,
     stats_api_service: StatsApi,
@@ -134,13 +231,7 @@ impl RlBuddyApp {
         let ctx = cc.egui_ctx.clone();
         egui_system_fonts::set_auto(&ctx, egui_system_fonts::FontStyle::Sans);
 
-        let app_data: AppData = data_file()
-            .and_then(|file| {
-                let _ = fs::create_dir_all(file.parent()?);
-                let string = fs::read_to_string(file).ok()?;
-                serde_json::from_str(&string).ok()
-            })
-            .unwrap_or_default();
+        let app_data = AppData::load();
 
         if let Some(remembered_dimensions) = app_data.saved_window_dimensions {
             ctx.send_viewport_cmd(ViewportCommand::OuterPosition(remembered_dimensions.0));
@@ -153,7 +244,7 @@ impl RlBuddyApp {
         let matches_service =
             MatchesService::new(&ctx, stats_api_service.subscribe(), app_data.matches);
         let match_notificator_service = MatchNotificatorService::new(
-            app_data.match_notifications,
+            app_data.match_notification_settings,
             matches_service.state_handle(),
             stats_api_service.subscribe(),
             toast_service.sender(),
@@ -170,7 +261,7 @@ impl RlBuddyApp {
         let hotkey_service = HotkeyService::new(&overlay_tx, app_data.hotkey_settings);
         let player_info_service = PlayerInfoService::new(ctx.clone());
 
-        let current_transparency = Rc::new(RefCell::new(app_data.transparency));
+        let current_transparency = Rc::new(RefCell::new(app_data.app_settings.transparency));
         RlBuddyApp {
             settings_widget: SettingsWidget::new(
                 &hotkey_service,
@@ -195,7 +286,7 @@ impl RlBuddyApp {
 
             my_stats_widget: MyStatsWidget::new(
                 matches_service.state_handle(),
-                app_data.my_stats_settings.unwrap_or_default(),
+                app_data.my_stats_settings,
             ),
             current_match: CurrentMatchWidget::new(
                 matches_service.state_handle(),
@@ -262,26 +353,21 @@ impl RlBuddyApp {
     }
 
     fn on_close(&self, ctx: &egui::Context) {
-        let Some(file) = data_file() else {
-            return;
-        };
-
-        let data = AppData {
-            transparency: *self.current_transparency.borrow(),
-            hotkey_settings: Some(self.hotkey_service.settings_handle().read().clone()),
-            rich_presence_settings: Some(self.discord_service.settings_handle().read().clone()),
+        AppData {
+            app_settings: AppSettings {
+                transparency: *self.current_transparency.borrow(),
+            },
+            hotkey_settings: self.hotkey_service.settings_handle().read().clone(),
+            rich_presence_settings: self.discord_service.settings_handle().read().clone(),
             open_panels: self.open_panels.clone(),
             matches: self.matches_service.stripped_history(),
-            my_stats_settings: Some(self.my_stats_widget.clone_settings()),
-            music_control_settings: Some(
-                self.music_control_service.settings_handle().read().clone(),
-            ),
-            match_notifications: Some(
-                self.match_notificator_service
-                    .settings_handle()
-                    .read()
-                    .clone(),
-            ),
+            my_stats_settings: self.my_stats_widget.clone_settings(),
+            music_control_settings: self.music_control_service.settings_handle().read().clone(),
+            match_notification_settings: self
+                .match_notificator_service
+                .settings_handle()
+                .read()
+                .clone(),
             saved_window_dimensions: ctx.input(|i| {
                 i.viewport().outer_rect.and_then(|outer| {
                     i.viewport()
@@ -289,19 +375,8 @@ impl RlBuddyApp {
                         .map(|inner| (outer.left_top(), inner.size()))
                 })
             }),
-        };
-
-        let to_write = match serde_json::to_string(&data) {
-            Ok(dih) => dih,
-            Err(error) => {
-                eprintln!("Failed to serialize savedata: {error}");
-                return;
-            }
-        };
-
-        if let Err(error) = fs::write(file, to_write) {
-            eprintln!("Error while writing savedata: {error}");
         }
+        .save();
     }
 }
 
@@ -438,8 +513,8 @@ impl eframe::App for RlBuddyApp {
     }
 }
 
-fn data_file() -> Option<PathBuf> {
+fn data_dir() -> Option<PathBuf> {
     std::env::var("APPDATA")
-        .map(|roaming| PathBuf::from(roaming).join("rlbuddy/data.json"))
+        .map(|roaming| PathBuf::from(roaming).join("rlbuddy/"))
         .ok()
 }

@@ -156,8 +156,8 @@ pub struct HotkeyService {
 }
 
 impl HotkeyService {
-    pub fn new(overlay_tx: &mpsc::Sender<bool>, settings: Option<HotkeySettings>) -> Self {
-        let settings = ThreadedReadWriteStateHandle::new(settings.unwrap_or_default());
+    pub fn new(overlay_tx: &mpsc::Sender<bool>, settings: HotkeySettings) -> Self {
+        let settings = ThreadedReadWriteStateHandle::new(settings);
 
         let settings_for_kb_manager = settings.clone();
         let overlay_tx_for_kb_manager = overlay_tx.clone();

@@ -38,12 +38,12 @@ pub struct MusicControlService {
 }
 
 impl MusicControlService {
-    pub fn new(savedata: Option<MusicControlSettings>, stats_api: EventReceiver<RLEvent>) -> Self {
+    pub fn new(savedata: MusicControlSettings, stats_api: EventReceiver<RLEvent>) -> Self {
         let (playback_info_tx, playback_info_rx) = mpsc::channel();
 
         Self {
             controller: MediaController::new(playback_info_tx),
-            settings: ReadWriteStateHandle::new(savedata.unwrap_or_default()),
+            settings: ReadWriteStateHandle::new(savedata),
             state: ThreadedReadWriteStateHandle::default(),
             command_receiver: Receiver::new(),
             stats_api,
