@@ -48,6 +48,8 @@ rlbuddy used to integrate with Spotify, but it was pretty annoying, so it now in
 
 ### Discord rich presence
 
+<img src="readme-images/discord.jpg">
+
 rlbuddy can now show Rich Presence in Discord, so now all your friends can see you destroying your opponents ;)
 
 Of course, you can disable it or just hide the current score.
