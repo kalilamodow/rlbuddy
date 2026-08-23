@@ -21,7 +21,7 @@ impl MatchData {
         let mut details = format!("{} in {}", self.playlist, self.arena);
         let mut state: Option<String> = None;
 
-        if self.playlist.is_singleplayer() && include_score {
+        if !self.playlist.is_singleplayer() && include_score {
             details += format!(" | {}-{}", self.team_score, self.opp_score).as_str();
             state = Some(self.state.as_str().to_owned());
         }
