@@ -1,94 +1,92 @@
-# note: readme is very out of date, it will be updated soon though
-
-download: [link to latest prerelease](https://github.com/kalilamodow/rlbuddy/releases/latest), click Assets and download rlbuddy.exe
-
-there's no set schedule for releases right now, it's basically whenever I get a stable binary
-
 # rlbuddy
 
-An overlay for Rocket League which displays the names/ranks of everybody in your lobby without tabbing out, and a lot of other stuff too!
+rlbuddy is a Rocket League companion app for Windows that lets you preview your lobby's ranks without tabbing out, offers various statistics based on your match history, and has a bunch of widgets allowing for Discord rich presence, automatic music control, player stats, and more!
 
-rlbuddy uses a widget system, where each feature has its own widget which can be opened/closed, so you can customize it however you want! For example, if you don't use Spotify, you can just hide its widget, and it'll stay out of your way.
+Each feature has its own widget, so you can customize it to your heart's desire :)
 
-- Shows ranks of everyone in your lobby and previous lobbies
-- Can display information from Tracker, too if you want to know more
-- Customizable MMR graphs and stat tracking (W/L, etc.)
-- Opens using a configurable hotkey/button
-- Can be partially transparent!
-- Local playback control and Discord integration
-- Sets up the stats api for you <3
+## Installation
 
-> My setup:
+Go to the [latest release](https://github.com/kalilamodow/rlbuddy/releases/latest), open the Assets dropdown, and download rlbuddy.exe. It's self-contained and stores data in the user appdata directory, so you can put the executable wherever you want and it'll work.
 
-> <img src="readme-images/demo.jpeg">
+## Features
 
-## Features/widgets
+### Lobby
 
-#### Lobby
+This is the main widget that you'll probably look at. It lists each player along with their comp 1s, 2s, and 3s ranks, and puts their rank in whatever mode you're currently playing on the left. It also uncensors their name automatically, and shows their platform next to their name.
 
-<img src="readme-images/lobby.jpeg">
-
-This is the primary widget, showing your current lobby along with some of each player's stats (their score). It also uncensors each player's name and colors them with their team color. Your name is automatically guessed and highlighted.
-
-The three ranks under each player are their competitive 1s, 2s, and 3s ranks, with the icon to the left being their rank in the current mode.
-
-It also shows each player's platform, and allows you to open their profiles in TRN. For Switch players, the TRN page is only guaranteed to be valid if they're in a club.
+By default, it sources rank/name information from the game's API itself, so no Tracker is required, but you can click their name to get more detailed information. It attempts to fully resolve Switch player ids, but it's only guaranteed to be right if they're in a club.
 
 <details>
   <summary>"Only guaranteed if they're in a club? That seems... arbitrary."</summary>
 
-Switch names aren't unique, so usually, just putting a player's name into tracker.gg doesn't work. It also doesn't accept their platform id, for some reason. So, rlbuddy uses a special lookup using the player's club information to get their Epic Games ID, which it can then easily open in TRN.
+Switch names aren't unique, so usually, just putting a player's name into tracker.gg doesn't work. It also doesn't accept their platform id, for some reason. So, rlbuddy uses a special lookup using the player's club information to get their Epic id, which TRN can serve information for.
 </details>
 
-#### Match history
+Each player also gets some badges based on how they've played with you before! By default, each player has a sprout icon if it's your first time meeting them. However, there are also badges for games won together as well as how well you've played against them!
 
-<img src="readme-images/matchhistory.jpeg">
+### Match history
 
-This widget lets you browse and view the past matches in this session, using the same interface as the current match widget.
+This widget lets you peruse previous matches at your leisure. Matches that aren't part of the current session have a more stripped down view as to not waste space.
 
-#### Hotkeys
+### My Stats
 
-The main way to open rlbuddy is to press and hold a hotkey/controller button, which will keep it open for the duration of the press (unless you focus it). By default, the key is `Alt` and the button is `Select`, but it can be changed or disabled through in the settings. The available hotkeys are:
+This widget gives a quick glance as to your current session's stats (eg. goals, winrate, MMR change). There's also a per-playlist MMR graph, which is pretty cool.
 
-**Keyboard**
+### Player search
 
-- Alt
-- LShift (left shift)
-- LCtrl (left control)
+Ever wanted to check if a player was smurfing without having to open a browser and go to Tracker? Hopefully not, but if you have then this solves that. It's basically what clicking a name of a player in your match does, opening a view which shows some of their all-time stats (sourced from Tracker).
+
+### Music
+
+You can control your music straight from the overlay, like skipping a song. It also allows you to automatically pause your music while anthems are playing, kind of like the builtin Rocket Radio. It asks Windows for music data, so anything that shows up in the Action center should also show up in rlbuddy.
+
+rlbuddy used to integrate with Spotify, but it was pretty annoying, so it now interfaces directly with Windows. It's a lot faster this way as well.
+
+### Discord rich presence
+
+rlbuddy can now show Rich Presence in Discord, so now all your friends can see you destroying your opponents ;)
+
+Of course, you can disable it or just hide the current score.
+
+### Hotkey
+
+rlbuddy is usually opened with a hotkey/controller button, so you don't have to go through the taskbar or alt tab or anything. It kind of just pops up on top of the game window.
+
+The supported keyboard hotkeys are:
+
+- Alt (default)
+- Left shift
+- Left control
 - Tab
-- Super (Windows)
+- Windows/Super
 
-**Gamepad**
+It also has controller buttons, being:
 
-- Select
+- Options (default)
 - Start
 - Left bumper
 - Right bumper
 
-Dynamic selection coming soon!
+It stays up as long as you are holding the hotkey or while the window stays in focus. It's also disable-able.
 
-#### Local music playback
+### Match toasts
 
-<!--<img src="readme-images/music.jpeg">-->
+This actually isn't a widget, but toggleable default behaviour. When you score a goal or hit the crossbar, it'll tell you the release velocity (how hard you shot it) as well as how fast the goal/hit was. This is useful in training when you're practicing pinches or hard flicks and don't want to wait for the goal replay to check the speed. You can make it only appear in training.
 
-rlbuddy allows a few playback controls and has an option to pause your music while player anthems are playing (during goal replays and the post-game scene). It asks Windows for this information, so anything you would see playing in the Action center will show up here, too.
+### Automatic setup
 
-### Integrations
+rlbuddy uses the stats api to get game information, and it can automatically set up the Rocket League stats api for you that way you don't have to manually edit the ini. The automatic setup widget is shown by default on first open.
 
-#### Discord
+### Automatic popup-ing
 
-<img src="readme-images/discord.jpeg">
-
-rlbuddy shows your current status in Discord. You can disable this through the widget, or just hide the current score.
+It automatically pops up (without taking away focus) in front of the game when a match starts until kickoff so you don't have to open it manually.
 
 ### Other
 
-#### Automatic Stats API setup
+rlbuddy can be partially transparent. You can adjust the opacity through the settings widget.
 
-<img src="readme-images/statsapisetup.jpeg">
+## Development/project architecture
 
-If you don't have the Stats API enabled yet, this widget will automatically enable it for you based on the path to your Rocket League executable.
+rlbuddy is written in Rust and uses the `eframe` gui framework. The build script automatically downloads assets from the Fandom images server. It does use a couple of Windows-only features, but Linux support is totally possible if enough people want it (I'm on Windows so I'm not totally sure what works on other platforms).
 
-#### App transparency
-
-The app can be partly transparent so you can see the game behind it even while it's up. The amount of transparency can be configured in the settings menu.
+There are services and widgets. Services are the code-behind, they're state managers with `update` methods called every tick. They usually connect to external programs (discord, rocket league, etc.) to give rlbuddy information. They're composable, so for example the Discord service relies on the Stats API service to show data from the game. Widgets are `egui::Widget`s and take service state handles, just graphical information relays.
