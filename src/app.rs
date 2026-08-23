@@ -85,7 +85,7 @@ impl Default for AppData {
             transparency: 25,
             hotkey_settings: None,
             rich_presence_settings: None,
-            open_panels: vec![Panel::CurrentMatch],
+            open_panels: vec![Panel::CurrentMatch, Panel::AutoSetup],
             matches: Vec::new(),
             music_control_settings: None,
             my_stats_settings: None,
