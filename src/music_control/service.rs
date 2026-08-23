@@ -83,7 +83,7 @@ impl MusicControlService {
             MusicControlCommand::Previous => self.controller.previous(),
             MusicControlCommand::Play => self.controller.play(),
             MusicControlCommand::Pause => self.controller.pause(),
-        };
+        }
     }
 
     pub fn sender(&self) -> Sender<MusicControlCommand> {

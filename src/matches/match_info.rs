@@ -34,7 +34,7 @@ impl MatchPlayer {
 
     pub fn open_player_info_command(&self) -> Option<PlayerInfoServiceCommand> {
         open_player_info_command(
-            self.epic_name.as_ref().map(|s| s.as_ref()),
+            self.epic_name.as_ref().map(std::convert::AsRef::as_ref),
             self.data.platform,
             self.display_name(),
             &self.data.platform_id,

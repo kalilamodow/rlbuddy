@@ -65,7 +65,7 @@ impl ThumbnailInfo {
                 .ContentType()?
                 .to_string()
                 .split('/')
-                .last()
+                .next_back()
                 .unwrap()
                 .to_owned(),
             bytes: bytes.into(),
@@ -142,7 +142,7 @@ impl PlaybackInfo {
                 sender_for_timelinechanged
                     .send(PlaybackInfo::try_from_session(session).ok())
                     .unwrap();
-                return Ok(());
+                Ok(())
             }))
             .unwrap();
     }
@@ -216,7 +216,7 @@ impl MediaController {
             + Sync
             + 'static,
     {
-        self.use_session(|s| func(s)?.join().and_then(|_| Ok(())));
+        self.use_session(|s| func(s)?.join().map(|_| ()));
     }
 
     fn use_session<F>(&self, func: F)
@@ -233,9 +233,9 @@ impl MediaController {
                 return;
             };
 
-            if let Err(error) = func(&session) {
+            if let Err(error) = func(session) {
                 eprintln!("winrt failure: {error:?}");
-            };
+            }
         });
     }
 }

@@ -11,7 +11,7 @@ use crate::{
     stats_api::{RLEvent, StatsApi},
     toast_alert::{MatchNotificatorService, MatchNotificatorSettings, ToastAlertService},
 };
-use eframe::egui::{self, Rect, ViewportCommand};
+use eframe::egui::{self, ViewportCommand};
 use serde::{Deserialize, Serialize};
 use std::{cell::RefCell, fs, path::PathBuf, rc::Rc, thread};
 use std::{sync::mpsc, time::Duration};

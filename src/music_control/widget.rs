@@ -8,7 +8,7 @@ use crate::{
 use eframe::egui::{self, ImageSource, load::Bytes};
 use std::time::{Duration, SystemTime};
 
-fn handle_null_string<'a>(s: Option<&'a String>) -> &'a str {
+fn handle_null_string(s: Option<&String>) -> &str {
     s.map_or("-", |s| s.as_str())
 }
 
@@ -118,10 +118,10 @@ impl MusicControlWidget {
                     {
                         match status {
                             PlaybackStatus::Paused => {
-                                self.commander.send(MusicControlCommand::Play)
+                                self.commander.send(MusicControlCommand::Play);
                             }
                             PlaybackStatus::Playing => {
-                                self.commander.send(MusicControlCommand::Pause)
+                                self.commander.send(MusicControlCommand::Pause);
                             }
                             _ => unreachable!("Button shouldn't exist right now"),
                         }

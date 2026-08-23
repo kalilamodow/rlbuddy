@@ -55,12 +55,12 @@ impl MyStatsWidget {
 
         let count = session_matches().count();
         ui.horizontal(|ui| {
-            ui.strong(format!("{} matches", count));
+            ui.strong(format!("{count} matches"));
             if count < 1 {
                 return;
             }
 
-            let won_last_match = session_matches().last().unwrap().is_win();
+            let won_last_match = session_matches().next_back().unwrap().is_win();
             let streak = session_matches()
                 .rev()
                 .take_while(|m| m.is_win() == won_last_match)
@@ -213,16 +213,16 @@ impl MyStatsWidget {
             MatchType::Session(s) => s
                 .players
                 .iter()
-                .find_map(|p| p.is_local_player.then(|| &p.data.stats)),
+                .find_map(|p| p.is_local_player.then_some(&p.data.stats)),
             MatchType::Old(_) => None,
         });
 
         let totals: PlayerLongtimeStats =
             all_stats.fold(PlayerLongtimeStats::default(), |mut total, stats| {
-                total.goals += stats.goals as u64;
-                total.shots += stats.shots as u64;
-                total.assists += stats.assists as u64;
-                total.saves += stats.saves as u64;
+                total.goals += u64::from(stats.goals);
+                total.shots += u64::from(stats.shots);
+                total.assists += u64::from(stats.assists);
+                total.saves += u64::from(stats.saves);
                 total
             });
 

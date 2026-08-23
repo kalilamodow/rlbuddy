@@ -52,7 +52,7 @@ impl SettingsWidget {
             hotkey: HotkeySettingsWidget::new(hotkey_service.settings_handle()),
             app: AppSettingsWidget::new(transparency),
             notificator: MatchNotificatorSettingsWidget::new(
-                &match_notificator_service,
+                match_notificator_service,
                 toast_service.sender(),
             ),
         }
