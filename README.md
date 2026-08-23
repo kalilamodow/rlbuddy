@@ -34,9 +34,13 @@ This widget gives a quick glance as to your current session's stats (eg. goals, 
 
 ### Player search
 
+<img src="readme-images/playersearch.jpg">
+
 Ever wanted to check if a player was smurfing without having to open a browser and go to Tracker? Hopefully not, but if you have then this solves that. It's basically what clicking a name of a player in your match does, opening a view which shows some of their all-time stats (sourced from Tracker).
 
 ### Music
+
+<img src="readme-images/music_control.jpg">
 
 You can control your music straight from the overlay, like skipping a song. It also allows you to automatically pause your music while anthems are playing, kind of like the builtin Rocket Radio. It asks Windows for music data, so anything that shows up in the Action center should also show up in rlbuddy.
 
@@ -70,6 +74,8 @@ It also has controller buttons, being:
 It stays up as long as you are holding the hotkey or while the window stays in focus. It's also disable-able.
 
 ### Match toasts
+
+<img src="readme-images/toast.jpg">
 
 This actually isn't a widget, but toggleable default behaviour. When you score a goal or hit the crossbar, it'll tell you the release velocity (how hard you shot it) as well as how fast the goal/hit was. This is useful in training when you're practicing pinches or hard flicks and don't want to wait for the goal replay to check the speed. You can make it only appear in training.
 
