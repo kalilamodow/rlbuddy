@@ -2,6 +2,7 @@ use crate::{
     matches::apis::{
         EpicIdAPI, NameAPI, PlayerSkillInformation, PlaylistSkillInformation, RankAPI,
     },
+    player_info::PlayerInfoServiceCommand,
     rocket_league::{Platform, Playlist, Team},
     stats_api::{MatchState, MatchUpdate, PlayerData, PlayerStats, TeamScores},
 };
@@ -31,22 +32,13 @@ impl MatchPlayer {
         }
     }
 
-    pub fn trn_link(&self) -> Option<String> {
-        let (prefix, id) = self.epic_name.as_ref().map_or(
-            match self.data.platform {
-                Platform::Bot => return None,
-                Platform::Epic => ("epic", self.display_name()),
-                Platform::Switch => ("switch", self.display_name()),
-                Platform::PlayStation => ("psn", self.display_name()),
-                Platform::Xbox => ("xbl", self.display_name()),
-                Platform::Steam => ("steam", self.data.platform_id.split('|').nth(1).unwrap()),
-            },
-            |n| ("epic", n.as_str()),
-        );
-
-        Some(format!(
-            "https://rocketleague.tracker.network/rocket-league/profile/{prefix}/{id}/overview"
-        ))
+    pub fn open_player_info_command(&self) -> Option<PlayerInfoServiceCommand> {
+        open_player_info_command(
+            self.epic_name.as_ref().map(|s| s.as_ref()),
+            self.data.platform,
+            self.display_name(),
+            &self.data.platform_id,
+        )
     }
 }
 
@@ -214,6 +206,7 @@ pub enum StrippedPlayerType {
 pub struct StrippedPlayer {
     pub name: String,
     pub player_id: String,
+    pub epic_id: Option<String>,
     pub rank_in_mode: Option<PlaylistSkillInformation>,
     pub player_type: StrippedPlayerType,
     pub team: Team,
@@ -236,11 +229,21 @@ impl StrippedPlayer {
             }),
             team: value.data.team,
             platform: value.data.platform,
+            epic_id: value.epic_name.as_ref().map(|s| s.as_ref().clone()),
         }
     }
 
     pub fn is_local_player(&self) -> bool {
         matches!(self.player_type, StrippedPlayerType::LocalPlayer(_))
+    }
+
+    pub fn open_player_info_command(&self) -> Option<PlayerInfoServiceCommand> {
+        open_player_info_command(
+            self.epic_id.as_ref(),
+            self.platform,
+            &self.name,
+            &self.player_id,
+        )
     }
 }
 
@@ -281,4 +284,26 @@ impl From<MatchInfo> for StrippedMatchInfo {
                 .collect(),
         }
     }
+}
+
+fn open_player_info_command(
+    epic_name: Option<&String>,
+    platform: Platform,
+    display_name: &str,
+    player_id: &str,
+) -> Option<PlayerInfoServiceCommand> {
+    if let Some(epic_name) = epic_name {
+        return Some(PlayerInfoServiceCommand::Open(
+            Platform::Epic,
+            epic_name.clone(),
+        ));
+    }
+
+    let (platform, id) = match platform {
+        Platform::Bot => return None,
+        Platform::Steam => (Platform::Steam, player_id.split('|').nth(1).unwrap()),
+        _ => (platform, display_name),
+    };
+
+    Some(PlayerInfoServiceCommand::Open(platform, id.to_owned()))
 }

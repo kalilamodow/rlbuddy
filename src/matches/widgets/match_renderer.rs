@@ -159,16 +159,15 @@ impl<'a> MatchRenderer<'a> {
                     }
                 });
 
-                if match_player.data.platform != Platform::Bot {
+                if !matches!(match_player.data.platform, Platform::Bot) {
                     if name_label.hovered() {
                         ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
                     }
 
-                    if name_label.clicked() {
-                        self.player_info_sender
-                            .send(PlayerInfoServiceCommand::OpenPlayer(
-                                match_player.data.clone(),
-                            ));
+                    if name_label.clicked()
+                        && let Some(cmd) = match_player.open_player_info_command()
+                    {
+                        self.player_info_sender.send(cmd);
                     }
                 }
 

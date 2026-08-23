@@ -3,13 +3,11 @@ use crate::{
     common::channel::{Receiver, Sender},
     player_info::{trn::TRNError, trn_widget::TrackerWidget},
     rocket_league::Platform,
-    stats_api::PlayerData,
 };
 use eframe::egui;
 
 pub enum PlayerInfoServiceCommand {
     Open(Platform, String),
-    OpenPlayer(PlayerData),
 }
 
 #[derive(Debug)]
@@ -45,10 +43,6 @@ impl PlayerInfoService {
 
     fn process_command(&mut self, command: PlayerInfoServiceCommand) {
         match command {
-            PlayerInfoServiceCommand::OpenPlayer(p) => self.open_players.push(OpenedPlayer {
-                data: p.into(),
-                open: true,
-            }),
             PlayerInfoServiceCommand::Open(platform, platform_id) => {
                 self.open_players.push(OpenedPlayer {
                     data: PlayerKey {
