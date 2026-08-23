@@ -152,6 +152,8 @@ impl AppData {
             return;
         };
 
+        let _ = fs::create_dir_all(&data_dir);
+
         Self::write_setting(&data_dir, "app_settings", self.app_settings);
         Self::write_setting(&data_dir, "hotkey_settings", self.hotkey_settings);
         Self::write_setting(&data_dir, "drpc_settings", self.rich_presence_settings);
