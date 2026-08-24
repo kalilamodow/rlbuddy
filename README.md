@@ -29,6 +29,8 @@ Each player also gets some badges based on how they've played with you before! B
 
 ### Match history
 
+<img src="readme-images/history.jpg">
+
 This widget lets you peruse previous matches at your leisure. Matches that aren't part of the current session have a more stripped down view as to not waste space.
 
 ### My Stats
