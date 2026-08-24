@@ -1,5 +1,8 @@
 # rlbuddy
 
+- [Check out rlbuddy's development journey on Stardance!](https://stardance.hackclub.com/projects/25644)
+- rlbuddy is 100% sleep-deprived-humanslop. Little to no AI was used in its making!
+
 rlbuddy is a Rocket League companion app for Windows that lets you preview your lobby's ranks without tabbing out, offers various statistics based on your match history, and has a bunch of widgets allowing for Discord rich presence, automatic music control, player stats, and more!
 
 Each feature has its own widget, so you can customize it to your heart's desire :)
