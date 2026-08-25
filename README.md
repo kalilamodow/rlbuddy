@@ -15,6 +15,8 @@ Go to the [latest release](https://github.com/kalilamodow/rlbuddy/releases/lates
 
 ### Lobby
 
+<img src="readme-images/lobby.jpg">
+
 This is the main widget that you'll probably look at. It lists each player along with their comp 1s, 2s, and 3s ranks, and puts their rank in whatever mode you're currently playing on the left. It also uncensors their name automatically, and shows their platform next to their name.
 
 By default, it sources rank/name information from the game's API itself, so no Tracker is required, but you can click their name to get more detailed information. It attempts to fully resolve Switch player ids, but it's only guaranteed to be right if they're in a club.
@@ -33,7 +35,9 @@ Each player also gets some badges based on how they've played with you before! B
 
 This widget lets you peruse previous matches at your leisure. Matches that aren't part of the current session have a more stripped down view as to not waste space.
 
-### My Stats
+### Session Stats
+
+<img src="readme-images/session.jpg">
 
 This widget gives a quick glance as to your current session's stats (eg. goals, winrate, MMR change). There's also a per-playlist MMR graph, which is pretty cool.
 
