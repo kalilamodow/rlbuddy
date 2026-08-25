@@ -102,6 +102,11 @@ It automatically pops up (without taking away focus) in front of the game when a
 
 rlbuddy can be partially transparent. You can adjust the opacity through the settings widget.
 
+## Current roadmap
+
+- Custom/workshop map downloader
+- Player avatars
+
 ## Development/project architecture
 
 rlbuddy is written in Rust and uses the `eframe` gui framework. The build script automatically downloads assets from the Fandom images server. It does use a couple of Windows-only features, but Linux support is totally possible if enough people want it (I'm on Windows so I'm not totally sure what works on other platforms).
