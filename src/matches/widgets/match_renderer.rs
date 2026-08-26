@@ -11,7 +11,7 @@ use crate::{
     rocket_league::{Platform, Playlist, Rank, Team},
     stats_api::TeamScores,
 };
-use eframe::egui::{self, Color32};
+use eframe::egui::{self, Color32, include_image};
 use std::cmp::Ordering;
 use std::sync::Arc;
 use std::time::SystemTime;
@@ -127,6 +127,27 @@ impl<'a> MatchRenderer<'a> {
             render_player_rank_cell(ui, rank);
         } else {
             center_label(ui, "-");
+        }
+
+        if let Some(avatar_url) = match_player.avatar_url.as_ref() {
+            ui.add(
+                egui::Image::new(avatar_url.as_str())
+                    .fit_to_exact_size(egui::vec2(28.0, 28.0))
+                    .corner_radius(egui::CornerRadius::same(4)),
+            );
+        } else {
+            // the icon is crap so there's some padding around the actual icon, meaning
+            // we need to shift and scale it to make it appear 28x28
+            let scale_factor = 128.0 / 90.0; // webp dimension / icon dimension
+
+            let rect = ui
+                .allocate_space(egui::vec2(28.0 * scale_factor, 28.0 * scale_factor))
+                .1;
+
+            let paint_rect = rect.translate(-egui::vec2((128.0 - 90.0) / 2.0 * (28.0 / 90.0), 0.0));
+            egui::Image::new(include_image!("../../../assets/Avatar_icon.webp"))
+                .corner_radius(egui::CornerRadius::same(4))
+                .paint_at(ui, paint_rect);
         }
 
         ui.vertical(|ui| {
@@ -475,11 +496,12 @@ impl egui::Widget for MatchRenderer<'_> {
 
         ui.vertical(|ui| {
             egui::Grid::new(self.match_info.started_at())
-                .spacing(egui::vec2(8.0, 12.0))
+                .spacing(egui::vec2(0.0, 12.0))
                 .striped(true)
                 .show(ui, |ui| {
-                    center_label(ui, bold_text("Rank"));
-                    ui.label(bold_text("Player"));
+                    center_label(ui, bold_text("Rank")); // icon
+                    ui.label(""); // actual player
+                    ui.label(bold_text("Player")); // technically avatar
                     if matches!(self.match_info, MatchType::Session(_)) {
                         center_label(ui, bold_text("Score"));
                         ui.label(""); // more button

@@ -29,11 +29,16 @@ features = ["glow"]
 [dependencies.egui_extras]
 version = "0.34.3"
 default-features = false
-features = ["webp"]
+features = ["http", "image"]
 
 [dependencies.emath]
 version = "0.34.3"
 features = ["serde"]
+
+[dependencies.image]
+version = "0.25.10"
+default-features = false
+features = ["jpeg", "png", "webp"]
 
 [dependencies.windows]
 version = "0.62.2"

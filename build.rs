@@ -5,7 +5,7 @@ use std::{
     thread,
 };
 
-const URLS: [&str; 24] = [
+const URLS: [&str; 25] = [
     "https://static.wikia.nocookie.net/rocketleague/images/0/00/Unranked_icon.png",
     "https://static.wikia.nocookie.net/rocketleague/images/6/6c/Bronze1_rank_icon.png",
     "https://static.wikia.nocookie.net/rocketleague/images/5/5d/Bronze2_rank_icon.png",
@@ -30,6 +30,7 @@ const URLS: [&str; 24] = [
     "https://static.wikia.nocookie.net/rocketleague/images/f/f8/Silver2_rank_icon.png",
     "https://static.wikia.nocookie.net/rocketleague/images/7/7c/Silver3_rank_icon.png",
     "https://static.wikia.nocookie.net/rocketleague/images/2/2d/Supersonic_Legend_rank_icon.png",
+    "https://static.wikia.nocookie.net/rocketleague/images/a/ac/Avatar_icon.png",
 ];
 
 // all the "png" URLs are actually webps btw
