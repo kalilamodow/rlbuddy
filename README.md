@@ -11,6 +11,8 @@ Each feature has its own widget, so you can customize it to your heart's desire 
 
 Go to the [latest release](https://github.com/kalilamodow/rlbuddy/releases/latest), open the Assets dropdown, and download rlbuddy.exe. It's self-contained and stores data in the user appdata directory, so you can put the executable wherever you want and it'll work.
 
+If you've never turned on the stats api before, on first run, make sure to enable it with the Stats API Setup widget. It's open by default.
+
 ## Features
 
 ### Lobby
