@@ -68,7 +68,7 @@ impl MyStatsWidget {
 
             ui.label(format!(
                 "{} {streak}",
-                if won_last_match { "🔥" } else { "❄️" }
+                if won_last_match { '🔥' } else { '❄' }
             ));
 
             if !won_last_match && streak > 4 {
