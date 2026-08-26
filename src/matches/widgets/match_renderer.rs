@@ -158,6 +158,23 @@ impl<'a> MatchRenderer<'a> {
                     if ui.button("Copy player id").clicked() {
                         ui.ctx().copy_text(match_player.data.platform_id.clone());
                     }
+
+                    if ui
+                        .add_enabled(
+                            match_player.avatar_url.is_some(),
+                            egui::Button::new("Copy avatar url"),
+                        )
+                        .clicked()
+                    {
+                        ui.ctx().copy_text(
+                            match_player
+                                .avatar_url
+                                .as_ref()
+                                .unwrap()
+                                .as_ref()
+                                .to_owned(),
+                        );
+                    }
                 });
 
                 if !matches!(match_player.data.platform, Platform::Bot) {

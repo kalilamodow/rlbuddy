@@ -3,7 +3,9 @@ use super::{MatchInfo, MatchOverInfo};
 use crate::common::eventsource::EventReceiver;
 use crate::common::{ReadWriteStateHandle, ReadonlyStateHandle};
 use crate::matches::StrippedMatchInfo;
-use crate::matches::apis::{EpicIdAPI, new_epic_id_api, new_name_api, new_rank_api};
+use crate::matches::apis::{
+    AvatarAPI, EpicIdAPI, new_avatar_api, new_epic_id_api, new_name_api, new_rank_api,
+};
 use crate::rocket_league::{Playlist, Team};
 use crate::stats_api::{RLEvent, TeamScores};
 use eframe::egui;
@@ -74,6 +76,7 @@ pub struct MatchesService {
     rank_api: RankAPI,
     names_api: NameAPI,
     epic_ids_api: EpicIdAPI,
+    avatar_api: AvatarAPI,
 }
 
 impl MatchesService {
@@ -96,6 +99,7 @@ impl MatchesService {
             rank_api: new_rank_api(ctx.clone()),
             names_api: new_name_api(ctx.clone()),
             epic_ids_api: new_epic_id_api(ctx.clone()),
+            avatar_api: new_avatar_api(ctx.clone()),
         }
     }
 
@@ -152,6 +156,7 @@ impl MatchesService {
                             &self.rank_api,
                             &self.epic_ids_api,
                             &self.names_api,
+                            &self.avatar_api,
                         );
                     } else {
                         state.current_match = Some(MatchInfo::new(

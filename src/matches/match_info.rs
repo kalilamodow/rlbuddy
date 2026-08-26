@@ -1,6 +1,6 @@
 use crate::{
     matches::apis::{
-        EpicIdAPI, NameAPI, PlayerSkillInformation, PlaylistSkillInformation, RankAPI,
+        AvatarAPI, EpicIdAPI, NameAPI, PlayerSkillInformation, PlaylistSkillInformation, RankAPI,
     },
     player_info::PlayerInfoServiceCommand,
     rocket_league::{Platform, Playlist, Team},
@@ -16,10 +16,27 @@ pub struct MatchPlayer {
     pub epic_name: Option<Arc<String>>,
     pub data: PlayerData,
     pub skill: Option<Arc<PlayerSkillInformation>>,
+    pub avatar_url: Option<Arc<String>>,
     pub is_local_player: bool,
 }
 
 impl MatchPlayer {
+    fn from_data(value: PlayerData, local_player_id: Option<&String>) -> Self {
+        Self {
+            is_local_player: Some(&value.platform_id) == local_player_id,
+            left: false,
+            uncensored_name: None,
+            epic_name: None,
+            skill: None,
+            data: value,
+            avatar_url: None,
+        }
+    }
+
+    pub fn display_name_is_censored(&self) -> bool {
+        self.display_name().chars().all(|c| c == '*')
+    }
+
     pub fn uncensor_with(&mut self, api: &NameAPI) {
         self.uncensored_name = api.get(&self.data.platform_id);
     }
@@ -76,14 +93,7 @@ impl MatchInfo {
             players: update
                 .players
                 .into_iter()
-                .map(|p| MatchPlayer {
-                    is_local_player: Some(&p.platform_id) == local_player_id,
-                    left: false,
-                    uncensored_name: None,
-                    epic_name: None,
-                    skill: None,
-                    data: p,
-                })
+                .map(|p| MatchPlayer::from_data(p, local_player_id))
                 .collect(),
         }
     }
@@ -95,6 +105,7 @@ impl MatchInfo {
         rank_api: &RankAPI,
         epic_id_api: &EpicIdAPI,
         name_api: &NameAPI,
+        avatar_api: &AvatarAPI,
     ) {
         self.state = updated.state;
         self.max_active_players = self.max_active_players.max(updated.players.len());
@@ -116,19 +127,14 @@ impl MatchInfo {
         }
 
         for remaining_player in updated.players {
-            self.players.push(MatchPlayer {
-                is_local_player: Some(&remaining_player.platform_id) == local_player_id,
-                left: false,
-                uncensored_name: None,
-                epic_name: None,
-                skill: None,
-                data: remaining_player,
-            });
+            self.players
+                .push(MatchPlayer::from_data(remaining_player, local_player_id));
         }
 
         self.update_ranks(rank_api);
         self.update_epic_ids(epic_id_api);
         self.uncensor_names(name_api);
+        self.load_avatar_urls(avatar_api);
 
         self.our_team = self
             .players
@@ -167,17 +173,22 @@ impl MatchInfo {
     pub fn uncensor_names(&mut self, api: &NameAPI) {
         self.on_each_player(
             |p| p.uncensored_name = api.get(&p.data.platform_id),
-            |c| is_censored(c.display_name()),
+            |c| c.display_name_is_censored(),
         );
+    }
+
+    pub fn load_avatar_urls(&mut self, api: &AvatarAPI) {
+        for player in &mut self.players {
+            //                to &MatchPlayer
+            if let Ok(key) = (&*player).try_into() {
+                player.avatar_url = api.get(&key);
+            }
+        }
     }
 
     pub fn is_win(&self) -> bool {
         self.finish.as_ref().and_then(|f| f.winner) == Some(self.our_team)
     }
-}
-
-fn is_censored(name: &str) -> bool {
-    !name.is_empty() && name.chars().all(|c| c == '*')
 }
 
 fn normalize_bot_player_ids(players: &mut [PlayerData]) {
