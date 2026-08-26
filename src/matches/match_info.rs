@@ -216,7 +216,7 @@ pub struct StrippedPlayer {
 impl StrippedPlayer {
     fn from_player(value: MatchPlayer, playlist: Playlist) -> Self {
         Self {
-            name: value.data.name,
+            name: value.display_name().to_owned(),
             player_id: value.data.platform_id,
             player_type: if value.is_local_player {
                 StrippedPlayerType::LocalPlayer(value.data.stats)
