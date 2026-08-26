@@ -138,13 +138,15 @@ impl<'a> MatchRenderer<'a> {
         } else {
             // the icon is crap so there's some padding around the actual icon, meaning
             // we need to shift and scale it to make it appear 28x28
-            let scale_factor = 128.0 / 90.0; // webp dimension / icon dimension
+            let scale_factor = 128.0 / 92.0; // webp dimension / icon dimension
 
             let rect = ui
                 .allocate_space(egui::vec2(28.0 * scale_factor, 28.0 * scale_factor))
                 .1;
 
-            let paint_rect = rect.translate(-egui::vec2((128.0 - 90.0) / 2.0 * (28.0 / 90.0), 0.0));
+            let padding_translation = (128.0 - 92.0) / 2.0 * (28.0 / 128.0);
+            let paint_rect =
+                rect.translate(egui::vec2(-padding_translation, padding_translation / 2.0));
             egui::Image::new(include_image!("../../../assets/Avatar_icon.webp"))
                 .corner_radius(egui::CornerRadius::same(4))
                 .paint_at(ui, paint_rect);
