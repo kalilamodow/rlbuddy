@@ -107,7 +107,7 @@ rlbuddy can be partially transparent. You can adjust the opacity through the set
 ## Current roadmap
 
 - Custom/workshop map downloader
-- Player avatars
+- Controller overlay
 
 ## Development/project architecture
 
