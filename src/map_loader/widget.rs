@@ -83,9 +83,18 @@ impl MapLoaderWidget {
     }
 
     fn render_header(&self, ui: &mut egui::Ui) {
+        let state = self.state.read();
+
         ui.horizontal(|ui| {
             if ui.button("Import new map").clicked() {
                 self.import_map();
+            }
+
+            if ui
+                .add_enabled(state.loaded_map.is_some(), egui::Button::new("Unload"))
+                .clicked()
+            {
+                self.command_sender.send(MapLoaderCommand::Unload);
             }
         });
         ui.add_space(4.0);

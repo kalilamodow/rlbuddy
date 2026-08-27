@@ -57,6 +57,7 @@ pub struct MapLoaderServiceState {
 pub enum MapLoaderCommand {
     Import(PathBuf), // zip file path
     Load(CustomMapId),
+    Unload,
     UpdateUnderpassPath(PathBuf),
     ClearError,
 }
@@ -130,6 +131,12 @@ impl MapLoaderService {
             }
             MapLoaderCommand::Load(id) => {
                 if let Err(error) = self.load(id) {
+                    let mut state = self.state.write();
+                    state.current_error = Some(error.to_string());
+                }
+            }
+            MapLoaderCommand::Unload => {
+                if let Err(error) = self.unload() {
                     let mut state = self.state.write();
                     state.current_error = Some(error.to_string());
                 }
@@ -223,6 +230,20 @@ impl MapLoaderService {
         fs::copy(map_directory.join("map.upk"), underpass_path)?;
 
         state.loaded_map = Some(id.clone());
+        Ok(())
+    }
+
+    fn unload(&self) -> io::Result<()> {
+        let mut state = self.state.write();
+        let Some(underpass_path) = &state.underpass_path else {
+            return Err(io::Error::new(io::ErrorKind::Other, "no underpass path"));
+        };
+
+        fs::remove_file(underpass_path)?;
+        let backup_path = underpass_path.join("..\\Labs_Underpass_P.upk.bak");
+        fs::rename(backup_path, underpass_path)?;
+
+        state.loaded_map = None;
         Ok(())
     }
 }
