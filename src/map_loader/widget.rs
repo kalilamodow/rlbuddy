@@ -51,7 +51,36 @@ impl MapLoaderWidget {
             .send(MapLoaderCommand::UpdateUnderpassPath(underpass_path));
     }
 
-    fn import_map(&self) {}
+    fn import_map(&self) {
+        let Some(zip_path) = FileDialog::new()
+            .add_filter("Custom Map", &["zip"])
+            .pick_file()
+        else {
+            return;
+        };
+
+        let zip_path = match fs::canonicalize(zip_path) {
+            Ok(wtv) => wtv,
+            Err(error) => {
+                eprintln!("{error}");
+                return;
+            }
+        };
+
+        self.command_sender.send(MapLoaderCommand::Import(zip_path));
+    }
+
+    fn render_error_header(&self, ui: &mut egui::Ui) {
+        let state = self.state.read();
+        if let Some(err) = state.current_error.as_ref() {
+            ui.horizontal(|ui| {
+                ui.colored_label(ui.style().visuals.error_fg_color, err);
+                if ui.small_button("X").clicked() {
+                    self.command_sender.send(MapLoaderCommand::ClearError);
+                }
+            });
+        }
+    }
 
     fn render_header(&self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
@@ -73,6 +102,7 @@ impl egui::Widget for &MapLoaderWidget {
                 }
             }
 
+            self.render_error_header(ui);
             self.render_header(ui);
         })
         .response
