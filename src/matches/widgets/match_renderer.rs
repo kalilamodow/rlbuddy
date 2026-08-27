@@ -21,6 +21,14 @@ pub enum BuddyStatsOption<'a> {
     No,
 }
 
+const DEFAULT_AVATAR_EXTRA_SCALE: f32 = {
+    let image_heght = 128.0;
+    let icon_height = 92.0;
+    let total_padding = image_heght - icon_height;
+    let one_size_padding = total_padding / 2.0;
+    one_size_padding / 2.0
+};
+
 pub struct MatchRenderer<'a> {
     match_info: &'a MatchType<'a>,
     is_open: Option<&'a mut bool>,
@@ -136,20 +144,14 @@ impl<'a> MatchRenderer<'a> {
                     .corner_radius(egui::CornerRadius::same(4)),
             );
         } else {
-            // the icon is crap so there's some padding around the actual icon, meaning
-            // we need to shift and scale it to make it appear 28x28
-            let scale_factor = 128.0 / 92.0; // webp dimension / icon dimension
-
             let rect = ui
-                .allocate_space(egui::vec2(28.0 * scale_factor, 28.0 * scale_factor))
-                .1;
+                .allocate_space(egui::vec2(28.0, 28.0))
+                .1
+                .expand(DEFAULT_AVATAR_EXTRA_SCALE);
 
-            let padding_translation = (128.0 - 92.0) / 2.0 * (28.0 / 128.0);
-            let paint_rect =
-                rect.translate(egui::vec2(-padding_translation, padding_translation / 2.0));
             egui::Image::new(include_image!("../../../assets/Avatar_icon.webp"))
                 .corner_radius(egui::CornerRadius::same(4))
-                .paint_at(ui, paint_rect);
+                .paint_at(ui, rect);
         }
 
         ui.vertical(|ui| {
