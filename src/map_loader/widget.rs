@@ -1,11 +1,11 @@
-use std::fs;
+use std::{fs, path::PathBuf};
 
 use eframe::egui;
 use rfd::FileDialog;
 
 use crate::{
-    common::{ReadonlyStateHandle, channel::Sender},
-    map_loader::service::{MapLoaderCommand, MapLoaderService, MapLoaderServiceState},
+    common::{ReadonlyStateHandle, channel::Sender, data_dir::rlbuddy_data_dir},
+    map_loader::service::{CustomMapId, MapLoaderCommand, MapLoaderService, MapLoaderServiceState},
 };
 
 pub struct MapLoaderWidget {
@@ -88,6 +88,91 @@ impl MapLoaderWidget {
                 self.import_map();
             }
         });
+        ui.add_space(4.0);
+    }
+
+    fn render_map_list(&self, ui: &mut egui::Ui) {
+        let state = self.state.read();
+
+        ui.horizontal_wrapped(|ui| {
+            for map in &state.maps {
+                let this_map_is_selected = state
+                    .loaded_map
+                    .as_ref()
+                    .is_some_and(|m| m.as_str() == map.id.as_str());
+
+                // first, draw the background
+                let image_rect = match preview_image(&map.id) {
+                    Some(preview_image) => {
+                        ui.add(
+                            egui::Image::new(egui::ImageSource::Uri(
+                                preview_image
+                                    .to_string_lossy()
+                                    .replace("\\\\?\\", "file://")
+                                    .into(),
+                            ))
+                            .fit_to_exact_size(egui::vec2(200.0, 115.0))
+                            .maintain_aspect_ratio(false)
+                            .corner_radius(egui::CornerRadius::same(8)),
+                        )
+                        .rect
+                    }
+                    None => ui.allocate_space(egui::vec2(200.0, 115.0)).1,
+                };
+
+                // then, add a dark overlay for contrast
+                ui.painter().add(
+                    egui::Frame::new()
+                        .fill(egui::Color32::from_black_alpha(200))
+                        .corner_radius(egui::CornerRadius::same(8))
+                        .stroke(if this_map_is_selected {
+                            egui::Stroke::new(0.5f32, egui::Color32::WHITE)
+                        } else {
+                            Default::default()
+                        })
+                        .paint(image_rect),
+                );
+
+                if image_rect.width() < 50.0 || image_rect.height() < 50.0 {
+                    // probably loading, dont render content
+                    continue;
+                }
+
+                // finally, put the actual content (shrink for margin)
+                let content_rect = image_rect.shrink(8.0);
+
+                ui.place(content_rect, |ui: &mut egui::Ui| {
+                    ui.vertical(|ui| {
+                        ui.label(egui::RichText::new(map.id.as_str()).strong().size(15.0));
+                        ui.add_space(2.0);
+                        ui.label(&map.description);
+
+                        ui.with_layout(egui::Layout::bottom_up(egui::Align::Min), |ui| {
+                            ui.horizontal(|ui| {
+                                ui.label(format!("By {}", map.author));
+
+                                ui.with_layout(
+                                    egui::Layout::right_to_left(egui::Align::Max),
+                                    |ui| {
+                                        if ui
+                                            .add_enabled(
+                                                !this_map_is_selected,
+                                                egui::Button::new("Load"),
+                                            )
+                                            .clicked()
+                                        {
+                                            self.command_sender
+                                                .send(MapLoaderCommand::Load(map.id.clone()))
+                                        }
+                                    },
+                                );
+                            });
+                        });
+                    })
+                    .response
+                });
+            }
+        });
     }
 }
 
@@ -104,7 +189,19 @@ impl egui::Widget for &MapLoaderWidget {
 
             self.render_error_header(ui);
             self.render_header(ui);
+            self.render_map_list(ui);
         })
         .response
     }
+}
+
+fn preview_image(map_id: &CustomMapId) -> Option<PathBuf> {
+    let data_dir = rlbuddy_data_dir()?;
+
+    data_dir
+        .join("custom maps")
+        .join(map_id.as_str())
+        .join("preview.jpg")
+        .canonicalize()
+        .ok()
 }

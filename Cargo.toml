@@ -30,7 +30,7 @@ features = ["glow"]
 [dependencies.egui_extras]
 version = "0.34.3"
 default-features = false
-features = ["http", "image"]
+features = ["file", "http", "image"]
 
 [dependencies.emath]
 version = "0.34.3"
