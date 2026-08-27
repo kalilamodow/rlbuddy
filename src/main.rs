@@ -5,6 +5,7 @@ mod auto_setup;
 mod common;
 mod discord;
 mod hotkey;
+mod map_loader;
 mod matches;
 mod music_control;
 mod my_stats;

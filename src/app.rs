@@ -1,8 +1,9 @@
 use crate::{
     auto_setup::AutoSetupWidget,
-    common::eventsource::EventReceiver,
+    common::{data_dir::rlbuddy_data_dir, eventsource::EventReceiver},
     discord,
     hotkey::{HotkeyService, HotkeySettings},
+    map_loader::{MapLoaderService, MapLoaderServiceSavedata, MapLoaderWidget},
     matches::{CurrentMatchWidget, MatchesService, PastMatchesWidget, StrippedMatchInfo},
     music_control::{self, MusicControlService, MusicControlSettings, MusicControlWidget},
     my_stats::{MyStatsWidget, MyStatsWidgetSettings},
@@ -13,13 +14,7 @@ use crate::{
 };
 use eframe::egui::{self, ViewportCommand};
 use serde::{Deserialize, Serialize};
-use std::{
-    cell::RefCell,
-    fs,
-    path::{Path, PathBuf},
-    rc::Rc,
-    thread,
-};
+use std::{cell::RefCell, fs, path::Path, rc::Rc, thread};
 use std::{sync::mpsc, time::Duration};
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, Serialize, Deserialize)]
@@ -30,6 +25,7 @@ enum Panel {
     MyStats,
     Discord,
     PlayerSearch,
+    MapLoader,
     AutoSetup,
     Settings,
 }
@@ -46,6 +42,7 @@ impl std::fmt::Display for Panel {
                 Panel::MusicControl => "Music",
                 Panel::Discord => "Discord",
                 Panel::PlayerSearch => "Player Search",
+                Panel::MapLoader => "Custom Maps",
                 Panel::AutoSetup => "Stats API Setup",
                 Panel::Settings => "Settings",
             }
@@ -53,12 +50,13 @@ impl std::fmt::Display for Panel {
     }
 }
 
-const OPENABLE_PANELS: [Panel; 8] = [
+const OPENABLE_PANELS: [Panel; 9] = [
     Panel::CurrentMatch,
     Panel::Discord,
     Panel::MusicControl,
     Panel::MyStats,
     Panel::PastMatches,
+    Panel::MapLoader,
     Panel::AutoSetup,
     Panel::PlayerSearch,
     Panel::Settings,
@@ -112,11 +110,12 @@ struct AppData {
     music_control_settings: MusicControlSettings,
     match_notification_settings: MatchNotificatorSettings,
     saved_window_dimensions: Option<(egui::Pos2, egui::Vec2)>, // outer pos, inner size
+    map_loader_savedata: MapLoaderServiceSavedata,
 }
 
 impl AppData {
     fn load() -> Self {
-        let Some(data_dir) = data_dir() else {
+        let Some(data_dir) = rlbuddy_data_dir() else {
             return Self::default();
         };
 
@@ -133,6 +132,7 @@ impl AppData {
                 "match_notifications_settings",
             ),
             saved_window_dimensions: Self::load_setting(&data_dir, "saved_window_dimensions"),
+            map_loader_savedata: Self::load_setting(&data_dir, "map_loader_savedata"),
         }
     }
 
@@ -148,7 +148,7 @@ impl AppData {
     }
 
     fn save(self) {
-        let Some(data_dir) = data_dir() else {
+        let Some(data_dir) = rlbuddy_data_dir() else {
             return;
         };
 
@@ -175,6 +175,7 @@ impl AppData {
             "saved_window_dimensions",
             self.saved_window_dimensions,
         );
+        Self::write_setting(&data_dir, "map_loader_savedata", self.map_loader_savedata);
     }
 
     fn write_setting<T>(data_dir: &Path, name: &str, new: T)
@@ -220,6 +221,9 @@ pub struct RlBuddyApp {
     player_info_service: PlayerInfoService,
     player_search_widget: PlayerSearchWidget,
 
+    map_loader_widget: MapLoaderWidget,
+    map_loader_service: MapLoaderService,
+
     match_notificator_service: MatchNotificatorService,
     toast_service: ToastAlertService,
 
@@ -262,6 +266,7 @@ impl RlBuddyApp {
         );
         let hotkey_service = HotkeyService::new(&overlay_tx, app_data.hotkey_settings);
         let player_info_service = PlayerInfoService::new(ctx.clone());
+        let map_loader_service = MapLoaderService::new(app_data.map_loader_savedata);
 
         let current_transparency = Rc::new(RefCell::new(app_data.app_settings.transparency));
         RlBuddyApp {
@@ -303,6 +308,9 @@ impl RlBuddyApp {
 
             stats_api_events: stats_api_service.subscribe(),
             stats_api_service,
+
+            map_loader_widget: MapLoaderWidget::new(&map_loader_service),
+            map_loader_service,
 
             hotkey_service,
             player_search_widget: PlayerSearchWidget::new(player_info_service.sender()),
@@ -377,6 +385,7 @@ impl RlBuddyApp {
                         .map(|inner| (outer.left_top(), inner.size()))
                 })
             }),
+            map_loader_savedata: self.map_loader_service.save(),
         }
         .save();
     }
@@ -452,6 +461,7 @@ impl eframe::App for RlBuddyApp {
                                 Panel::MusicControl => ui.add(&mut self.music_control_widget),
                                 Panel::PastMatches => ui.add(&mut self.past_matches),
                                 Panel::PlayerSearch => ui.add(&mut self.player_search_widget),
+                                Panel::MapLoader => ui.add(&self.map_loader_widget),
                                 Panel::AutoSetup => ui.add(&mut self.auto_setup_widget),
                                 Panel::Settings => ui.add(&mut self.settings_widget),
                             };
@@ -481,6 +491,7 @@ impl eframe::App for RlBuddyApp {
         self.music_control_service.update();
         self.match_notificator_service.update();
         self.toast_service.update();
+        self.map_loader_service.update();
 
         while let Some(event) = self.stats_api_events.try_recv() {
             match *event {
@@ -513,10 +524,4 @@ impl eframe::App for RlBuddyApp {
     fn clear_color(&self, _visuals: &egui::Visuals) -> [f32; 4] {
         egui::Rgba::TRANSPARENT.to_array()
     }
-}
-
-fn data_dir() -> Option<PathBuf> {
-    std::env::var("APPDATA")
-        .map(|roaming| PathBuf::from(roaming).join("rlbuddy/"))
-        .ok()
 }
