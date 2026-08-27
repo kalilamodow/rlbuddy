@@ -489,9 +489,21 @@ impl egui::Widget for MatchRenderer<'_> {
                 .striped(true)
                 .min_col_width(0.0)
                 .show(ui, |ui| {
-                    center_label(ui, bold_text("Rank")); // icon
-                    ui.label(""); // avatar
-                    ui.label(bold_text("Player"));
+                    center_label(ui, bold_text("Rank"));
+                    {
+                        // so it doesnt add space between the avatar and player details
+                        let mut rect = ui
+                            .allocate_space(egui::vec2(
+                                24.0,
+                                ui.style().text_styles[&egui::TextStyle::Body].size + 2.0,
+                            ))
+                            .1;
+                        rect.min.x += 12.0;
+
+                        ui.place(rect, egui::Label::new(bold_text("Player")).extend());
+                    }
+
+                    ui.label("");
                     if matches!(self.match_info, MatchType::Session(_)) {
                         center_label(ui, bold_text("Score"));
                         ui.label(""); // more button
