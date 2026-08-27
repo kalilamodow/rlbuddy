@@ -7,7 +7,11 @@ use crate::{
     map_loader::service::MapLoaderCommand::ClearError,
 };
 use serde::{Deserialize, Serialize};
-use std::{fs, io::Read as _, path::PathBuf};
+use std::{
+    fs,
+    io::{self, Read as _},
+    path::{Path, PathBuf},
+};
 use zip::ZipArchive;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -125,7 +129,10 @@ impl MapLoaderService {
                 }
             }
             MapLoaderCommand::Load(id) => {
-                println!("loading {id:?}");
+                if let Err(error) = self.load(id) {
+                    let mut state = self.state.write();
+                    state.current_error = Some(error.to_string());
+                }
             }
             ClearError => {
                 let mut state = self.state.write();
@@ -185,10 +192,7 @@ impl MapLoaderService {
         }
         // its ok if theres no preview
 
-        let Some(data_dir) = rlbuddy_data_dir() else {
-            return Err(string_to_error("no data directory"));
-        };
-        let custom_map_dir = data_dir.join("custom maps\\").join(map_name);
+        let custom_map_dir = get_custom_map_directory(&info.id)?;
         fs::create_dir_all(&custom_map_dir)?;
 
         fs::write(custom_map_dir.join("map.upk"), rl_pkg_data)?;
@@ -206,6 +210,38 @@ impl MapLoaderService {
 
         Ok(())
     }
+
+    fn load(&self, id: CustomMapId) -> Result<(), Box<dyn std::error::Error>> {
+        let mut state = self.state.write();
+        let Some(underpass_path) = &state.underpass_path else {
+            return Err(string_to_error("no valid underpass path"));
+        };
+
+        back_up_old_underpass(underpass_path)?;
+
+        let map_directory = get_custom_map_directory(&id)?;
+        fs::copy(map_directory.join("map.upk"), underpass_path)?;
+
+        state.loaded_map = Some(id.clone());
+        Ok(())
+    }
+}
+
+fn get_custom_map_directory(id: &CustomMapId) -> Result<PathBuf, String> {
+    let Some(data_dir) = rlbuddy_data_dir() else {
+        return Err("no data directory".into());
+    };
+
+    Ok(data_dir.join("custom maps\\").join(id.as_str()))
+}
+
+fn back_up_old_underpass(underpass_path: &Path) -> io::Result<u64> {
+    let backup_path = underpass_path.join("..\\Labs_Underpass_P.upk.bak");
+    if backup_path.is_file() {
+        return Ok(0);
+    }
+
+    fs::copy(underpass_path, backup_path)
 }
 
 fn string_to_error(s: &str) -> Box<dyn std::error::Error> {
