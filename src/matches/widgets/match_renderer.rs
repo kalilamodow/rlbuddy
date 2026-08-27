@@ -26,7 +26,7 @@ const DEFAULT_AVATAR_EXTRA_SCALE: f32 = {
     let icon_height = 92.0;
     let total_padding = image_heght - icon_height;
     let one_size_padding = total_padding / 2.0;
-    one_size_padding / 2.0
+    one_size_padding / 4.0
 };
 
 pub struct MatchRenderer<'a> {
@@ -137,26 +137,9 @@ impl<'a> MatchRenderer<'a> {
             center_label(ui, "-");
         }
 
-        if let Some(avatar_url) = match_player.avatar_url.as_ref() {
-            ui.add(
-                egui::Image::new(avatar_url.as_str())
-                    .fit_to_exact_size(egui::vec2(28.0, 28.0))
-                    .corner_radius(egui::CornerRadius::same(4)),
-            );
-        } else {
-            let rect = ui
-                .allocate_space(egui::vec2(28.0, 28.0))
-                .1
-                .expand(DEFAULT_AVATAR_EXTRA_SCALE);
-
-            egui::Image::new(include_image!("../../../assets/Avatar_icon.webp"))
-                .corner_radius(egui::CornerRadius::same(4))
-                .paint_at(ui, rect);
-        }
+        render_avatar(ui, match_player.avatar_url.as_ref().map(|u| u.as_str()));
 
         ui.vertical(|ui| {
-            ui.spacing_mut().item_spacing.y = 4.0;
-
             ui.horizontal(|ui| {
                 let name_color = if match_player.left {
                     Color32::GRAY
@@ -268,6 +251,8 @@ impl<'a> MatchRenderer<'a> {
         } else {
             center_label(ui, "-");
         }
+
+        render_avatar(ui, player.avatar_url.as_ref().map(|u| u.as_str()));
 
         let name_color = if player.is_local_player() {
             ui.visuals().strong_text_color()
@@ -500,12 +485,13 @@ impl egui::Widget for MatchRenderer<'_> {
 
         ui.vertical(|ui| {
             egui::Grid::new(self.match_info.started_at())
-                .spacing(egui::vec2(0.0, 12.0))
+                .spacing(egui::vec2(8.0, 12.0))
                 .striped(true)
+                .min_col_width(0.0)
                 .show(ui, |ui| {
                     center_label(ui, bold_text("Rank")); // icon
-                    ui.label(""); // actual player
-                    ui.label(bold_text("Player")); // technically avatar
+                    ui.label(""); // avatar
+                    ui.label(bold_text("Player"));
                     if matches!(self.match_info, MatchType::Session(_)) {
                         center_label(ui, bold_text("Score"));
                         ui.label(""); // more button
@@ -535,6 +521,24 @@ impl egui::Widget for MatchRenderer<'_> {
             self.render_match_mmr_info(ui);
         })
         .response
+    }
+}
+
+fn render_avatar(ui: &mut egui::Ui, url: Option<&str>) {
+    if let Some(avatar_url) = url {
+        ui.add(
+            egui::Image::new(avatar_url)
+                .fit_to_exact_size(egui::vec2(28.0, 28.0))
+                .corner_radius(egui::CornerRadius::same(4)),
+        );
+    } else {
+        let rect = ui
+            .allocate_space(egui::vec2(28.0, 28.0))
+            .1
+            .expand(DEFAULT_AVATAR_EXTRA_SCALE);
+        egui::Image::new(include_image!("../../../assets/Avatar_icon.webp"))
+            .corner_radius(egui::CornerRadius::same(4))
+            .paint_at(ui, rect);
     }
 }
 

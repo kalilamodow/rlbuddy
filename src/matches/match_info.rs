@@ -222,6 +222,7 @@ pub struct StrippedPlayer {
     pub player_type: StrippedPlayerType,
     pub team: Team,
     pub platform: Platform,
+    pub avatar_url: Option<String>,
 }
 
 impl StrippedPlayer {
@@ -241,6 +242,7 @@ impl StrippedPlayer {
             team: value.data.team,
             platform: value.data.platform,
             epic_id: value.epic_name.as_ref().map(|s| s.as_ref().clone()),
+            avatar_url: value.avatar_url.as_ref().map(|s| s.as_ref().clone()),
         }
     }
 
