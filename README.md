@@ -19,7 +19,7 @@ If you've never turned on the stats api before, on first run, make sure to enabl
 
 <img src="readme-images/lobby.jpg">
 
-This is the main widget that you'll probably look at. It lists each player along with their comp 1s, 2s, and 3s ranks, and puts their rank in whatever mode you're currently playing on the left. It also uncensors their name automatically, and shows their platform next to their name.
+This is the main widget that you'll probably look at. It lists each player along with their comp 1s, 2s, and 3s ranks, and puts their rank in whatever mode you're currently playing on the left. It also uncensors their name automatically, and shows their platform next to their name. It also shows each player's avatar if they're on Steam, Xbox, or PlayStation.
 
 By default, it sources rank/name information from the game's API itself, so no Tracker is required, but you can click their name to get more detailed information. It attempts to fully resolve Switch player ids, but it's only guaranteed to be right if they're in a club.
 
