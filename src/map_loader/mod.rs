@@ -1,3 +1,4 @@
+mod map_card_widget;
 mod service;
 mod widget;
 
