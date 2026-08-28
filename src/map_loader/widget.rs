@@ -1,6 +1,7 @@
 use crate::{
     common::{ThreadedReadonlyStateHandle, channel::Sender, data_dir::rlbuddy_data_dir},
     map_loader::{
+        downloader::MapDownloaderWidget,
         map_card_widget::MapCardWidget,
         service::{CustomMapId, MapLoaderCommand, MapLoaderService, MapLoaderServiceState},
     },
@@ -12,6 +13,7 @@ use std::{fs, path::PathBuf};
 pub struct MapLoaderWidget {
     state: ThreadedReadonlyStateHandle<MapLoaderServiceState>,
     command_sender: Sender<MapLoaderCommand>,
+    downloader_widget: MapDownloaderWidget,
 }
 
 impl MapLoaderWidget {
@@ -19,6 +21,7 @@ impl MapLoaderWidget {
         Self {
             state: service.state_handle(),
             command_sender: service.sender(),
+            downloader_widget: MapDownloaderWidget::new(),
         }
     }
 
@@ -153,7 +156,7 @@ impl MapLoaderWidget {
     }
 }
 
-impl egui::Widget for &MapLoaderWidget {
+impl egui::Widget for &mut MapLoaderWidget {
     fn ui(self, ui: &mut egui::Ui) -> egui::Response {
         ui.vertical(|ui| {
             {
@@ -167,6 +170,9 @@ impl egui::Widget for &MapLoaderWidget {
             self.render_error_header(ui);
             self.render_header(ui);
             self.render_map_list(ui);
+
+            ui.separator();
+            ui.add(&mut self.downloader_widget);
         })
         .response
     }

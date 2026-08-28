@@ -461,7 +461,7 @@ impl eframe::App for RlBuddyApp {
                                 Panel::MusicControl => ui.add(&mut self.music_control_widget),
                                 Panel::PastMatches => ui.add(&mut self.past_matches),
                                 Panel::PlayerSearch => ui.add(&mut self.player_search_widget),
-                                Panel::MapLoader => ui.add(&self.map_loader_widget),
+                                Panel::MapLoader => ui.add(&mut self.map_loader_widget),
                                 Panel::AutoSetup => ui.add(&mut self.auto_setup_widget),
                                 Panel::Settings => ui.add(&mut self.settings_widget),
                             };
