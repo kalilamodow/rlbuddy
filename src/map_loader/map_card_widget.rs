@@ -13,7 +13,7 @@ pub struct MapCardWidget<'a, ButtonsWidget> {
 
 impl<'a, ButtonsWidget> MapCardWidget<'a, ButtonsWidget>
 where
-    ButtonsWidget: Fn(&mut egui::Ui),
+    ButtonsWidget: FnMut(&mut egui::Ui),
 {
     pub fn new(
         title: &'a str,
@@ -35,7 +35,7 @@ where
         }
     }
 
-    fn render_map_card_content(&self, ui: &mut egui::Ui, bg_rect: Rect) {
+    fn render_map_card_content(&mut self, ui: &mut egui::Ui, bg_rect: Rect) {
         // shrink for margin
         let content_rect = bg_rect.shrink(8.0);
 
@@ -67,9 +67,9 @@ where
 
 impl<'a, ButtonsWidget> egui::Widget for MapCardWidget<'a, ButtonsWidget>
 where
-    ButtonsWidget: Fn(&mut egui::Ui),
+    ButtonsWidget: FnMut(&mut egui::Ui),
 {
-    fn ui(self, ui: &mut egui::Ui) -> egui::Response {
+    fn ui(mut self, ui: &mut egui::Ui) -> egui::Response {
         let size = if self.big {
             egui::vec2(300.0, 170.0)
         } else {

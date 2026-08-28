@@ -8,7 +8,7 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 use std::{
-    fs,
+    fs::{self, File},
     io::{self, Read as _},
     path::{Path, PathBuf},
     thread,
@@ -158,7 +158,8 @@ impl MapLoaderService {
     fn import(&self, zip_path: PathBuf) {
         let state_handle = self.state.clone();
         thread::spawn(move || {
-            let result = import_blocking(&zip_path, state_handle.clone());
+            let result = import_archive_from_file(&zip_path, state_handle.clone());
+
             if let Err(error) = result {
                 let mut state = state_handle.write();
                 state.current_error = Some(error.to_string());
@@ -205,17 +206,10 @@ impl MapLoaderService {
     }
 }
 
-fn import_blocking(
+fn import_archive_from_file(
     zip_path: &Path,
     state_handle: ThreadedReadWriteStateHandle<MapLoaderServiceState>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let update_progress = |progress: f32| {
-        let mut state = state_handle.write();
-        state.import_progress = Some(progress);
-    };
-
-    update_progress(0.0);
-
     let map_name = zip_path
         .file_prefix()
         .and_then(|f| f.to_str())
@@ -223,15 +217,31 @@ fn import_blocking(
         .to_owned();
 
     let file = fs::File::open(zip_path)?;
-    let mut archive = ZipArchive::new(file)?;
+    let archive = ZipArchive::new(file)?;
 
-    update_progress(0.25);
+    import_archive(
+        CustomMapInfo {
+            id: CustomMapId(map_name),
+            author: None,
+            description: None,
+        },
+        archive,
+        state_handle,
+    )
+}
 
-    let mut info = CustomMapInfo {
-        id: CustomMapId(map_name),
-        description: None,
-        author: None,
+fn import_archive(
+    mut info: CustomMapInfo,
+    mut archive: ZipArchive<File>,
+    state_handle: ThreadedReadWriteStateHandle<MapLoaderServiceState>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let update_progress = |progress: f32| {
+        let mut state = state_handle.write();
+        state.import_progress = Some(progress);
     };
+
+    update_progress(0.05);
+
     let mut rl_pkg_data = vec![];
     let mut preview_image_data = vec![];
 
@@ -258,8 +268,8 @@ fn import_blocking(
             for (i, chunk) in rl_pkg_data.chunks_mut(chunk_size).enumerate() {
                 file.read_exact(chunk)?;
                 // i as f32 / 100.0 = actual completion
-                // * 0.75 to take up the remaining 75% (starts at 25%)
-                update_progress((i as f32 / 100.0) * 0.75 + 0.25);
+                // * 0.9 to only fill up to 90% + 0.05 because it starts at 5%
+                update_progress((i as f32 / 100.0) * 0.9 + 0.05);
             }
         } else if filename == "preview.jpg" {
             file.read_to_end(&mut preview_image_data)?;
