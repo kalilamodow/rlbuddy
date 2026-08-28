@@ -26,10 +26,10 @@ impl std::ops::Deref for CustomMapId {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CustomMapInfo {
-    pub id: CustomMapId, // name
-    pub author: String,  // from info.json
-    pub description: String, // from info.json
-                         // preview path is always preview.jpg
+    pub id: CustomMapId,        // name
+    pub author: Option<String>, // from info.json
+    pub description: Option<String>, // from info.json
+                                // preview path is always preview.jpg
 }
 
 #[derive(Debug, Deserialize)]
@@ -158,7 +158,11 @@ impl MapLoaderService {
         let file = fs::File::open(zip_path)?;
         let mut archive = ZipArchive::new(file)?;
 
-        let mut info: Option<CustomMapInfo> = None;
+        let mut info = CustomMapInfo {
+            id: CustomMapId(map_name),
+            description: None,
+            author: None,
+        };
         let mut rl_pkg_data = vec![];
         let mut preview_image_data = vec![];
 
@@ -174,16 +178,9 @@ impl MapLoaderService {
             };
 
             if filename == "info.json" {
-                if info.is_some() {
-                    return Err(string_to_error("multiple custom map manifests found"));
-                }
-
                 let info_json: CustomMapInfoJson = serde_json::from_reader(file)?;
-                info = Some(CustomMapInfo {
-                    id: CustomMapId(map_name.clone()),
-                    author: info_json.author,
-                    description: info_json.desc,
-                });
+                info.author = Some(info_json.author);
+                info.description = Some(info_json.desc);
             } else if filename.ends_with(".udk") || filename.ends_with(".upk") {
                 file.read_to_end(&mut rl_pkg_data)?;
             } else if filename == "preview.jpg" {
@@ -191,9 +188,6 @@ impl MapLoaderService {
             }
         }
 
-        let Some(info) = info else {
-            return Err(string_to_error("failed to load info.json"));
-        };
         if rl_pkg_data.is_empty() {
             return Err(string_to_error("failed to load package data"));
         }

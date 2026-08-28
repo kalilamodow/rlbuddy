@@ -103,85 +103,103 @@ impl MapLoaderWidget {
     fn render_map_list(&self, ui: &mut egui::Ui) {
         let state = self.state.read();
 
-        ui.horizontal_wrapped(|ui| {
-            for map in &state.maps {
-                let this_map_is_selected = state
-                    .loaded_map
-                    .as_ref()
-                    .is_some_and(|m| m.as_str() == map.id.as_str());
+        ui.with_layout(
+            egui::Layout::left_to_right(egui::Align::Min).with_main_wrap(true),
+            |ui| {
+                for map in &state.maps {
+                    let this_map_is_selected = state
+                        .loaded_map
+                        .as_ref()
+                        .is_some_and(|m| m.as_str() == map.id.as_str());
 
-                // first, draw the background
-                let image_rect = match preview_image(&map.id) {
-                    Some(preview_image) => {
-                        ui.add(
-                            egui::Image::new(egui::ImageSource::Uri(
-                                preview_image
-                                    .to_string_lossy()
-                                    .replace("\\\\?\\", "file://")
-                                    .into(),
+                    // first, draw the background
+                    let image_rect = match preview_image(&map.id) {
+                        Some(preview_image) => {
+                            ui.add(
+                                egui::Image::new(egui::ImageSource::Uri(
+                                    preview_image
+                                        .to_string_lossy()
+                                        .replace("\\\\?\\", "file://")
+                                        .into(),
+                                ))
+                                .fit_to_exact_size(egui::vec2(200.0, 115.0))
+                                .maintain_aspect_ratio(false)
+                                .corner_radius(egui::CornerRadius::same(8)),
+                            )
+                            .rect
+                        }
+                        None => {
+                            ui.allocate_space(egui::vec2(
+                                200.0,
+                                if map.description.is_some() {
+                                    115.0
+                                } else {
+                                    75.0
+                                },
                             ))
-                            .fit_to_exact_size(egui::vec2(200.0, 115.0))
-                            .maintain_aspect_ratio(false)
-                            .corner_radius(egui::CornerRadius::same(8)),
-                        )
-                        .rect
+                            .1
+                        }
+                    };
+
+                    // then, add a dark overlay for contrast
+                    ui.painter().add(
+                        egui::Frame::new()
+                            .fill(egui::Color32::from_black_alpha(200))
+                            .corner_radius(egui::CornerRadius::same(8))
+                            .stroke(if this_map_is_selected {
+                                egui::Stroke::new(0.5f32, egui::Color32::WHITE)
+                            } else {
+                                Default::default()
+                            })
+                            .paint(image_rect),
+                    );
+
+                    if image_rect.width() < 50.0 || image_rect.height() < 50.0 {
+                        // probably loading, dont render content
+                        continue;
                     }
-                    None => ui.allocate_space(egui::vec2(200.0, 115.0)).1,
-                };
 
-                // then, add a dark overlay for contrast
-                ui.painter().add(
-                    egui::Frame::new()
-                        .fill(egui::Color32::from_black_alpha(200))
-                        .corner_radius(egui::CornerRadius::same(8))
-                        .stroke(if this_map_is_selected {
-                            egui::Stroke::new(0.5f32, egui::Color32::WHITE)
-                        } else {
-                            Default::default()
-                        })
-                        .paint(image_rect),
-                );
+                    // finally, put the actual content (shrink for margin)
+                    let content_rect = image_rect.shrink(8.0);
 
-                if image_rect.width() < 50.0 || image_rect.height() < 50.0 {
-                    // probably loading, dont render content
-                    continue;
-                }
+                    ui.place(content_rect, |ui: &mut egui::Ui| {
+                        ui.vertical(|ui| {
+                            ui.label(egui::RichText::new(map.id.as_str()).strong().size(15.0));
+                            ui.add_space(2.0);
 
-                // finally, put the actual content (shrink for margin)
-                let content_rect = image_rect.shrink(8.0);
+                            if let Some(description) = &map.description {
+                                ui.label(description);
+                            }
 
-                ui.place(content_rect, |ui: &mut egui::Ui| {
-                    ui.vertical(|ui| {
-                        ui.label(egui::RichText::new(map.id.as_str()).strong().size(15.0));
-                        ui.add_space(2.0);
-                        ui.label(&map.description);
+                            ui.with_layout(egui::Layout::bottom_up(egui::Align::Min), |ui| {
+                                ui.horizontal(|ui| {
+                                    if let Some(author) = &map.author {
+                                        ui.label(format!("By {}", author));
+                                    }
 
-                        ui.with_layout(egui::Layout::bottom_up(egui::Align::Min), |ui| {
-                            ui.horizontal(|ui| {
-                                ui.label(format!("By {}", map.author));
-
-                                ui.with_layout(
-                                    egui::Layout::right_to_left(egui::Align::Max),
-                                    |ui| {
-                                        if ui
-                                            .add_enabled(
-                                                !this_map_is_selected,
-                                                egui::Button::new("Load"),
-                                            )
-                                            .clicked()
-                                        {
-                                            self.command_sender
-                                                .send(MapLoaderCommand::Load(map.id.clone()))
-                                        }
-                                    },
-                                );
+                                    ui.with_layout(
+                                        egui::Layout::right_to_left(egui::Align::Max),
+                                        |ui| {
+                                            if ui
+                                                .add_enabled(
+                                                    !this_map_is_selected,
+                                                    egui::Button::new("Load"),
+                                                )
+                                                .clicked()
+                                            {
+                                                self.command_sender
+                                                    .send(MapLoaderCommand::Load(map.id.clone()))
+                                            }
+                                        },
+                                    );
+                                });
                             });
-                        });
-                    })
-                    .response
-                });
-            }
-        });
+                        })
+                        .response
+                    });
+                }
+            },
+        );
     }
 }
 
