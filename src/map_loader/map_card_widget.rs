@@ -45,7 +45,12 @@ where
                 ui.add_space(2.0);
 
                 if let Some(description) = self.description {
-                    ui.label(description);
+                    if self.big || description.len() < 80 {
+                        ui.label(description);
+                    } else {
+                        ui.label(format!("{}...", &description[..80].trim_end()))
+                            .on_hover_text(description);
+                    }
                 }
 
                 ui.with_layout(egui::Layout::bottom_up(egui::Align::Min), |ui| {
