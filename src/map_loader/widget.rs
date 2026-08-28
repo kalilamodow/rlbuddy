@@ -5,14 +5,14 @@ use emath::Rect;
 use rfd::FileDialog;
 
 use crate::{
-    common::{ReadonlyStateHandle, channel::Sender, data_dir::rlbuddy_data_dir},
+    common::{ThreadedReadonlyStateHandle, channel::Sender, data_dir::rlbuddy_data_dir},
     map_loader::service::{
         CustomMapId, CustomMapInfo, MapLoaderCommand, MapLoaderService, MapLoaderServiceState,
     },
 };
 
 pub struct MapLoaderWidget {
-    state: ReadonlyStateHandle<MapLoaderServiceState>,
+    state: ThreadedReadonlyStateHandle<MapLoaderServiceState>,
     command_sender: Sender<MapLoaderCommand>,
 }
 
@@ -87,9 +87,13 @@ impl MapLoaderWidget {
 
     fn render_header(&self, ui: &mut egui::Ui) {
         let state = self.state.read();
+        let is_importing = state.import_progress.is_some();
 
         ui.horizontal(|ui| {
-            if ui.button("Import new map").clicked() {
+            if ui
+                .add_enabled(!is_importing, egui::Button::new("Import new map"))
+                .clicked()
+            {
                 self.import_map();
             }
 
@@ -98,6 +102,10 @@ impl MapLoaderWidget {
                 .clicked()
             {
                 self.command_sender.send(MapLoaderCommand::Unload);
+            }
+
+            if let Some(import_progress) = state.import_progress {
+                ui.add(egui::ProgressBar::new(import_progress).text("Importing..."));
             }
         });
         ui.add_space(4.0);

@@ -1,6 +1,6 @@
 use crate::{
     common::{
-        ReadWriteStateHandle, ReadonlyStateHandle,
+        ThreadedReadWriteStateHandle, ThreadedReadonlyStateHandle,
         channel::{Receiver, Sender},
         data_dir::rlbuddy_data_dir,
     },
@@ -11,6 +11,7 @@ use std::{
     fs,
     io::{self, Read as _},
     path::{Path, PathBuf},
+    thread,
 };
 use zip::ZipArchive;
 
@@ -51,6 +52,7 @@ pub struct MapLoaderServiceState {
     pub loaded_map: Option<CustomMapId>,
     pub underpass_path: Option<PathBuf>,
     pub current_error: Option<String>,
+    pub import_progress: Option<f32>, // 0-1
 }
 
 #[derive(Debug)]
@@ -64,7 +66,7 @@ pub enum MapLoaderCommand {
 }
 
 pub struct MapLoaderService {
-    state: ReadWriteStateHandle<MapLoaderServiceState>,
+    state: ThreadedReadWriteStateHandle<MapLoaderServiceState>,
     command_receiver: Receiver<MapLoaderCommand>,
 }
 
@@ -78,11 +80,12 @@ impl MapLoaderService {
         };
 
         Self {
-            state: ReadWriteStateHandle::new(MapLoaderServiceState {
+            state: ThreadedReadWriteStateHandle::new(MapLoaderServiceState {
                 maps: savedata.maps,
                 loaded_map: savedata.loaded_map,
                 underpass_path,
                 current_error: None,
+                import_progress: None,
             }),
             command_receiver: Receiver::new(),
         }
@@ -92,8 +95,8 @@ impl MapLoaderService {
         self.command_receiver.send()
     }
 
-    pub fn state_handle(&self) -> ReadonlyStateHandle<MapLoaderServiceState> {
-        ReadonlyStateHandle::over(&self.state)
+    pub fn state_handle(&self) -> ThreadedReadonlyStateHandle<MapLoaderServiceState> {
+        ThreadedReadonlyStateHandle::over(&self.state)
     }
 
     pub fn save(&self) -> MapLoaderServiceSavedata {
@@ -125,10 +128,7 @@ impl MapLoaderService {
                     return;
                 }
 
-                if let Err(error) = self.import(path) {
-                    let mut state = self.state.write();
-                    state.current_error = Some(error.to_string());
-                }
+                self.import(path);
             }
             MapLoaderCommand::Delete(id) => {
                 if let Err(error) = self.delete(id) {
@@ -155,68 +155,15 @@ impl MapLoaderService {
         }
     }
 
-    fn import(&self, zip_path: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
-        let map_name = zip_path
-            .file_prefix()
-            .and_then(|f| f.to_str())
-            .ok_or_else(|| string_to_error("could not get map name"))?
-            .to_owned();
-
-        let file = fs::File::open(zip_path)?;
-        let mut archive = ZipArchive::new(file)?;
-
-        let mut info = CustomMapInfo {
-            id: CustomMapId(map_name),
-            description: None,
-            author: None,
-        };
-        let mut rl_pkg_data = vec![];
-        let mut preview_image_data = vec![];
-
-        for i in 0..archive.len() {
-            let mut file = archive.by_index(i)?;
-            let Some(path) = file.enclosed_name() else {
-                eprintln!("failed to get enclosed name of {}", file.name());
-                continue;
-            };
-            let Some(filename) = path.file_name().and_then(|f| f.to_str()) else {
-                eprintln!("failed to get filename of {}", file.name());
-                continue;
-            };
-
-            if filename == "info.json" {
-                let info_json: CustomMapInfoJson = serde_json::from_reader(file)?;
-                info.author = Some(info_json.author);
-                info.description = Some(info_json.desc);
-            } else if filename.ends_with(".udk") || filename.ends_with(".upk") {
-                file.read_to_end(&mut rl_pkg_data)?;
-            } else if filename == "preview.jpg" {
-                file.read_to_end(&mut preview_image_data)?;
+    fn import(&self, zip_path: PathBuf) {
+        let state_handle = self.state.clone();
+        thread::spawn(move || {
+            let result = import_blocking(&zip_path, state_handle.clone());
+            if let Err(error) = result {
+                let mut state = state_handle.write();
+                state.current_error = Some(error.to_string());
             }
-        }
-
-        if rl_pkg_data.is_empty() {
-            return Err(string_to_error("failed to load package data"));
-        }
-        // its ok if theres no preview
-
-        let custom_map_dir = get_custom_map_directory(&info.id)?;
-        fs::create_dir_all(&custom_map_dir)?;
-
-        fs::write(custom_map_dir.join("map.upk"), rl_pkg_data)?;
-        if !preview_image_data.is_empty() {
-            fs::write(
-                custom_map_dir.join(format!("preview.jpg")),
-                preview_image_data,
-            )?;
-        }
-
-        {
-            let mut state = self.state.write();
-            state.maps.push(info);
-        }
-
-        Ok(())
+        });
     }
 
     fn load(&self, id: CustomMapId) -> Result<(), Box<dyn std::error::Error>> {
@@ -256,6 +203,92 @@ impl MapLoaderService {
 
         Ok(())
     }
+}
+
+fn import_blocking(
+    zip_path: &Path,
+    state_handle: ThreadedReadWriteStateHandle<MapLoaderServiceState>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let update_progress = |progress: f32| {
+        let mut state = state_handle.write();
+        state.import_progress = Some(progress);
+    };
+
+    update_progress(0.0);
+
+    let map_name = zip_path
+        .file_prefix()
+        .and_then(|f| f.to_str())
+        .ok_or_else(|| string_to_error("could not get map name"))?
+        .to_owned();
+
+    let file = fs::File::open(zip_path)?;
+    let mut archive = ZipArchive::new(file)?;
+
+    update_progress(0.25);
+
+    let mut info = CustomMapInfo {
+        id: CustomMapId(map_name),
+        description: None,
+        author: None,
+    };
+    let mut rl_pkg_data = vec![];
+    let mut preview_image_data = vec![];
+
+    for i in 0..archive.len() {
+        let mut file = archive.by_index(i)?;
+        let Some(path) = file.enclosed_name() else {
+            eprintln!("failed to get enclosed name of {}", file.name());
+            continue;
+        };
+        let Some(filename) = path.file_name().and_then(|f| f.to_str()) else {
+            eprintln!("failed to get filename of {}", file.name());
+            continue;
+        };
+
+        if filename == "info.json" {
+            let info_json: CustomMapInfoJson = serde_json::from_reader(file)?;
+            info.author = Some(info_json.author);
+            info.description = Some(info_json.desc);
+        } else if filename.ends_with(".udk") || filename.ends_with(".upk") {
+            let total_size = usize::try_from(file.size())?;
+            rl_pkg_data = vec![0u8; total_size];
+
+            let chunk_size = total_size / 100;
+            for (i, chunk) in rl_pkg_data.chunks_mut(chunk_size).enumerate() {
+                file.read_exact(chunk)?;
+                // i as f32 / 100.0 = actual completion
+                // * 0.75 to take up the remaining 75% (starts at 25%)
+                update_progress((i as f32 / 100.0) * 0.75 + 0.25);
+            }
+        } else if filename == "preview.jpg" {
+            file.read_to_end(&mut preview_image_data)?;
+        }
+    }
+
+    if rl_pkg_data.is_empty() {
+        return Err(string_to_error("failed to load package data"));
+    }
+    // its ok if theres no preview
+
+    let custom_map_dir = get_custom_map_directory(&info.id)?;
+    fs::create_dir_all(&custom_map_dir)?;
+
+    fs::write(custom_map_dir.join("map.upk"), rl_pkg_data)?;
+    if !preview_image_data.is_empty() {
+        fs::write(
+            custom_map_dir.join(format!("preview.jpg")),
+            preview_image_data,
+        )?;
+    }
+
+    {
+        let mut state = state_handle.write();
+        state.maps.push(info);
+        state.import_progress = None;
+    }
+
+    Ok(())
 }
 
 fn get_custom_map_directory(id: &CustomMapId) -> Result<PathBuf, String> {
