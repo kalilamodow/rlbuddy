@@ -119,15 +119,22 @@ impl MapDownloaderWidget {
 
             let parsed = search_parse(
                 &map_info_response,
-                [(
+                [
+                    // preview image url
+                    (
+                        "position:absolute;height:100%;width:100%;left:0;top:0;right:0;bottom:0;color:transparent\" src=\"",
+                        "\"",
+                    ),
                     // the zip link
-                    "<a class=\"relative inline-flex items-center gap-2 rounded-l-md border border-blue-600 border-r-0 bg-blue-600 px-4 py-2 font-medium whitespace-nowrap text-white hover:bg-blue-700\" href=\"",
-                    "\"",
-                )],
+                    (
+                        "<a class=\"relative inline-flex items-center gap-2 rounded-l-md border border-blue-600 border-r-0 bg-blue-600 px-4 py-2 font-medium whitespace-nowrap text-white hover:bg-blue-700\" href=\"",
+                        "\"",
+                    ),
+                ],
             );
 
-            let Some(zip_url) = parsed.first().map(|f| f[0]) else {
-                eprintln!("Could not find zip url");
+            let Some([image_url, zip_url]) = parsed.first() else {
+                eprintln!("Could not find urls");
                 let mut currently_downloading = currently_downloading_handle.lock().unwrap();
                 *currently_downloading = None;
                 return;
@@ -135,6 +142,7 @@ impl MapDownloaderWidget {
 
             // then we can actually download it
             let archive_bytes = download_with_progress::<65_535>(zip_url, update_progress);
+            let image_bytes = download_with_progress::<4_096>(image_url, update_progress);
 
             let Some(map_info) = ({
                 let mut currently_downloading = currently_downloading_handle.lock().unwrap();
@@ -153,6 +161,7 @@ impl MapDownloaderWidget {
                         Some(map_info.description),
                     ),
                     zip_archive_bytes: archive_bytes,
+                    image_jpeg_bytes: image_bytes,
                 })
                 .unwrap()
         });

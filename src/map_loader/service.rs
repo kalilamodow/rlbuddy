@@ -71,6 +71,7 @@ pub enum MapLoaderCommand {
     ImportBytes {
         info: CustomMapInfo,
         zip_archive_bytes: Vec<u8>,
+        image_jpeg_bytes: Vec<u8>,
     },
     Load(CustomMapId),
     Delete(CustomMapId),
@@ -159,11 +160,16 @@ impl MapLoaderService {
             MapLoaderCommand::ImportBytes {
                 info,
                 zip_archive_bytes,
+                image_jpeg_bytes,
             } => {
                 let state_handle = self.state.clone();
                 thread::spawn(move || {
-                    let result =
-                        import_archive_from_bytes(info, zip_archive_bytes, state_handle.clone());
+                    let result = import_archive_from_bytes(
+                        info,
+                        zip_archive_bytes,
+                        state_handle.clone(),
+                        image_jpeg_bytes,
+                    );
 
                     if let Err(error) = result {
                         let mut state = state_handle.write();
@@ -256,6 +262,7 @@ fn import_archive_from_file(
         },
         archive,
         state_handle,
+        None,
     )
 }
 
@@ -263,15 +270,17 @@ fn import_archive_from_bytes(
     info: CustomMapInfo,
     archive_bytes: Vec<u8>,
     state_handle: ThreadedReadWriteStateHandle<MapLoaderServiceState>,
+    image_jpeg_bytes: Vec<u8>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let archive = ZipArchive::new(std::io::Cursor::new(archive_bytes))?;
-    import_archive(info, archive, state_handle)
+    import_archive(info, archive, state_handle, Some(image_jpeg_bytes))
 }
 
 fn import_archive<R>(
     mut info: CustomMapInfo,
     mut archive: ZipArchive<R>,
     state_handle: ThreadedReadWriteStateHandle<MapLoaderServiceState>,
+    default_preview_image_jpeg_data: Option<Vec<u8>>,
 ) -> Result<(), Box<dyn std::error::Error>>
 where
     R: std::io::Read + std::io::Seek, // required for ZipArchive
@@ -284,7 +293,7 @@ where
     update_progress(0.05);
 
     let mut rl_pkg_data = vec![];
-    let mut preview_image_data = vec![];
+    let mut preview_image_data = default_preview_image_jpeg_data.unwrap_or_default();
 
     for i in 0..archive.len() {
         let mut file = archive.by_index(i)?;
