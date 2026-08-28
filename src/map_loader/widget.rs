@@ -1,5 +1,5 @@
 use crate::{
-    common::{ThreadedReadonlyStateHandle, channel::Sender, data_dir::rlbuddy_data_dir},
+    common::{ThreadedReadonlyStateHandle, data_dir::rlbuddy_data_dir},
     map_loader::{
         downloader::MapDownloaderWidget,
         map_card_widget::MapCardWidget,
@@ -8,11 +8,11 @@ use crate::{
 };
 use eframe::egui;
 use rfd::FileDialog;
-use std::{fs, path::PathBuf};
+use std::{fs, path::PathBuf, sync::mpsc};
 
 pub struct MapLoaderWidget {
     state: ThreadedReadonlyStateHandle<MapLoaderServiceState>,
-    command_sender: Sender<MapLoaderCommand>,
+    command_sender: mpsc::Sender<MapLoaderCommand>,
     downloader_widget: MapDownloaderWidget,
 }
 
@@ -21,7 +21,7 @@ impl MapLoaderWidget {
         Self {
             state: service.state_handle(),
             command_sender: service.sender(),
-            downloader_widget: MapDownloaderWidget::new(),
+            downloader_widget: MapDownloaderWidget::new(service),
         }
     }
 
@@ -51,7 +51,8 @@ impl MapLoaderWidget {
             }
         };
 
-        self.command_sender
+        let _ = self
+            .command_sender
             .send(MapLoaderCommand::UpdateUnderpassPath(underpass_path));
     }
 
@@ -71,7 +72,7 @@ impl MapLoaderWidget {
             }
         };
 
-        self.command_sender.send(MapLoaderCommand::Import(zip_path));
+        let _ = self.command_sender.send(MapLoaderCommand::Import(zip_path));
     }
 
     fn render_error_header(&self, ui: &mut egui::Ui) {
@@ -80,7 +81,7 @@ impl MapLoaderWidget {
             ui.horizontal(|ui| {
                 ui.colored_label(ui.style().visuals.error_fg_color, err);
                 if ui.small_button("X").clicked() {
-                    self.command_sender.send(MapLoaderCommand::ClearError);
+                    let _ = self.command_sender.send(MapLoaderCommand::ClearError);
                 }
             });
         }
@@ -102,7 +103,7 @@ impl MapLoaderWidget {
                 .add_enabled(state.loaded_map.is_some(), egui::Button::new("Unload"))
                 .clicked()
             {
-                self.command_sender.send(MapLoaderCommand::Unload);
+                let _ = self.command_sender.send(MapLoaderCommand::Unload);
             }
 
             if let Some(import_progress) = state.import_progress {
@@ -136,16 +137,18 @@ impl MapLoaderWidget {
                                 .add_enabled(!this_map_is_selected, egui::Button::new("Load"))
                                 .clicked()
                             {
-                                self.command_sender
-                                    .send(MapLoaderCommand::Load(map.id.clone()))
+                                let _ = self
+                                    .command_sender
+                                    .send(MapLoaderCommand::Load(map.id.clone()));
                             }
 
                             if ui
                                 .add_enabled(!this_map_is_selected, egui::Button::new("Delete"))
                                 .clicked()
                             {
-                                self.command_sender
-                                    .send(MapLoaderCommand::Delete(map.id.clone()))
+                                let _ = self
+                                    .command_sender
+                                    .send(MapLoaderCommand::Delete(map.id.clone()));
                             }
                         },
                         this_map_is_selected,

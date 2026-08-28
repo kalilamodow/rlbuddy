@@ -1,16 +1,15 @@
 use crate::{
     common::{
-        ThreadedReadWriteStateHandle, ThreadedReadonlyStateHandle,
-        channel::{Receiver, Sender},
-        data_dir::rlbuddy_data_dir,
+        ThreadedReadWriteStateHandle, ThreadedReadonlyStateHandle, data_dir::rlbuddy_data_dir,
     },
     map_loader::service::MapLoaderCommand::ClearError,
 };
 use serde::{Deserialize, Serialize};
 use std::{
-    fs::{self, File},
+    fs,
     io::{self, Read as _},
     path::{Path, PathBuf},
+    sync::mpsc,
     thread,
 };
 use zip::ZipArchive;
@@ -31,6 +30,16 @@ pub struct CustomMapInfo {
     pub author: Option<String>, // from info.json
     pub description: Option<String>, // from info.json
                                 // preview path is always preview.jpg
+}
+
+impl CustomMapInfo {
+    pub fn new(name: String, author: Option<String>, description: Option<String>) -> Self {
+        Self {
+            id: CustomMapId(name),
+            author,
+            description,
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -57,7 +66,12 @@ pub struct MapLoaderServiceState {
 
 #[derive(Debug)]
 pub enum MapLoaderCommand {
-    Import(PathBuf), // zip file path
+    // zip file path
+    Import(PathBuf),
+    ImportBytes {
+        info: CustomMapInfo,
+        zip_archive_bytes: Vec<u8>,
+    },
     Load(CustomMapId),
     Delete(CustomMapId),
     Unload,
@@ -67,7 +81,8 @@ pub enum MapLoaderCommand {
 
 pub struct MapLoaderService {
     state: ThreadedReadWriteStateHandle<MapLoaderServiceState>,
-    command_receiver: Receiver<MapLoaderCommand>,
+    command_receiver: mpsc::Receiver<MapLoaderCommand>,
+    command_sender: mpsc::Sender<MapLoaderCommand>,
 }
 
 impl MapLoaderService {
@@ -79,6 +94,8 @@ impl MapLoaderService {
                 .take_if(|p| p.exists())
         };
 
+        let (command_sender, command_receiver) = mpsc::channel();
+
         Self {
             state: ThreadedReadWriteStateHandle::new(MapLoaderServiceState {
                 maps: savedata.maps,
@@ -87,12 +104,13 @@ impl MapLoaderService {
                 current_error: None,
                 import_progress: None,
             }),
-            command_receiver: Receiver::new(),
+            command_sender,
+            command_receiver,
         }
     }
 
-    pub fn sender(&self) -> Sender<MapLoaderCommand> {
-        self.command_receiver.send()
+    pub fn sender(&self) -> mpsc::Sender<MapLoaderCommand> {
+        self.command_sender.clone()
     }
 
     pub fn state_handle(&self) -> ThreadedReadonlyStateHandle<MapLoaderServiceState> {
@@ -112,7 +130,7 @@ impl MapLoaderService {
     }
 
     pub fn update(&self) {
-        while let Some(command) = self.command_receiver.try_recv() {
+        for command in self.command_receiver.try_iter() {
             self.handle_command(command);
         }
     }
@@ -128,7 +146,30 @@ impl MapLoaderService {
                     return;
                 }
 
-                self.import(path);
+                let state_handle = self.state.clone();
+                thread::spawn(move || {
+                    let result = import_archive_from_file(&path, state_handle.clone());
+
+                    if let Err(error) = result {
+                        let mut state = state_handle.write();
+                        state.current_error = Some(error.to_string());
+                    }
+                });
+            }
+            MapLoaderCommand::ImportBytes {
+                info,
+                zip_archive_bytes,
+            } => {
+                let state_handle = self.state.clone();
+                thread::spawn(move || {
+                    let result =
+                        import_archive_from_bytes(info, zip_archive_bytes, state_handle.clone());
+
+                    if let Err(error) = result {
+                        let mut state = state_handle.write();
+                        state.current_error = Some(error.to_string());
+                    }
+                });
             }
             MapLoaderCommand::Delete(id) => {
                 if let Err(error) = self.delete(id) {
@@ -153,18 +194,6 @@ impl MapLoaderService {
                 state.current_error = None;
             }
         }
-    }
-
-    fn import(&self, zip_path: PathBuf) {
-        let state_handle = self.state.clone();
-        thread::spawn(move || {
-            let result = import_archive_from_file(&zip_path, state_handle.clone());
-
-            if let Err(error) = result {
-                let mut state = state_handle.write();
-                state.current_error = Some(error.to_string());
-            }
-        });
     }
 
     fn load(&self, id: CustomMapId) -> Result<(), Box<dyn std::error::Error>> {
@@ -230,11 +259,23 @@ fn import_archive_from_file(
     )
 }
 
-fn import_archive(
-    mut info: CustomMapInfo,
-    mut archive: ZipArchive<File>,
+fn import_archive_from_bytes(
+    info: CustomMapInfo,
+    archive_bytes: Vec<u8>,
     state_handle: ThreadedReadWriteStateHandle<MapLoaderServiceState>,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    let archive = ZipArchive::new(std::io::Cursor::new(archive_bytes))?;
+    import_archive(info, archive, state_handle)
+}
+
+fn import_archive<R>(
+    mut info: CustomMapInfo,
+    mut archive: ZipArchive<R>,
+    state_handle: ThreadedReadWriteStateHandle<MapLoaderServiceState>,
+) -> Result<(), Box<dyn std::error::Error>>
+where
+    R: std::io::Read + std::io::Seek, // required for ZipArchive
+{
     let update_progress = |progress: f32| {
         let mut state = state_handle.write();
         state.import_progress = Some(progress);

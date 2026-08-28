@@ -1,12 +1,16 @@
-use crate::map_loader::map_card_widget::MapCardWidget;
+use crate::map_loader::{
+    MapLoaderService,
+    map_card_widget::MapCardWidget,
+    service::{CustomMapInfo, MapLoaderCommand},
+};
 use eframe::egui;
 use std::{
     io::Read as _,
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, mpsc},
     thread,
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct MapSearchResult {
     pub id: u16,
     pub title: String,
@@ -43,14 +47,16 @@ pub struct MapDownloaderWidget {
     search_text: String,
     results: Arc<Mutex<Option<Vec<MapSearchResult>>>>, // none if loading
     currently_downloading: Arc<Mutex<Option<(MapSearchResult, f32)>>>, // downloading, progress %
+    service_command_sender: mpsc::Sender<MapLoaderCommand>,
 }
 
 impl MapDownloaderWidget {
-    pub fn new() -> Self {
+    pub fn new(service: &MapLoaderService) -> Self {
         Self {
             search_text: "".into(),
             results: Arc::new(Mutex::new(Some(Vec::new()))),
             currently_downloading: Arc::default(),
+            service_command_sender: service.sender(),
         }
     }
 
@@ -75,13 +81,13 @@ impl MapDownloaderWidget {
     }
 
     fn download(&self, id: u16) {
-        let mut results_guard = self.results.lock().unwrap();
-        let Some(results) = results_guard.take() else {
+        let results_guard = self.results.lock().unwrap();
+        let Some(results) = results_guard.as_ref() else {
             eprintln!("downloading from not loaded list");
             return;
         };
 
-        let Some(map_to_download) = results.into_iter().find(|m| m.id == id) else {
+        let Some(map_to_download) = results.iter().find(|m| m.id == id).map(|m| m.clone()) else {
             eprintln!("no loaded map found with id {id}");
             return;
         };
@@ -91,6 +97,7 @@ impl MapDownloaderWidget {
             let mut currently_downloading = currently_downloading_handle.lock().unwrap();
             *currently_downloading = Some((map_to_download, 0.0));
         }
+        let command_sender = self.service_command_sender.clone();
 
         thread::spawn(move || {
             let update_progress = |new_progress| {
@@ -107,6 +114,8 @@ impl MapDownloaderWidget {
                 .into_body()
                 .read_to_string()
                 .unwrap();
+
+            update_progress(0.25);
 
             let parsed = search_parse(
                 &map_info_response,
@@ -125,7 +134,27 @@ impl MapDownloaderWidget {
             };
 
             // then we can actually download it
-            println!("downloading zip url: {zip_url}");
+            let archive_bytes = download_with_progress::<65_535>(zip_url, update_progress);
+
+            let Some(map_info) = ({
+                let mut currently_downloading = currently_downloading_handle.lock().unwrap();
+                currently_downloading.take()
+            })
+            .map(|m| m.0) else {
+                eprintln!("currently downloading state cleared while downloading");
+                return;
+            };
+
+            command_sender
+                .send(MapLoaderCommand::ImportBytes {
+                    info: CustomMapInfo::new(
+                        map_info.title,
+                        Some(map_info.author),
+                        Some(map_info.description),
+                    ),
+                    zip_archive_bytes: archive_bytes,
+                })
+                .unwrap()
         });
     }
 }
@@ -134,6 +163,16 @@ impl egui::Widget for &mut MapDownloaderWidget {
     fn ui(self, ui: &mut egui::Ui) -> egui::Response {
         ui.vertical(|ui| {
             ui.strong("Map downloader");
+
+            {
+                let currently_downloading_guard = self.currently_downloading.lock().unwrap();
+                if let Some(currently_downloading) = currently_downloading_guard.as_ref() {
+                    currently_downloading
+                        .0
+                        .render(ui, Some(currently_downloading.1));
+                    return;
+                }
+            }
 
             ui.horizontal(|ui| {
                 let mut results = self.results.lock().unwrap();
@@ -271,4 +310,32 @@ fn parse_bakkesplugins_response(response: &str) -> Vec<MapSearchResult> {
             })
         })
         .collect()
+}
+
+fn download_with_progress<const CHUNK_SIZE: usize>(
+    url: &str,
+    mut on_progress: impl FnMut(f32),
+) -> Vec<u8> {
+    let response = ureq::get(url).call().unwrap();
+    let content_length: Option<usize> = response
+        .headers()
+        .get("content-length")
+        .and_then(|h| h.to_str().ok()?.parse::<usize>().ok());
+
+    let Some(content_length) = content_length else {
+        // cant stream, just download
+        return response.into_body().read_to_vec().unwrap();
+    };
+
+    let n_chunks = (content_length / CHUNK_SIZE) as f32;
+
+    let mut buffer = vec![0u8; content_length];
+    let mut reader = response.into_body().into_reader();
+
+    for (i, buf_chunk) in buffer.chunks_mut(CHUNK_SIZE).enumerate() {
+        reader.read_exact(buf_chunk).unwrap();
+        on_progress(i as f32 / n_chunks);
+    }
+
+    buffer
 }
