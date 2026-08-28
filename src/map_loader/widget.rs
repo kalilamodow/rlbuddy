@@ -1,11 +1,14 @@
 use std::{fs, path::PathBuf};
 
 use eframe::egui;
+use emath::Rect;
 use rfd::FileDialog;
 
 use crate::{
     common::{ReadonlyStateHandle, channel::Sender, data_dir::rlbuddy_data_dir},
-    map_loader::service::{CustomMapId, MapLoaderCommand, MapLoaderService, MapLoaderServiceState},
+    map_loader::service::{
+        CustomMapId, CustomMapInfo, MapLoaderCommand, MapLoaderService, MapLoaderServiceState,
+    },
 };
 
 pub struct MapLoaderWidget {
@@ -159,58 +162,60 @@ impl MapLoaderWidget {
                         continue;
                     }
 
-                    // finally, put the actual content (shrink for margin)
-                    let content_rect = image_rect.shrink(8.0);
-
-                    ui.place(content_rect, |ui: &mut egui::Ui| {
-                        ui.vertical(|ui| {
-                            ui.label(egui::RichText::new(map.id.as_str()).strong().size(15.0));
-                            ui.add_space(2.0);
-
-                            if let Some(description) = &map.description {
-                                ui.label(description);
-                            }
-
-                            ui.with_layout(egui::Layout::bottom_up(egui::Align::Min), |ui| {
-                                ui.horizontal(|ui| {
-                                    if let Some(author) = &map.author {
-                                        ui.label(format!("By {}", author));
-                                    }
-
-                                    ui.with_layout(
-                                        egui::Layout::right_to_left(egui::Align::Max),
-                                        |ui| {
-                                            if ui
-                                                .add_enabled(
-                                                    !this_map_is_selected,
-                                                    egui::Button::new("Load"),
-                                                )
-                                                .clicked()
-                                            {
-                                                self.command_sender
-                                                    .send(MapLoaderCommand::Load(map.id.clone()))
-                                            }
-
-                                            if ui
-                                                .add_enabled(
-                                                    !this_map_is_selected,
-                                                    egui::Button::new("Delete"),
-                                                )
-                                                .clicked()
-                                            {
-                                                self.command_sender
-                                                    .send(MapLoaderCommand::Delete(map.id.clone()))
-                                            }
-                                        },
-                                    );
-                                });
-                            });
-                        })
-                        .response
-                    });
+                    // finally, put the actual content
+                    self.render_map_card_content(ui, image_rect, map, this_map_is_selected);
                 }
             },
         );
+    }
+
+    fn render_map_card_content(
+        &self,
+        ui: &mut egui::Ui,
+        bg_rect: Rect,
+        map: &CustomMapInfo,
+        map_selected: bool,
+    ) {
+        // shrink for margin
+        let content_rect = bg_rect.shrink(8.0);
+
+        ui.place(content_rect, |ui: &mut egui::Ui| {
+            ui.vertical(|ui| {
+                ui.label(egui::RichText::new(map.id.as_str()).strong().size(15.0));
+                ui.add_space(2.0);
+
+                if let Some(description) = &map.description {
+                    ui.label(description);
+                }
+
+                ui.with_layout(egui::Layout::bottom_up(egui::Align::Min), |ui| {
+                    ui.horizontal(|ui| {
+                        if let Some(author) = &map.author {
+                            ui.label(format!("By {}", author));
+                        }
+
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Max), |ui| {
+                            if ui
+                                .add_enabled(!map_selected, egui::Button::new("Load"))
+                                .clicked()
+                            {
+                                self.command_sender
+                                    .send(MapLoaderCommand::Load(map.id.clone()))
+                            }
+
+                            if ui
+                                .add_enabled(!map_selected, egui::Button::new("Delete"))
+                                .clicked()
+                            {
+                                self.command_sender
+                                    .send(MapLoaderCommand::Delete(map.id.clone()))
+                            }
+                        });
+                    });
+                });
+            })
+            .response
+        });
     }
 }
 
