@@ -190,6 +190,17 @@ impl MapLoaderWidget {
                                                 self.command_sender
                                                     .send(MapLoaderCommand::Load(map.id.clone()))
                                             }
+
+                                            if ui
+                                                .add_enabled(
+                                                    !this_map_is_selected,
+                                                    egui::Button::new("Delete"),
+                                                )
+                                                .clicked()
+                                            {
+                                                self.command_sender
+                                                    .send(MapLoaderCommand::Delete(map.id.clone()))
+                                            }
                                         },
                                     );
                                 });

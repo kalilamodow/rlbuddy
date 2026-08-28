@@ -57,6 +57,7 @@ pub struct MapLoaderServiceState {
 pub enum MapLoaderCommand {
     Import(PathBuf), // zip file path
     Load(CustomMapId),
+    Delete(CustomMapId),
     Unload,
     UpdateUnderpassPath(PathBuf),
     ClearError,
@@ -125,6 +126,12 @@ impl MapLoaderService {
                 }
 
                 if let Err(error) = self.import(path) {
+                    let mut state = self.state.write();
+                    state.current_error = Some(error.to_string());
+                }
+            }
+            MapLoaderCommand::Delete(id) => {
+                if let Err(error) = self.delete(id) {
                     let mut state = self.state.write();
                     state.current_error = Some(error.to_string());
                 }
@@ -238,6 +245,15 @@ impl MapLoaderService {
         fs::rename(backup_path, underpass_path)?;
 
         state.loaded_map = None;
+        Ok(())
+    }
+
+    fn delete(&self, id: CustomMapId) -> Result<(), Box<dyn std::error::Error>> {
+        fs::remove_dir_all(get_custom_map_directory(&id)?)?;
+
+        let mut state = self.state.write();
+        state.maps.retain(|map| map.id.as_str() != id.as_str());
+
         Ok(())
     }
 }
