@@ -8,6 +8,7 @@ pub struct MapCardWidget<'a, ButtonsWidget> {
     image_url: Option<&'a str>,
     buttons: ButtonsWidget,
     highlight: bool,
+    big: bool,
 }
 
 impl<'a, ButtonsWidget> MapCardWidget<'a, ButtonsWidget>
@@ -21,6 +22,7 @@ where
         image_url: Option<&'a str>,
         buttons: ButtonsWidget,
         highlight: bool,
+        big: bool,
     ) -> Self {
         Self {
             title,
@@ -29,6 +31,7 @@ where
             image_url,
             buttons,
             highlight,
+            big,
         }
     }
 
@@ -67,19 +70,25 @@ where
     ButtonsWidget: Fn(&mut egui::Ui),
 {
     fn ui(self, ui: &mut egui::Ui) -> egui::Response {
+        let size = if self.big {
+            egui::vec2(300.0, 170.0)
+        } else {
+            egui::vec2(210.0, 120.0)
+        };
+
         ui.allocate_ui(egui::vec2(200.0, 75.0), |ui| {
             // first, draw the background
             let image_rect = match self.image_url {
                 Some(image_url) => {
                     ui.add(
                         egui::Image::new(egui::ImageSource::Uri(image_url.into()))
-                            .fit_to_exact_size(egui::vec2(210.0, 120.0))
+                            .fit_to_exact_size(size)
                             .maintain_aspect_ratio(false)
                             .corner_radius(egui::CornerRadius::same(8)),
                     )
                     .rect
                 }
-                None => ui.allocate_space(egui::vec2(210.0, 120.0)).1,
+                None => ui.allocate_space(size).1,
             };
 
             // then, add a dark overlay for contrast

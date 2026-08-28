@@ -5,6 +5,8 @@ use std::{
 
 use eframe::egui;
 
+use crate::map_loader::map_card_widget::MapCardWidget;
+
 #[derive(Debug)]
 struct MapSearchResult {
     pub id: u16,
@@ -14,9 +16,32 @@ struct MapSearchResult {
     pub image_url: String,
 }
 
+impl MapSearchResult {
+    fn render(&self, ui: &mut egui::Ui, download: impl Fn(u16), allow_download: bool) {
+        ui.add(MapCardWidget::new(
+            &self.title,
+            Some(&self.author),
+            Some(&self.description),
+            Some(&self.image_url),
+            |ui| {
+                if ui
+                    .add_enabled(allow_download, egui::Button::new("Download"))
+                    .clicked()
+                    && allow_download
+                {
+                    download(self.id);
+                }
+            },
+            false,
+            true,
+        ));
+    }
+}
+
 pub struct MapDownloaderWidget {
     search_text: String,
     results: Arc<Mutex<Option<Vec<MapSearchResult>>>>, // none if loading
+    currently_downloading: Option<MapSearchResult>,
 }
 
 impl MapDownloaderWidget {
@@ -24,6 +49,7 @@ impl MapDownloaderWidget {
         Self {
             search_text: "".into(),
             results: Arc::new(Mutex::new(Some(Vec::new()))),
+            currently_downloading: None,
         }
     }
 
@@ -45,6 +71,10 @@ impl MapDownloaderWidget {
             let mut results = results_handle.lock().unwrap();
             *results = Some(parsed);
         });
+    }
+
+    fn download(&self, id: u16) {
+        println!("Downloading {id}");
     }
 }
 
@@ -72,10 +102,26 @@ impl egui::Widget for &mut MapDownloaderWidget {
             });
 
             {
-                let results = self.results.lock().unwrap();
+                let mut results_guard = self.results.lock().unwrap();
 
-                if let Some(results) = results.as_deref() {
-                    ui.label(format!("{results:#?}"));
+                if let Some(results) = &mut *results_guard {
+                    if !results.is_empty() && ui.button("Hide results").clicked() {
+                        results.clear();
+                        return;
+                    }
+
+                    if results.is_empty() {
+                        ui.label("No results");
+                    }
+
+                    for result in results {
+                        ui.add_space(4.0);
+                        result.render(
+                            ui,
+                            |id| self.download(id),
+                            self.currently_downloading.is_none(),
+                        );
+                    }
                 } else {
                     ui.add_space(8.0);
                     ui.spinner();

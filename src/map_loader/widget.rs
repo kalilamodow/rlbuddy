@@ -149,6 +149,7 @@ impl MapLoaderWidget {
                             }
                         },
                         this_map_is_selected,
+                        false,
                     ));
                 }
             },
