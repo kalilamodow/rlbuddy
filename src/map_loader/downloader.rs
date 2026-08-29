@@ -10,6 +10,23 @@ use std::{
     thread,
 };
 
+#[derive(Debug, Clone, Copy)]
+enum DownloadProgressState {
+    FetchingInfo,
+    DownloadingZip,
+    DownloadingImage,
+}
+
+impl DownloadProgressState {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::FetchingInfo => "Fetching manifest...",
+            Self::DownloadingZip => "Downloading map...",
+            Self::DownloadingImage => "Downloading thumbnail...",
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 struct MapSearchResult {
     pub id: u16,
@@ -20,7 +37,11 @@ struct MapSearchResult {
 }
 
 impl MapSearchResult {
-    fn render(&self, ui: &mut egui::Ui, download_progress: Option<f32>) -> bool {
+    fn render(
+        &self,
+        ui: &mut egui::Ui,
+        download_progress: Option<(DownloadProgressState, f32)>,
+    ) -> bool {
         let mut download_btn_pressed = false;
 
         ui.add(MapCardWidget::new(
@@ -30,7 +51,10 @@ impl MapSearchResult {
             Some(&self.image_url),
             |ui| {
                 if let Some(download_progress) = download_progress {
-                    ui.add(egui::ProgressBar::new(download_progress).text("Downloading..."));
+                    ui.add(
+                        egui::ProgressBar::new(download_progress.1)
+                            .text(download_progress.0.as_str()),
+                    );
                 } else if ui.button("Download").clicked() {
                     download_btn_pressed = true;
                 }
@@ -46,7 +70,7 @@ impl MapSearchResult {
 pub struct MapDownloaderWidget {
     search_text: String,
     results: Arc<Mutex<Option<Vec<MapSearchResult>>>>, // none if loading
-    currently_downloading: Arc<Mutex<Option<(MapSearchResult, f32)>>>, // downloading, progress %
+    currently_downloading: Arc<Mutex<Option<(MapSearchResult, DownloadProgressState, f32)>>>, // downloading, progress %
     service_command_sender: mpsc::Sender<MapLoaderCommand>,
 }
 
@@ -95,17 +119,21 @@ impl MapDownloaderWidget {
         let currently_downloading_handle = self.currently_downloading.clone();
         {
             let mut currently_downloading = currently_downloading_handle.lock().unwrap();
-            *currently_downloading = Some((map_to_download, 0.0));
+            *currently_downloading =
+                Some((map_to_download, DownloadProgressState::FetchingInfo, 0.0));
         }
         let command_sender = self.service_command_sender.clone();
 
         thread::spawn(move || {
-            let update_progress = |new_progress| {
+            let update_progress = |new_state, new_progress| {
                 let mut currently_downloading = currently_downloading_handle.lock().unwrap();
-                if let Some((_, progress)) = currently_downloading.as_mut() {
+                if let Some((_, state, progress)) = currently_downloading.as_mut() {
+                    *state = new_state;
                     *progress = new_progress;
                 }
             };
+
+            update_progress(DownloadProgressState::FetchingInfo, 0.1);
 
             // first we have to get the url to the zip file from the map information page
             let map_info_response = ureq::get(format!("https://bakkesplugins.com/maps/{id}"))
@@ -115,7 +143,7 @@ impl MapDownloaderWidget {
                 .read_to_string()
                 .unwrap();
 
-            update_progress(0.25);
+            update_progress(DownloadProgressState::FetchingInfo, 0.25);
 
             let parsed = search_parse(
                 &map_info_response,
@@ -141,14 +169,17 @@ impl MapDownloaderWidget {
             };
 
             // then we can actually download it
-            let archive_bytes = download_with_progress::<65_535>(zip_url, update_progress);
-            let image_bytes = download_with_progress::<4_096>(image_url, update_progress);
+            let archive_bytes = download_with_progress::<65_535>(zip_url, |p| {
+                update_progress(DownloadProgressState::DownloadingZip, p)
+            });
+            let image_bytes = download_with_progress::<4_096>(image_url, |p| {
+                update_progress(DownloadProgressState::DownloadingImage, p)
+            });
 
-            let Some(map_info) = ({
+            let Some((map_info, _, _)) = ({
                 let mut currently_downloading = currently_downloading_handle.lock().unwrap();
                 currently_downloading.take()
-            })
-            .map(|m| m.0) else {
+            }) else {
                 eprintln!("currently downloading state cleared while downloading");
                 return;
             };
@@ -178,7 +209,7 @@ impl egui::Widget for &mut MapDownloaderWidget {
                 if let Some(currently_downloading) = currently_downloading_guard.as_ref() {
                     currently_downloading
                         .0
-                        .render(ui, Some(currently_downloading.1));
+                        .render(ui, Some((currently_downloading.1, currently_downloading.2)));
                     return;
                 }
             }
