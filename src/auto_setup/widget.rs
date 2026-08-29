@@ -1,7 +1,7 @@
-use std::{fs, io, path::PathBuf};
-
 use eframe::egui;
 use rfd::FileDialog;
+use std::{fs, io, path::PathBuf};
+use sysinfo::ProcessesToUpdate;
 
 fn rewrite_ini(inipath: &PathBuf) -> io::Result<()> {
     let contents = fs::read_to_string(inipath)?;
@@ -10,8 +10,17 @@ fn rewrite_ini(inipath: &PathBuf) -> io::Result<()> {
     Ok(())
 }
 
+fn is_rocket_league_open() -> bool {
+    let mut system = sysinfo::System::new();
+    system.refresh_processes(ProcessesToUpdate::All, true);
+    system
+        .processes_by_name(std::ffi::OsStr::new("RocketLeague.exe"))
+        .next()
+        .is_some()
+}
+
 pub struct AutoSetupWidget {
-    success: Option<Result<(), String>>,
+    success: Option<Result<Option<&'static str>, String>>,
 }
 
 impl AutoSetupWidget {
@@ -46,7 +55,9 @@ impl AutoSetupWidget {
         if let Err(error) = rewrite_ini(&stats_api_config_path) {
             self.success = Some(Err(error.to_string()));
         } else {
-            self.success = Some(Ok(()));
+            self.success = Some(Ok(
+                is_rocket_league_open().then_some("You will need to restart Rocket League.")
+            ));
         }
     }
 }
@@ -55,17 +66,22 @@ impl egui::Widget for &mut AutoSetupWidget {
     fn ui(self, ui: &mut egui::Ui) -> egui::Response {
         ui.vertical(|ui| {
             if let Some(result) = &self.success {
-                if let Err(error) = result {
-                    ui.label(format!("Error: {error}"));
-                } else {
-                    ui.label("Success!");
-                    return;
+                match result {
+                    Ok(success_msg) => {
+                        ui.label("Success!");
+                        if let Some(msg) = success_msg {
+                            ui.label(*msg);
+                        }
+                    }
+                    Err(error) => {
+                        ui.label(format!("Error: {error}"));
+                    }
                 }
-            }
-
-            ui.label("Select RocketLeague.exe path");
-            if ui.button("Select file").clicked() {
-                self.do_setup();
+            } else {
+                ui.label("Select RocketLeague.exe path");
+                if ui.button("Select file").clicked() {
+                    self.do_setup();
+                }
             }
         })
         .response
