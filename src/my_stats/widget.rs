@@ -202,7 +202,7 @@ impl MyStatsWidget {
             ui.label(format!(
                 "{wins}/{} ({}%)",
                 total_games - wins,
-                (wins * 100 / total_games)
+                wins * 100 / total_games
             ));
         });
     }

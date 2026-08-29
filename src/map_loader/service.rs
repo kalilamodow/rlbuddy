@@ -272,7 +272,7 @@ fn import_archive_from_bytes(
     state_handle: ThreadedReadWriteStateHandle<MapLoaderServiceState>,
     image_jpeg_bytes: Vec<u8>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let archive = ZipArchive::new(std::io::Cursor::new(archive_bytes))?;
+    let archive = ZipArchive::new(io::Cursor::new(archive_bytes))?;
     import_archive(info, archive, state_handle, Some(image_jpeg_bytes))
 }
 
@@ -283,7 +283,7 @@ fn import_archive<R>(
     default_preview_image_jpeg_data: Option<Vec<u8>>,
 ) -> Result<(), Box<dyn std::error::Error>>
 where
-    R: std::io::Read + std::io::Seek, // required for ZipArchive
+    R: io::Read + io::Seek, // required for ZipArchive
 {
     let update_progress = |progress: f32| {
         let mut state = state_handle.write();
@@ -337,7 +337,7 @@ where
     fs::write(custom_map_dir.join("map.upk"), rl_pkg_data)?;
     if !preview_image_data.is_empty() {
         fs::write(
-            custom_map_dir.join(format!("preview.jpg")),
+            custom_map_dir.join("preview.jpg".to_string()),
             preview_image_data,
         )?;
     }

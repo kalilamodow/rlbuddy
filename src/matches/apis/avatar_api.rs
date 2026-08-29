@@ -49,7 +49,7 @@ impl TryFrom<Platform> for AvatarPlatform {
     }
 }
 
-fn get_platform_id<'a>(player_id: &'a str) -> &'a str {
+fn get_platform_id(player_id: &str) -> &str {
     player_id.split('|').nth(1).unwrap()
 }
 

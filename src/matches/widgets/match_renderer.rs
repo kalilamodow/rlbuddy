@@ -397,8 +397,8 @@ impl<'a> MatchRenderer<'a> {
                 let diff = local_mmr - avg_mmr;
 
                 match local_mmr.cmp(&avg_mmr) {
-                    Ordering::Greater => ui.colored_label(egui::Color32::GREEN, format!("+{diff}")),
-                    Ordering::Less => ui.colored_label(egui::Color32::RED, format!("{diff}")),
+                    Ordering::Greater => ui.colored_label(Color32::GREEN, format!("+{diff}")),
+                    Ordering::Less => ui.colored_label(Color32::RED, format!("{diff}")),
                     Ordering::Equal => ui.label("+0"),
                 };
             }

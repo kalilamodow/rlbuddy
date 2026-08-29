@@ -157,7 +157,7 @@ pub enum Division {
 }
 
 impl fmt::Display for Division {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
             "{}",

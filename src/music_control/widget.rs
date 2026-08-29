@@ -154,13 +154,13 @@ struct TitleArtistStack {
 
 impl egui::Widget for TitleArtistStack {
     fn ui(self, ui: &mut egui::Ui) -> egui::Response {
-        let title_alloc = (self.title).clone().into_galley(
+        let title_alloc = self.title.clone().into_galley(
             ui,
             None,
             ui.available_width(),
             egui::FontSelection::Default,
         );
-        let artist_alloc = (self.artist).clone().into_galley(
+        let artist_alloc = self.artist.clone().into_galley(
             ui,
             None,
             ui.available_width(),

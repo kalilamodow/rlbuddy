@@ -5,7 +5,7 @@ use crate::{
     hotkey::{HotkeyService, HotkeySettings},
     map_loader::{MapLoaderService, MapLoaderServiceSavedata, MapLoaderWidget},
     matches::{CurrentMatchWidget, MatchesService, PastMatchesWidget, StrippedMatchInfo},
-    music_control::{self, MusicControlService, MusicControlSettings, MusicControlWidget},
+    music_control::{MusicControlService, MusicControlSettings, MusicControlWidget},
     my_stats::{MyStatsWidget, MyStatsWidgetSettings},
     player_info::{PlayerInfoService, PlayerSearchWidget},
     settings::SettingsWidget,
@@ -210,8 +210,8 @@ pub struct RlBuddyApp {
     discord_service: discord::DiscordService,
     discord_widget: discord::DiscordWidget,
 
-    music_control_service: music_control::MusicControlService,
-    music_control_widget: music_control::MusicControlWidget,
+    music_control_service: MusicControlService,
+    music_control_widget: MusicControlWidget,
 
     matches_service: MatchesService,
     current_match: CurrentMatchWidget,
@@ -334,21 +334,17 @@ impl RlBuddyApp {
                 .map(|outer_rect| egui::pos2(outer_rect.left(), outer_rect.top()))
         });
 
-        ctx.send_viewport_cmd(egui::ViewportCommand::OuterPosition(egui::pos2(8.0, 8.0)));
-        ctx.send_viewport_cmd(egui::ViewportCommand::WindowLevel(
-            egui::WindowLevel::AlwaysOnTop,
-        ));
-        ctx.send_viewport_cmd(egui::ViewportCommand::Minimized(true));
-        ctx.send_viewport_cmd(egui::ViewportCommand::Minimized(false));
-        ctx.send_viewport_cmd(egui::ViewportCommand::WindowLevel(
-            egui::WindowLevel::Normal,
-        ));
+        ctx.send_viewport_cmd(ViewportCommand::OuterPosition(egui::pos2(8.0, 8.0)));
+        ctx.send_viewport_cmd(ViewportCommand::WindowLevel(egui::WindowLevel::AlwaysOnTop));
+        ctx.send_viewport_cmd(ViewportCommand::Minimized(true));
+        ctx.send_viewport_cmd(ViewportCommand::Minimized(false));
+        ctx.send_viewport_cmd(ViewportCommand::WindowLevel(egui::WindowLevel::Normal));
     }
 
     fn hide(&self, ctx: &egui::Context) {
-        ctx.send_viewport_cmd(egui::ViewportCommand::Minimized(true));
+        ctx.send_viewport_cmd(ViewportCommand::Minimized(true));
         if let Some(move_to) = self.prev_hide_pos {
-            ctx.send_viewport_cmd(egui::ViewportCommand::OuterPosition(move_to));
+            ctx.send_viewport_cmd(ViewportCommand::OuterPosition(move_to));
         }
     }
 
@@ -392,6 +388,44 @@ impl RlBuddyApp {
 }
 
 impl eframe::App for RlBuddyApp {
+    fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        self.stats_api_service.update();
+        self.matches_service.update();
+        self.player_info_service.update();
+        self.discord_service.update();
+        self.music_control_service.update();
+        self.match_notificator_service.update();
+        self.toast_service.update();
+        self.map_loader_service.update();
+
+        while let Some(event) = self.stats_api_events.try_recv() {
+            match *event {
+                RLEvent::Connected => {
+                    ctx.send_viewport_cmd(ViewportCommand::Title("rlbuddy (connected)".to_string()))
+                }
+                RLEvent::Disconnected => ctx.send_viewport_cmd(ViewportCommand::Title(
+                    "rlbuddy (not connected)".to_string(),
+                )),
+                RLEvent::MatchStart => self.pop_up(),
+                _ => {}
+            }
+        }
+
+        if let Some(should_overlay) = self.overlay_rx.try_iter().last() {
+            if should_overlay {
+                self.show(ctx);
+            } else {
+                self.hide(ctx);
+            }
+        }
+
+        ctx.request_repaint_after(Duration::from_millis(10));
+
+        if ctx.input(|i| i.viewport().close_requested()) {
+            self.on_close(ctx);
+        }
+    }
+
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         visuals_with_transparency(ui.visuals_mut(), *self.current_transparency.borrow());
 
@@ -481,44 +515,6 @@ impl eframe::App for RlBuddyApp {
         });
 
         ui.add(&mut self.player_info_service);
-    }
-
-    fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        self.stats_api_service.update();
-        self.matches_service.update();
-        self.player_info_service.update();
-        self.discord_service.update();
-        self.music_control_service.update();
-        self.match_notificator_service.update();
-        self.toast_service.update();
-        self.map_loader_service.update();
-
-        while let Some(event) = self.stats_api_events.try_recv() {
-            match *event {
-                RLEvent::Connected => ctx.send_viewport_cmd(egui::ViewportCommand::Title(
-                    "rlbuddy (connected)".to_string(),
-                )),
-                RLEvent::Disconnected => ctx.send_viewport_cmd(egui::ViewportCommand::Title(
-                    "rlbuddy (not connected)".to_string(),
-                )),
-                RLEvent::MatchStart => self.pop_up(),
-                _ => {}
-            }
-        }
-
-        if let Some(should_overlay) = self.overlay_rx.try_iter().last() {
-            if should_overlay {
-                self.show(ctx);
-            } else {
-                self.hide(ctx);
-            }
-        }
-
-        ctx.request_repaint_after(Duration::from_millis(10));
-
-        if ctx.input(|i| i.viewport().close_requested()) {
-            self.on_close(ctx);
-        }
     }
 
     fn clear_color(&self, _visuals: &egui::Visuals) -> [f32; 4] {
