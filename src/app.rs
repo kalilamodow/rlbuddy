@@ -429,7 +429,7 @@ impl eframe::App for RlBuddyApp {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         visuals_with_transparency(ui.visuals_mut(), *self.current_transparency.borrow());
 
-        egui::Panel::bottom("bottom_panel").show_inside(ui, |ui| {
+        egui::Panel::bottom("bottom_panel").show(ui, |ui| {
             egui::ComboBox::from_label("")
                 .selected_text("Widgets")
                 .show_ui(ui, |ui| {
@@ -447,7 +447,7 @@ impl eframe::App for RlBuddyApp {
                 });
         });
 
-        egui::CentralPanel::default().show_inside(ui, |ui| {
+        egui::CentralPanel::default().show(ui, |ui| {
             egui::ScrollArea::vertical().show(ui, |ui| {
                 ui.vertical_centered_justified(|ui| {
                     let mut to_swap: Option<(usize, usize)> = None; // index, move to
