@@ -130,7 +130,7 @@ impl MapLoaderWidget {
                         map.author.as_deref(),
                         map.description.as_deref(),
                         preview_image(&map.id)
-                            .map(|i| i.to_string_lossy().replace("\\\\?\\", "file://"))
+                            .map(|i| i.to_string_lossy().replace("\\\\?\\", "file:///"))
                             .as_deref(),
                         |ui| {
                             if ui
