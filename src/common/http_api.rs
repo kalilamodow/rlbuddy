@@ -60,6 +60,13 @@ where
                 return;
             };
 
+            if response.status() != 200 {
+                let mut current = current.write().unwrap();
+                current.insert(player_id, None);
+                eprintln!("http error {}", response.status().as_u16());
+                return;
+            }
+
             let response: Response = response.body_mut().read_json().unwrap();
             let mut current = current.write().unwrap();
             current.insert(player_id, response_to_value(response).map(Arc::new));
