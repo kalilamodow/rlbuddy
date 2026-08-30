@@ -5,7 +5,7 @@
 
 rlbuddy is a Rocket League companion app for Windows that lets you preview your lobby's ranks without tabbing out,
 offers various statistics based on your match history, and has a bunch of widgets allowing for Discord rich presence,
-automatic music control, player stats, and more!
+automatic music control, player stats, custom map loading, and more!
 
 Each feature has its own widget, so you can customize it to your heart's desire :)
 
@@ -78,6 +78,13 @@ that shows up in the Action center should also show up in rlbuddy.
 
 rlbuddy used to integrate with Spotify, but it was pretty annoying, so it now interfaces directly with Windows. It's a
 lot faster this way as well.
+
+### Custom map loader
+
+<video width="600" src="https://github.com/user-attachments/assets/f5aee111-da51-4bc5-bb44-50b151023afe"></video>
+
+You can download/import custom maps within rlbuddy. It replaces Underpass, so to play a custom map just load it and then
+play Underpass in training. If you want to actually play underpass again, you can just unload the map.
 
 ### Discord rich presence
 
