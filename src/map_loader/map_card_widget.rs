@@ -48,7 +48,7 @@ where
                     if self.big || description.len() < 80 {
                         ui.label(description);
                     } else {
-                        ui.label(format!("{}...", &description[..80].trim_end()))
+                        ui.label(format!("{}...", description[..80].trim_end()))
                             .on_hover_text(description);
                     }
                 }

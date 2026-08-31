@@ -242,7 +242,7 @@ impl TryFrom<RawStatsApiEvent> for StatsApiEvent {
     type Error = ();
 
     fn try_from(RawStatsApiEvent { event, data }: RawStatsApiEvent) -> Result<Self, Self::Error> {
-        fn parse_data<'a, T: serde::Deserialize<'a>>(data: &'a String) -> Result<T, ()> {
+        fn parse_data<'a, T: serde::Deserialize<'a>>(data: &'a str) -> Result<T, ()> {
             serde_json::from_str(data).map_err(|_| ())
         }
 

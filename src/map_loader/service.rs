@@ -220,7 +220,7 @@ impl MapLoaderService {
     fn unload(&self) -> io::Result<()> {
         let mut state = self.state.write();
         let Some(underpass_path) = &state.underpass_path else {
-            return Err(io::Error::new(io::ErrorKind::Other, "no underpass path"));
+            return Err(io::Error::other("no underpass path"));
         };
 
         fs::remove_file(underpass_path)?;
@@ -337,7 +337,7 @@ where
     fs::write(custom_map_dir.join("map.upk"), rl_pkg_data)?;
     if !preview_image_data.is_empty() {
         fs::write(
-            custom_map_dir.join("preview.jpg".to_string()),
+            custom_map_dir.join("preview.jpg"),
             preview_image_data,
         )?;
     }

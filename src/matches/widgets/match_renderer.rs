@@ -252,7 +252,7 @@ impl<'a> MatchRenderer<'a> {
             center_label(ui, "-");
         }
 
-        render_avatar(ui, player.avatar_url.as_ref().map(|u| u.as_str()));
+        render_avatar(ui, player.avatar_url.as_deref());
 
         let name_color = if player.is_local_player() {
             ui.visuals().strong_text_color()

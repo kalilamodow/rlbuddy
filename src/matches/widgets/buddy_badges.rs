@@ -100,7 +100,7 @@ fn bb_rivals(other_player: &MatchPlayer, matches: &Vec<MatchType<'_>>) -> Option
 
     let icon = match games_against_eachother {
         0 => return None,
-        ..4 => '⚔',
+        1..4 => '⚔',
         4.. => '🩸',
     };
 

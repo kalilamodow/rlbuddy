@@ -111,7 +111,7 @@ impl MapDownloaderWidget {
             return;
         };
 
-        let Some(map_to_download) = results.iter().find(|m| m.id == id).map(|m| m.clone()) else {
+        let Some(map_to_download) = results.iter().find(|m| m.id == id).cloned() else {
             eprintln!("no loaded map found with id {id}");
             return;
         };
@@ -228,7 +228,6 @@ impl egui::Widget for &mut MapDownloaderWidget {
                     *results = None;
 
                     self.search();
-                    return;
                 }
             });
 
@@ -345,7 +344,7 @@ fn parse_bakkesplugins_response(response: &str) -> Vec<MapSearchResult> {
                 id: result[0].parse().ok()?,
                 title: result[2].to_owned(),
                 author: result[3].to_owned(),
-                description: result[4].split('\n').nth(0).unwrap_or_default().to_owned(),
+                description: result[4].split('\n').next().unwrap_or_default().to_owned(),
                 image_url: result[1].to_owned(),
             })
         })

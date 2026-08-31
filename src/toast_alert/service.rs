@@ -80,7 +80,7 @@ impl ToastAlertService {
                             egui::Frame::canvas(ui.style())
                                 .corner_radius(egui::CornerRadius::same(4)),
                         )
-                        .show(ui, |ui| {
+                        .show_inside(ui, |ui| {
                             ui.centered_and_justified(|ui| {
                                 ui.label(egui::RichText::new(&text).line_height(Some(20.0)))
                             })
