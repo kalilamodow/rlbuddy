@@ -342,6 +342,10 @@ impl RlBuddyApp {
     }
 
     fn hide(&self, ctx: &egui::Context) {
+        if ctx.input(|i| i.focused) {
+            return;
+        }
+
         ctx.send_viewport_cmd(ViewportCommand::Minimized(true));
         if let Some(move_to) = self.prev_hide_pos {
             ctx.send_viewport_cmd(ViewportCommand::OuterPosition(move_to));
