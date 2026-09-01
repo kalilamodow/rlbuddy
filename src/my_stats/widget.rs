@@ -1,3 +1,4 @@
+use crate::matches::MatchInfo;
 use crate::{
     common::{ReadonlyStateHandle, timefmt::format_seconds},
     matches::{MatchType, MatchesServiceState},
@@ -6,6 +7,7 @@ use crate::{
 use eframe::egui;
 use egui_plot::{Line, Plot, PlotPoint, PlotPoints};
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 use std::{
     collections::HashSet,
     time::{SystemTime, UNIX_EPOCH},
@@ -46,22 +48,17 @@ impl MyStatsWidget {
 
     fn render_streak_header(&self, ui: &mut egui::Ui) {
         let state = self.matches_state.read();
-        let session_matches = || {
-            state.prev_matches.iter().filter_map(|m| match m {
-                MatchType::Session(s) => Some(s),
-                MatchType::Old(_) => None,
-            })
-        };
+        let get_session_matches = || session_matches(&state);
 
-        let count = session_matches().count();
+        let count = get_session_matches().count();
         ui.horizontal(|ui| {
             ui.strong(format!("{count} matches"));
             if count < 1 {
                 return;
             }
 
-            let won_last_match = session_matches().next_back().unwrap().is_win();
-            let streak = session_matches()
+            let won_last_match = get_session_matches().next_back().unwrap().is_win();
+            let streak = get_session_matches()
                 .rev()
                 .take_while(|m| m.is_win() == won_last_match)
                 .count();
@@ -181,15 +178,10 @@ impl MyStatsWidget {
 
     fn render_win_loss(&mut self, ui: &mut egui::Ui) {
         let state = self.matches_state.read();
-        let session_matches = || {
-            state.prev_matches.iter().filter_map(|m| match m {
-                MatchType::Session(s) => Some(s),
-                MatchType::Old(_) => None,
-            })
-        };
+        let get_session_matches = || session_matches(&state);
 
-        let total_games = session_matches().count();
-        let wins = session_matches()
+        let total_games = get_session_matches().count();
+        let wins = get_session_matches()
             .filter(|s| s.finish.as_ref().and_then(|f| f.winner) == Some(s.our_team))
             .count();
 
@@ -258,4 +250,13 @@ impl egui::Widget for &mut MyStatsWidget {
         })
         .response
     }
+}
+
+fn session_matches(
+    state: &MatchesServiceState,
+) -> impl DoubleEndedIterator<Item = &Cow<'_, MatchInfo>> {
+    state.prev_matches.iter().filter_map(|m| match m {
+        MatchType::Session(s) => Some(s),
+        MatchType::Old(_) => None,
+    })
 }

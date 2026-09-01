@@ -107,43 +107,34 @@ impl PlaybackInfo {
         })
     }
 
+    fn create_listener_event_handler<A: windows::core::RuntimeType>(
+        sender: mpsc::Sender<Option<PlaybackInfo>>,
+    ) -> TypedEventHandler<GlobalSystemMediaTransportControlsSession, A> {
+        TypedEventHandler::new(
+            move |s: windows::core::Ref<GlobalSystemMediaTransportControlsSession>, _| {
+                let Some(session) = s.as_ref() else {
+                    return Ok(());
+                };
+
+                sender
+                    .send(PlaybackInfo::try_from_session(session).ok())
+                    .unwrap();
+
+                Ok(())
+            },
+        )
+    }
+
     fn listen_from_session(
         session: &GlobalSystemMediaTransportControlsSession,
         sender: &mpsc::Sender<Option<PlaybackInfo>>,
     ) {
-        let sender_for_propschanged = sender.clone();
         session
-            .MediaPropertiesChanged(&TypedEventHandler::<
-                GlobalSystemMediaTransportControlsSession,
-                _,
-            >::new(move |s, _| {
-                let Some(session) = s.as_ref() else {
-                    return Ok(());
-                };
-
-                sender_for_propschanged
-                    .send(PlaybackInfo::try_from_session(session).ok())
-                    .unwrap();
-
-                Ok(())
-            }))
+            .MediaPropertiesChanged(&Self::create_listener_event_handler(sender.clone()))
             .unwrap();
 
-        let sender_for_timelinechanged = sender.clone();
         session
-            .TimelinePropertiesChanged(&TypedEventHandler::<
-                GlobalSystemMediaTransportControlsSession,
-                _,
-            >::new(move |s, _| {
-                let Some(session) = s.as_ref() else {
-                    return Ok(());
-                };
-
-                sender_for_timelinechanged
-                    .send(PlaybackInfo::try_from_session(session).ok())
-                    .unwrap();
-                Ok(())
-            }))
+            .TimelinePropertiesChanged(&Self::create_listener_event_handler(sender.clone()))
             .unwrap();
     }
 }
