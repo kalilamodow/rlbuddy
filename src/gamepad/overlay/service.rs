@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct GamepadOverlayServiceSettings {
     pub enabled: bool,
+    pub window_pos: egui::Pos2,
 }
 
 pub struct GamepadOverlayService {
@@ -32,16 +33,19 @@ impl GamepadOverlayService {
     }
 
     pub fn update(&mut self) {
-        let settings = self.settings.read();
-        if !settings.enabled {
-            return;
+        {
+            let settings = self.settings.read();
+            if !settings.enabled {
+                return;
+            }
         }
 
         self.render();
     }
 
     fn render(&self) {
-        let state = self.gamepad.read();
+        let gamepad_state = self.gamepad.read();
+        let mut settings = self.settings.write();
 
         self.ctx.show_viewport_immediate(
             ViewportId::from_hash_of("gamepad overlay"),
@@ -49,11 +53,16 @@ impl GamepadOverlayService {
                 .with_inner_size(egui::vec2(300.0, 175.0))
                 .with_transparent(true)
                 .with_taskbar(false)
+                .with_position(settings.window_pos)
                 .with_always_on_top(),
             |ui, _| {
                 egui::CentralPanel::default()
                     .frame(Frame::canvas(ui.style()))
                     .show_inside(ui, |ui| {
+                        if let Some(outer_rect) = ui.ctx().input(|i| i.viewport().outer_rect) {
+                            settings.window_pos = outer_rect.min;
+                        }
+
                         let stroke = Stroke::new(1.5f32, Color32::WHITE);
                         let painter = ui.painter();
 
@@ -69,7 +78,7 @@ impl GamepadOverlayService {
 
                         painter.hline(100.0..=200.0, 110.0, stroke); // bottom inner
 
-                        let Some(gp) = state.as_ref() else {
+                        let Some(gp) = gamepad_state.as_ref() else {
                             return;
                         };
 
