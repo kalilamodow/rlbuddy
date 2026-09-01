@@ -50,6 +50,7 @@ impl GamepadOverlayService {
         self.ctx.show_viewport_immediate(
             ViewportId::from_hash_of("gamepad overlay"),
             ViewportBuilder::default()
+                .with_title("Gamepad Overlay")
                 .with_inner_size(egui::vec2(300.0, 175.0))
                 .with_transparent(true)
                 .with_taskbar(false)
