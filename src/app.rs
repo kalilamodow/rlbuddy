@@ -1,4 +1,6 @@
 use crate::gamepad::GamepadService;
+use crate::gamepad::overlay::service::{GamepadOverlayService, GamepadOverlayServiceSettings};
+use crate::gamepad::overlay::widget::GamepadOverlayWidget;
 use crate::{
     auto_setup::AutoSetupWidget,
     common::{data_dir::rlbuddy_data_dir, eventsource::EventReceiver},
@@ -28,6 +30,7 @@ enum Panel {
     PlayerSearch,
     MapLoader,
     AutoSetup,
+    GamepadOverlay,
     Settings,
 }
 
@@ -45,13 +48,14 @@ impl std::fmt::Display for Panel {
                 Panel::PlayerSearch => "Player Search",
                 Panel::MapLoader => "Custom Maps",
                 Panel::AutoSetup => "Stats API Setup",
+                Panel::GamepadOverlay => "Gamepad Overlay",
                 Panel::Settings => "Settings",
             }
         )
     }
 }
 
-const OPENABLE_PANELS: [Panel; 9] = [
+const OPENABLE_PANELS: [Panel; 10] = [
     Panel::CurrentMatch,
     Panel::Discord,
     Panel::MusicControl,
@@ -60,6 +64,7 @@ const OPENABLE_PANELS: [Panel; 9] = [
     Panel::MapLoader,
     Panel::AutoSetup,
     Panel::PlayerSearch,
+    Panel::GamepadOverlay,
     Panel::Settings,
 ];
 
@@ -111,6 +116,7 @@ struct AppData {
     music_control_settings: MusicControlSettings,
     match_notification_settings: MatchNotificatorSettings,
     saved_window_dimensions: Option<(egui::Pos2, egui::Vec2)>, // outer pos, inner size
+    gamepad_overlay_savedata: GamepadOverlayServiceSettings,
     map_loader_savedata: MapLoaderServiceSavedata,
 }
 
@@ -133,6 +139,7 @@ impl AppData {
                 "match_notifications_settings",
             ),
             saved_window_dimensions: Self::load_setting(&data_dir, "saved_window_dimensions"),
+            gamepad_overlay_savedata: Self::load_setting(&data_dir, "gamepad_overlay_savedata"),
             map_loader_savedata: Self::load_setting(&data_dir, "map_loader_savedata"),
         }
     }
@@ -175,6 +182,11 @@ impl AppData {
             &data_dir,
             "saved_window_dimensions",
             self.saved_window_dimensions,
+        );
+        Self::write_setting(
+            &data_dir,
+            "gamepad_overlay_savedata",
+            self.gamepad_overlay_savedata,
         );
         Self::write_setting(&data_dir, "map_loader_savedata", self.map_loader_savedata);
     }
@@ -228,6 +240,9 @@ pub struct RlBuddyApp {
     match_notificator_service: MatchNotificatorService,
     toast_service: ToastAlertService,
 
+    gamepad_overlay_service: GamepadOverlayService,
+    gamepad_overlay_widget: GamepadOverlayWidget,
+
     gamepad_service: GamepadService,
     hotkey_service: HotkeyService,
     auto_setup_widget: AutoSetupWidget,
@@ -267,6 +282,11 @@ impl RlBuddyApp {
             stats_api_service.subscribe(),
         );
         let mut gamepad_service = GamepadService::new();
+        let gamepad_overlay_service = GamepadOverlayService::new(
+            app_data.gamepad_overlay_savedata,
+            ctx.clone(),
+            &gamepad_service,
+        );
         let hotkey_service =
             HotkeyService::new(&mut gamepad_service, &overlay_tx, app_data.hotkey_settings);
         let player_info_service = PlayerInfoService::new(ctx.clone());
@@ -315,6 +335,9 @@ impl RlBuddyApp {
 
             map_loader_widget: MapLoaderWidget::new(&map_loader_service),
             map_loader_service,
+
+            gamepad_overlay_widget: GamepadOverlayWidget::new(&gamepad_overlay_service),
+            gamepad_overlay_service,
 
             hotkey_service,
             gamepad_service,
@@ -390,6 +413,11 @@ impl RlBuddyApp {
                         .map(|inner| (outer.left_top(), inner.size()))
                 })
             }),
+            gamepad_overlay_savedata: self
+                .gamepad_overlay_service
+                .settings_handle()
+                .read()
+                .clone(),
             map_loader_savedata: self.map_loader_service.save(),
         }
         .save();
@@ -408,6 +436,7 @@ impl eframe::App for RlBuddyApp {
         self.match_notificator_service.update();
         self.toast_service.update();
         self.map_loader_service.update();
+        self.gamepad_overlay_service.update();
 
         while let Some(event) = self.stats_api_events.try_recv() {
             match *event {
@@ -508,6 +537,7 @@ impl eframe::App for RlBuddyApp {
                                 Panel::PlayerSearch => ui.add(&mut self.player_search_widget),
                                 Panel::MapLoader => ui.add(&mut self.map_loader_widget),
                                 Panel::AutoSetup => ui.add(&mut self.auto_setup_widget),
+                                Panel::GamepadOverlay => ui.add(&mut self.gamepad_overlay_widget),
                                 Panel::Settings => ui.add(&mut self.settings_widget),
                             };
                         });
