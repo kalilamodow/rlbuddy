@@ -4,6 +4,7 @@ mod app;
 mod auto_setup;
 mod common;
 mod discord;
+pub mod gamepad;
 mod hotkey;
 mod map_loader;
 mod matches;

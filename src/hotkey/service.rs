@@ -1,8 +1,10 @@
+use crate::common::eventsource::EventReceiver;
 use crate::common::{ThreadedReadWriteStateHandle, ThreadedReadonlyStateHandle};
-use gilrs::{Button, Gilrs};
+use crate::gamepad::{GamepadEvent, GamepadService};
+use gilrs::Button;
 use rdev::Key;
 use serde::{Deserialize, Serialize};
-use std::{sync::mpsc, thread, time};
+use std::{sync::mpsc, thread};
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SelectableHotkey {
@@ -107,44 +109,6 @@ impl SelectableControllerButton {
     }
 }
 
-struct ControllerInputManager {
-    tx: mpsc::Sender<bool>,
-    settings: ThreadedReadonlyStateHandle<HotkeySettings>,
-}
-
-impl ControllerInputManager {
-    pub fn new(
-        tx: mpsc::Sender<bool>,
-        settings: ThreadedReadonlyStateHandle<HotkeySettings>,
-    ) -> Self {
-        Self { tx, settings }
-    }
-
-    pub fn listen(self) {
-        let mut g = Gilrs::new().unwrap();
-
-        loop {
-            while let Some(event) = g.next_event() {
-                match event.event {
-                    gilrs::EventType::ButtonPressed(button, _) => {
-                        if Some(button) == self.settings.read().button.to_gilrs_button() {
-                            self.tx.send(true).unwrap();
-                        }
-                    }
-                    gilrs::EventType::ButtonReleased(button, _)
-                        if Some(button) == self.settings.read().button.to_gilrs_button() =>
-                    {
-                        self.tx.send(false).unwrap();
-                    }
-                    _ => {}
-                }
-            }
-
-            thread::sleep(time::Duration::from_millis(5));
-        }
-    }
-}
-
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct HotkeySettings {
     pub key: SelectableHotkey,
@@ -153,10 +117,16 @@ pub struct HotkeySettings {
 
 pub struct HotkeyService {
     settings: ThreadedReadWriteStateHandle<HotkeySettings>,
+    gamepad_rx: EventReceiver<GamepadEvent>,
+    overlay_tx: mpsc::Sender<bool>,
 }
 
 impl HotkeyService {
-    pub fn new(overlay_tx: &mpsc::Sender<bool>, settings: HotkeySettings) -> Self {
+    pub fn new(
+        gamepad_service: &mut GamepadService,
+        overlay_tx: &mpsc::Sender<bool>,
+        settings: HotkeySettings,
+    ) -> Self {
         let settings = ThreadedReadWriteStateHandle::new(settings);
 
         let settings_for_kb_manager = settings.clone();
@@ -169,17 +139,29 @@ impl HotkeyService {
             manager.listen();
         });
 
-        let settings_for_ctrl_manager = settings.clone();
-        let overlay_tx_for_ctrl_manager = overlay_tx.clone();
-        thread::spawn(move || {
-            let manager = ControllerInputManager::new(
-                overlay_tx_for_ctrl_manager,
-                ThreadedReadonlyStateHandle::over(&settings_for_ctrl_manager),
-            );
-            manager.listen();
-        });
+        HotkeyService {
+            settings,
+            overlay_tx: overlay_tx.clone(),
+            gamepad_rx: gamepad_service.subscribe(),
+        }
+    }
 
-        HotkeyService { settings }
+    pub fn update(&mut self) {
+        let settings = self.settings.read();
+        while let Some(event) = self.gamepad_rx.try_recv() {
+            match event.as_ref() {
+                GamepadEvent::ButtonPressed(button) => {
+                    if Some(*button) == settings.button.to_gilrs_button() {
+                        self.overlay_tx.send(true).unwrap();
+                    }
+                }
+                GamepadEvent::ButtonReleased(button) => {
+                    if Some(*button) == settings.button.to_gilrs_button() {
+                        self.overlay_tx.send(false).unwrap();
+                    }
+                }
+            }
+        }
     }
 
     pub fn settings_handle(&self) -> ThreadedReadWriteStateHandle<HotkeySettings> {

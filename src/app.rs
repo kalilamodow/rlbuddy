@@ -1,3 +1,4 @@
+use crate::gamepad::GamepadService;
 use crate::{
     auto_setup::AutoSetupWidget,
     common::{data_dir::rlbuddy_data_dir, eventsource::EventReceiver},
@@ -227,6 +228,7 @@ pub struct RlBuddyApp {
     match_notificator_service: MatchNotificatorService,
     toast_service: ToastAlertService,
 
+    gamepad_service: GamepadService,
     hotkey_service: HotkeyService,
     auto_setup_widget: AutoSetupWidget,
     settings_widget: SettingsWidget,
@@ -264,7 +266,9 @@ impl RlBuddyApp {
             matches_service.state_handle(),
             stats_api_service.subscribe(),
         );
-        let hotkey_service = HotkeyService::new(&overlay_tx, app_data.hotkey_settings);
+        let mut gamepad_service = GamepadService::new();
+        let hotkey_service =
+            HotkeyService::new(&mut gamepad_service, &overlay_tx, app_data.hotkey_settings);
         let player_info_service = PlayerInfoService::new(ctx.clone());
         let map_loader_service = MapLoaderService::new(app_data.map_loader_savedata);
 
@@ -313,6 +317,7 @@ impl RlBuddyApp {
             map_loader_service,
 
             hotkey_service,
+            gamepad_service,
             player_search_widget: PlayerSearchWidget::new(player_info_service.sender()),
             player_info_service,
 
@@ -393,6 +398,8 @@ impl RlBuddyApp {
 
 impl eframe::App for RlBuddyApp {
     fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        self.gamepad_service.update();
+        self.hotkey_service.update();
         self.stats_api_service.update();
         self.matches_service.update();
         self.player_info_service.update();
