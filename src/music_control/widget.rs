@@ -5,6 +5,7 @@ use super::{
     },
 };
 use crate::common::{ReadWriteStateHandle, ThreadedReadonlyStateHandle, channel::Sender};
+use crate::core::app::Panel;
 use eframe::egui::{self, ImageSource, load::Bytes};
 use std::time::{Duration, SystemTime};
 
@@ -132,8 +133,12 @@ impl MusicControlWidget {
     }
 }
 
-impl egui::Widget for &mut MusicControlWidget {
-    fn ui(self, ui: &mut egui::Ui) -> egui::Response {
+impl Panel for MusicControlWidget {
+    fn name(&self) -> &'static str {
+        "Music"
+    }
+
+    fn ui(&mut self, ui: &mut egui::Ui) -> egui::Response {
         ui.vertical(|ui| {
             self.render_currently_playing(ui);
 

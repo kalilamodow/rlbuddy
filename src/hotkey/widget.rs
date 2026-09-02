@@ -1,4 +1,5 @@
 use super::service::{HotkeyService, HotkeySettings, SelectableHotkey};
+use crate::core::app::Panel;
 use crate::{common::ThreadedReadWriteStateHandle, hotkey::service::SelectableControllerButton};
 use eframe::egui;
 
@@ -14,8 +15,12 @@ impl HotkeySettingsWidget {
     }
 }
 
-impl egui::Widget for &HotkeySettingsWidget {
-    fn ui(self, ui: &mut egui::Ui) -> egui::Response {
+impl Panel for HotkeySettingsWidget {
+    fn name(&self) -> &'static str {
+        "Hotkey Settings"
+    }
+
+    fn ui(&mut self, ui: &mut egui::Ui) -> egui::Response {
         let mut settings = self.settings.write();
 
         ui.vertical_centered_justified(|ui| {

@@ -1,3 +1,7 @@
+use crate::common::savedata::load_service_data;
+use crate::core::app::{Panel, Service, ServiceWithUi};
+use crate::music_control::widget::MusicControlWidget;
+use crate::stats_api::StatsApi;
 use crate::{
     common::{
         ReadWriteStateHandle, ThreadedReadWriteStateHandle, ThreadedReadonlyStateHandle,
@@ -37,16 +41,18 @@ pub struct MusicControlService {
     playback_info_rx: mpsc::Receiver<Option<PlaybackInfo>>,
 }
 
+const DATA_ID: &str = "music_control_settings";
+
 impl MusicControlService {
-    pub fn new(savedata: MusicControlSettings, stats_api: EventReceiver<RLEvent>) -> Self {
+    pub fn new(stats_api: &mut StatsApi) -> Self {
         let (playback_info_tx, playback_info_rx) = mpsc::channel();
 
         Self {
             controller: MediaController::new(playback_info_tx),
-            settings: ReadWriteStateHandle::new(savedata),
+            settings: ReadWriteStateHandle::new(load_service_data(DATA_ID)),
             state: ThreadedReadWriteStateHandle::default(),
             command_receiver: Receiver::new(),
-            stats_api,
+            stats_api: stats_api.subscribe(),
             playback_info_rx,
         }
     }
@@ -96,5 +102,17 @@ impl MusicControlService {
 
     pub fn settings_handle(&self) -> ReadWriteStateHandle<MusicControlSettings> {
         ReadWriteStateHandle::clone(&self.settings)
+    }
+}
+
+impl Service for MusicControlService {
+    fn update(&mut self) {
+        self.update();
+    }
+}
+
+impl ServiceWithUi for MusicControlService {
+    fn settings_panel(&self) -> impl Panel + 'static {
+        MusicControlWidget::new(self)
     }
 }

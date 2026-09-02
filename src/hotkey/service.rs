@@ -1,6 +1,9 @@
 use crate::common::eventsource::EventReceiver;
+use crate::common::savedata::{load_service_data, save_service_data};
 use crate::common::{ThreadedReadWriteStateHandle, ThreadedReadonlyStateHandle};
+use crate::core::app::{Panel, Service, ServiceWithUi};
 use crate::gamepad::{GamepadEvent, GamepadService};
+use crate::hotkey::HotkeySettingsWidget;
 use gilrs::Button;
 use rdev::Key;
 use serde::{Deserialize, Serialize};
@@ -122,12 +125,8 @@ pub struct HotkeyService {
 }
 
 impl HotkeyService {
-    pub fn new(
-        gamepad_service: &mut GamepadService,
-        overlay_tx: &mpsc::Sender<bool>,
-        settings: HotkeySettings,
-    ) -> Self {
-        let settings = ThreadedReadWriteStateHandle::new(settings);
+    pub fn new(gamepad_service: &mut GamepadService, overlay_tx: &mpsc::Sender<bool>) -> Self {
+        let settings = ThreadedReadWriteStateHandle::new(load_service_data(DATA_ID));
 
         let settings_for_kb_manager = settings.clone();
         let overlay_tx_for_kb_manager = overlay_tx.clone();
@@ -146,7 +145,15 @@ impl HotkeyService {
         }
     }
 
-    pub fn update(&mut self) {
+    pub fn settings_handle(&self) -> ThreadedReadWriteStateHandle<HotkeySettings> {
+        ThreadedReadWriteStateHandle::clone(&self.settings)
+    }
+}
+
+const DATA_ID: &str = "hotkey_settings";
+
+impl Service for HotkeyService {
+    fn update(&mut self) {
         let settings = self.settings.read();
         while let Some(event) = self.gamepad_rx.try_recv() {
             match event.as_ref() {
@@ -164,7 +171,13 @@ impl HotkeyService {
         }
     }
 
-    pub fn settings_handle(&self) -> ThreadedReadWriteStateHandle<HotkeySettings> {
-        ThreadedReadWriteStateHandle::clone(&self.settings)
+    fn save(&self) {
+        save_service_data(DATA_ID, self.settings.read().clone());
+    }
+}
+
+impl ServiceWithUi for HotkeyService {
+    fn settings_panel(&self) -> impl Panel + 'static {
+        HotkeySettingsWidget::new(&self)
     }
 }

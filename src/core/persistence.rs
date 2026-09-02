@@ -1,5 +1,5 @@
 use crate::common::savedata::rlbuddy_data_dir;
-use crate::core::app::OpenPanelList;
+use crate::core::app::OpenLegacyPanelList;
 use crate::discord;
 use crate::gamepad::overlay::service::GamepadOverlayServiceSettings;
 use crate::map_loader::MapLoaderServiceSavedata;
@@ -14,7 +14,7 @@ use std::path::Path;
 pub struct AppData {
     pub app_settings: crate::core::app::AppSettings,
     pub rich_presence_settings: discord::DiscordSettings,
-    pub open_panels: OpenPanelList,
+    pub open_panels: OpenLegacyPanelList,
     pub matches: Vec<StrippedMatchInfo>,
     pub my_stats_settings: MyStatsWidgetSettings,
     pub match_notification_settings: MatchNotificatorSettings,

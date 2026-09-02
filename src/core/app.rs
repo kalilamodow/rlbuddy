@@ -2,8 +2,8 @@ use crate::core::persistence::AppData;
 use crate::gamepad::GamepadService;
 use crate::gamepad::overlay::service::GamepadOverlayService;
 use crate::gamepad::overlay::widget::GamepadOverlayWidget;
-use crate::hotkey::HotkeyFeature;
-use crate::music_control::feature::MusicControlFeature;
+use crate::hotkey::HotkeyService;
+use crate::music_control::MusicControlService;
 use crate::{
     auto_setup::AutoSetupWidget,
     common::eventsource::EventReceiver,
@@ -16,7 +16,7 @@ use crate::{
     stats_api::{RLEvent, StatsApi},
     toast_alert::{MatchNotificatorService, ToastAlertService},
 };
-use eframe::egui::{self, ViewportCommand};
+use eframe::egui::{self, Ui, ViewportCommand};
 use serde::{Deserialize, Serialize};
 use std::{cell::RefCell, rc::Rc, thread};
 use std::{sync::mpsc, time::Duration};
@@ -26,13 +26,17 @@ pub trait Service {
     fn save(&self) {}
 }
 
-pub trait Feature: Service {
+pub trait ServiceWithUi: Service {
+    fn settings_panel(&self) -> impl Panel + 'static;
+}
+
+pub trait Panel {
     fn name(&self) -> &'static str;
-    fn ui(&mut self, ui: &mut egui::Ui) -> egui::Response;
+    fn ui(&mut self, ui: &mut Ui) -> egui::Response;
 }
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, Serialize, Deserialize)]
-pub enum Panel {
+pub enum LegacyPanel {
     CurrentMatch,
     PastMatches,
     MyStats,
@@ -44,56 +48,56 @@ pub enum Panel {
     Settings,
 }
 
-impl std::fmt::Display for Panel {
+impl std::fmt::Display for LegacyPanel {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
             "{}",
             match self {
-                Panel::CurrentMatch => "Lobby",
-                Panel::PastMatches => "History",
-                Panel::MyStats => "Session",
-                Panel::Discord => "Discord",
-                Panel::PlayerSearch => "Player Search",
-                Panel::MapLoader => "Custom Maps",
-                Panel::AutoSetup => "Stats API Setup",
-                Panel::GamepadOverlay => "Gamepad Overlay",
-                Panel::Settings => "Settings",
+                LegacyPanel::CurrentMatch => "Lobby",
+                LegacyPanel::PastMatches => "History",
+                LegacyPanel::MyStats => "Session",
+                LegacyPanel::Discord => "Discord",
+                LegacyPanel::PlayerSearch => "Player Search",
+                LegacyPanel::MapLoader => "Custom Maps",
+                LegacyPanel::AutoSetup => "Stats API Setup",
+                LegacyPanel::GamepadOverlay => "Gamepad Overlay",
+                LegacyPanel::Settings => "Settings",
             }
         )
     }
 }
 
-const OPENABLE_PANELS: [Panel; 9] = [
-    Panel::CurrentMatch,
-    Panel::Discord,
-    Panel::MyStats,
-    Panel::PastMatches,
-    Panel::MapLoader,
-    Panel::AutoSetup,
-    Panel::PlayerSearch,
-    Panel::GamepadOverlay,
-    Panel::Settings,
+const OPENABLE_LEGAGY_PANELS: [LegacyPanel; 9] = [
+    LegacyPanel::CurrentMatch,
+    LegacyPanel::Discord,
+    LegacyPanel::MyStats,
+    LegacyPanel::PastMatches,
+    LegacyPanel::MapLoader,
+    LegacyPanel::AutoSetup,
+    LegacyPanel::PlayerSearch,
+    LegacyPanel::GamepadOverlay,
+    LegacyPanel::Settings,
 ];
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OpenPanelList(Vec<Panel>);
+pub struct OpenLegacyPanelList(Vec<LegacyPanel>);
 
-impl Default for OpenPanelList {
+impl Default for OpenLegacyPanelList {
     fn default() -> Self {
-        Self(vec![Panel::CurrentMatch, Panel::AutoSetup])
+        Self(vec![LegacyPanel::CurrentMatch, LegacyPanel::AutoSetup])
     }
 }
 
-impl std::ops::Deref for OpenPanelList {
-    type Target = Vec<Panel>;
+impl std::ops::Deref for OpenLegacyPanelList {
+    type Target = Vec<LegacyPanel>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl std::ops::DerefMut for OpenPanelList {
+impl std::ops::DerefMut for OpenLegacyPanelList {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
@@ -108,19 +112,28 @@ fn visuals_with_transparency(visuals: &mut egui::Visuals, transparency: u8) {
     );
 }
 
-struct AppFeature {
+struct AppPanel {
     name: &'static str,
     open: bool,
-    feature: Box<dyn Feature>,
+    panel: Box<dyn Panel>,
 }
 
-impl AppFeature {
-    fn new<F: Feature + 'static>(feature: F) -> Self {
+impl AppPanel {
+    fn new<F>(feature: F) -> Self
+    where
+        F: Panel + 'static,
+    {
         Self {
             name: feature.name(),
             open: false,
-            feature: Box::new(feature),
+            panel: Box::new(feature),
         }
+    }
+}
+
+impl egui::Widget for &mut AppPanel {
+    fn ui(self, ui: &mut Ui) -> egui::Response {
+        self.panel.ui(ui)
     }
 }
 
@@ -135,7 +148,7 @@ pub struct RlBuddyApp {
     overlay_tx: mpsc::Sender<bool>,
     overlay_rx: mpsc::Receiver<bool>,
     prev_hide_pos: Option<egui::Pos2>,
-    open_panels: OpenPanelList,
+    open_panels: OpenLegacyPanelList,
 
     stats_api_events: EventReceiver<RLEvent>,
     stats_api_service: StatsApi,
@@ -165,7 +178,7 @@ pub struct RlBuddyApp {
     settings_widget: SettingsWidget,
 
     services: Vec<Box<dyn Service>>,
-    features: Vec<AppFeature>,
+    panels: Vec<AppPanel>,
 }
 
 impl RlBuddyApp {
@@ -205,8 +218,8 @@ impl RlBuddyApp {
         let player_info_service = PlayerInfoService::new(ctx.clone());
         let map_loader_service = MapLoaderService::new(app_data.map_loader_savedata);
 
-        let hotkey = HotkeyFeature::new(&mut gamepad_service, &overlay_tx);
-        let music_control = MusicControlFeature::new(&mut stats_api_service);
+        let hotkey_service = HotkeyService::new(&mut gamepad_service, &overlay_tx);
+        let music_service = MusicControlService::new(&mut stats_api_service);
 
         let current_transparency = Rc::new(RefCell::new(app_data.app_settings.transparency));
         let app = RlBuddyApp {
@@ -259,8 +272,11 @@ impl RlBuddyApp {
             auto_setup_widget: AutoSetupWidget::new(),
             open_panels: app_data.open_panels,
 
-            services: Vec::new(),
-            features: vec![AppFeature::new(hotkey), AppFeature::new(music_control)],
+            panels: vec![
+                AppPanel::new(music_service.settings_panel()),
+                AppPanel::new(hotkey_service.settings_panel()),
+            ],
+            services: vec![Box::new(hotkey_service), Box::new(music_service)],
         };
 
         app
@@ -307,8 +323,8 @@ impl RlBuddyApp {
     }
 
     fn on_close(&self, ctx: &egui::Context) {
-        for feature in &self.features {
-            feature.feature.save();
+        for service in &self.services {
+            service.save();
         }
 
         AppData {
@@ -344,9 +360,6 @@ impl RlBuddyApp {
     fn update_services(&mut self) {
         for s in &mut self.services {
             s.update();
-        }
-        for f in &mut self.features {
-            f.feature.update();
         }
     }
 }
@@ -393,14 +406,14 @@ impl eframe::App for RlBuddyApp {
         }
     }
 
-    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+    fn ui(&mut self, ui: &mut Ui, _frame: &mut eframe::Frame) {
         visuals_with_transparency(ui.visuals_mut(), *self.current_transparency.borrow());
 
         egui::Panel::bottom("bottom_panel").show_inside(ui, |ui| {
             egui::ComboBox::from_label("")
                 .selected_text("Widgets")
                 .show_ui(ui, |ui| {
-                    for panel in OPENABLE_PANELS {
+                    for panel in OPENABLE_LEGAGY_PANELS {
                         let open = self.open_panels.contains(&panel);
 
                         if ui.selectable_label(open, panel.to_string()).clicked() {
@@ -412,7 +425,7 @@ impl eframe::App for RlBuddyApp {
                         }
                     }
 
-                    for feature in &mut self.features {
+                    for feature in &mut self.panels {
                         if ui.selectable_label(feature.open, feature.name).clicked() {
                             feature.open = !feature.open;
                         }
@@ -424,7 +437,7 @@ impl eframe::App for RlBuddyApp {
             egui::ScrollArea::vertical().show(ui, |ui| {
                 ui.vertical_centered_justified(|ui| {
                     let mut to_swap: Option<(usize, usize)> = None; // index, move to
-                    let mut to_close: Option<Panel> = None;
+                    let mut to_close: Option<LegacyPanel> = None;
 
                     for (index, panel) in self.open_panels.iter().enumerate() {
                         let frame =
@@ -462,41 +475,42 @@ impl eframe::App for RlBuddyApp {
                             ui.separator();
 
                             match panel {
-                                Panel::CurrentMatch => ui.add(&mut self.current_match),
-                                Panel::Discord => ui.add(&mut self.discord_widget),
-                                Panel::MyStats => ui.add(&mut self.my_stats_widget),
-                                Panel::PastMatches => ui.add(&mut self.past_matches),
-                                Panel::PlayerSearch => ui.add(&mut self.player_search_widget),
-                                Panel::MapLoader => ui.add(&mut self.map_loader_widget),
-                                Panel::AutoSetup => ui.add(&mut self.auto_setup_widget),
-                                Panel::GamepadOverlay => ui.add(&mut self.gamepad_overlay_widget),
-                                Panel::Settings => ui.add(&mut self.settings_widget),
+                                LegacyPanel::CurrentMatch => ui.add(&mut self.current_match),
+                                LegacyPanel::Discord => ui.add(&mut self.discord_widget),
+                                LegacyPanel::MyStats => ui.add(&mut self.my_stats_widget),
+                                LegacyPanel::PastMatches => ui.add(&mut self.past_matches),
+                                LegacyPanel::PlayerSearch => ui.add(&mut self.player_search_widget),
+                                LegacyPanel::MapLoader => ui.add(&mut self.map_loader_widget),
+                                LegacyPanel::AutoSetup => ui.add(&mut self.auto_setup_widget),
+                                LegacyPanel::GamepadOverlay => {
+                                    ui.add(&mut self.gamepad_overlay_widget)
+                                }
+                                LegacyPanel::Settings => ui.add(&mut self.settings_widget),
                             };
                         });
 
                         ui.add_space(4.0);
                     }
 
-                    for feature in self.features.iter_mut().filter(|f| f.open) {
+                    for panel in self.panels.iter_mut().filter(|f| f.open) {
                         let frame =
                             egui::Frame::group(ui.style()).fill(ui.style().visuals.faint_bg_color);
 
                         frame.show(ui, |ui| {
                             ui.columns_const(|[c1, c2]| {
-                                c1.label(egui::RichText::new(feature.name).strong());
+                                c1.label(egui::RichText::new(panel.name).strong());
                                 c2.with_layout(
                                     egui::Layout::right_to_left(egui::Align::Min),
                                     |c2| {
                                         if c2.small_button("X").clicked() {
-                                            feature.open = false;
+                                            panel.open = false;
                                         }
                                     },
                                 );
                             });
 
                             ui.separator();
-
-                            feature.feature.ui(ui);
+                            ui.add(panel);
                         });
 
                         ui.add_space(4.0);
