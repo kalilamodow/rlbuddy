@@ -27,6 +27,8 @@ pub trait Service {
 }
 
 pub trait ServiceWithUi: Service {
+    // 'static otherwise it thinks the panel needs a reference to the Service for
+    // its whole lifetime
     fn settings_panel(&self) -> impl Panel + 'static;
 }
 
