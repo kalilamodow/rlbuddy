@@ -153,7 +153,6 @@ pub struct RlBuddyApp {
     open_panels: OpenLegacyPanelList,
 
     stats_api_events: EventReceiver<RLEvent>,
-    stats_api_service: StatsApi,
 
     discord_service: discord::DiscordService,
     discord_widget: discord::DiscordWidget,
@@ -258,7 +257,6 @@ impl RlBuddyApp {
             matches_service,
 
             stats_api_events: stats_api_service.subscribe(),
-            stats_api_service,
 
             map_loader_widget: MapLoaderWidget::new(&map_loader_service),
             map_loader_service,
@@ -278,7 +276,11 @@ impl RlBuddyApp {
                 AppPanel::new(music_service.settings_panel()),
                 AppPanel::new(hotkey_service.settings_panel()),
             ],
-            services: vec![Box::new(hotkey_service), Box::new(music_service)],
+            services: vec![
+                Box::new(hotkey_service),
+                Box::new(music_service),
+                Box::new(stats_api_service),
+            ],
         };
 
         app
@@ -369,7 +371,6 @@ impl RlBuddyApp {
 impl eframe::App for RlBuddyApp {
     fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.gamepad_service.update();
-        self.stats_api_service.update();
         self.matches_service.update();
         self.player_info_service.update();
         self.discord_service.update();

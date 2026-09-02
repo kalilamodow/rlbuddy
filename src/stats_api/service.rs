@@ -1,3 +1,8 @@
+use crate::core::app::Service;
+use crate::{
+    common::eventsource::{EventReceiver, EventSource},
+    rocket_league::{Platform, Playlist, Team, asset_to_arena},
+};
 use num_enum::TryFromPrimitive;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -9,11 +14,6 @@ use std::{
     sync::mpsc,
     thread,
     time::Duration,
-};
-
-use crate::{
-    common::eventsource::{EventReceiver, EventSource},
-    rocket_league::{Platform, Playlist, Team, asset_to_arena},
 };
 
 #[derive(Debug, Deserialize)]
@@ -399,5 +399,11 @@ impl StatsApi {
             },
             _ => return None,
         })
+    }
+}
+
+impl Service for StatsApi {
+    fn update(&mut self) {
+        self.update();
     }
 }
