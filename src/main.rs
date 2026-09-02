@@ -1,8 +1,8 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-mod app;
 mod auto_setup;
 mod common;
+mod core;
 mod discord;
 pub mod gamepad;
 mod hotkey;
@@ -33,7 +33,7 @@ fn main() -> eframe::Result {
         gui_options,
         Box::new(|cc| {
             egui_extras::install_image_loaders(&cc.egui_ctx);
-            Ok(Box::new(app::RlBuddyApp::new(cc)))
+            Ok(Box::new(core::app::RlBuddyApp::new(cc)))
         }),
     )
 }
