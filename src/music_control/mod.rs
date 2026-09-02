@@ -1,6 +1,4 @@
-pub(super) mod controller;
+mod controller;
+pub mod feature;
 mod service;
 mod widget;
-
-pub use service::*;
-pub use widget::MusicControlWidget;

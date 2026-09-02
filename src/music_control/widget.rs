@@ -1,10 +1,10 @@
-use crate::{
-    common::{ReadWriteStateHandle, ThreadedReadonlyStateHandle, channel::Sender},
-    music_control::{
+use super::{
+    controller::PlaybackStatus,
+    service::{
         MusicControlCommand, MusicControlService, MusicControlServiceState, MusicControlSettings,
-        controller::PlaybackStatus,
     },
 };
+use crate::common::{ReadWriteStateHandle, ThreadedReadonlyStateHandle, channel::Sender};
 use eframe::egui::{self, ImageSource, load::Bytes};
 use std::time::{Duration, SystemTime};
 

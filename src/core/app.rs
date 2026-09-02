@@ -2,6 +2,7 @@ use crate::core::persistence::AppData;
 use crate::gamepad::GamepadService;
 use crate::gamepad::overlay::service::GamepadOverlayService;
 use crate::gamepad::overlay::widget::GamepadOverlayWidget;
+use crate::music_control::feature::MusicControlFeature;
 use crate::{
     auto_setup::AutoSetupWidget,
     common::eventsource::EventReceiver,
@@ -9,7 +10,6 @@ use crate::{
     hotkey::HotkeyService,
     map_loader::{MapLoaderService, MapLoaderWidget},
     matches::{CurrentMatchWidget, MatchesService, PastMatchesWidget},
-    music_control::{MusicControlService, MusicControlWidget},
     my_stats::MyStatsWidget,
     player_info::{PlayerInfoService, PlayerSearchWidget},
     settings::SettingsWidget,
@@ -21,11 +21,20 @@ use serde::{Deserialize, Serialize};
 use std::{cell::RefCell, rc::Rc, thread};
 use std::{sync::mpsc, time::Duration};
 
+pub trait Service {
+    fn update(&mut self);
+    fn save(&self) {}
+}
+
+pub trait Feature: Service {
+    fn name(&self) -> &'static str;
+    fn ui(&mut self, ui: &mut egui::Ui) -> egui::Response;
+}
+
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Panel {
     CurrentMatch,
     PastMatches,
-    MusicControl,
     MyStats,
     Discord,
     PlayerSearch,
@@ -44,7 +53,6 @@ impl std::fmt::Display for Panel {
                 Panel::CurrentMatch => "Lobby",
                 Panel::PastMatches => "History",
                 Panel::MyStats => "Session",
-                Panel::MusicControl => "Music",
                 Panel::Discord => "Discord",
                 Panel::PlayerSearch => "Player Search",
                 Panel::MapLoader => "Custom Maps",
@@ -56,10 +64,9 @@ impl std::fmt::Display for Panel {
     }
 }
 
-const OPENABLE_PANELS: [Panel; 10] = [
+const OPENABLE_PANELS: [Panel; 9] = [
     Panel::CurrentMatch,
     Panel::Discord,
-    Panel::MusicControl,
     Panel::MyStats,
     Panel::PastMatches,
     Panel::MapLoader,
@@ -101,6 +108,22 @@ fn visuals_with_transparency(visuals: &mut egui::Visuals, transparency: u8) {
     );
 }
 
+struct AppFeature {
+    name: &'static str,
+    open: bool,
+    feature: Box<dyn Feature>,
+}
+
+impl AppFeature {
+    fn new<F: Feature + 'static>(feature: F) -> Self {
+        Self {
+            name: feature.name(),
+            open: false,
+            feature: Box::new(feature),
+        }
+    }
+}
+
 #[derive(Debug, Default, Deserialize, Serialize)]
 pub struct AppSettings {
     pub transparency: u8,
@@ -119,9 +142,6 @@ pub struct RlBuddyApp {
 
     discord_service: discord::DiscordService,
     discord_widget: discord::DiscordWidget,
-
-    music_control_service: MusicControlService,
-    music_control_widget: MusicControlWidget,
 
     matches_service: MatchesService,
     current_match: CurrentMatchWidget,
@@ -144,6 +164,9 @@ pub struct RlBuddyApp {
     hotkey_service: HotkeyService,
     auto_setup_widget: AutoSetupWidget,
     settings_widget: SettingsWidget,
+
+    services: Vec<Box<dyn Service>>,
+    features: Vec<AppFeature>,
 }
 
 impl RlBuddyApp {
@@ -169,10 +192,6 @@ impl RlBuddyApp {
             stats_api_service.subscribe(),
             toast_service.sender(),
         );
-        let music_control_service = MusicControlService::new(
-            app_data.music_control_settings,
-            stats_api_service.subscribe(),
-        );
         let discord_service = discord::DiscordService::new(
             app_data.rich_presence_settings,
             matches_service.state_handle(),
@@ -189,8 +208,10 @@ impl RlBuddyApp {
         let player_info_service = PlayerInfoService::new(ctx.clone());
         let map_loader_service = MapLoaderService::new(app_data.map_loader_savedata);
 
+        let music_control = MusicControlFeature::new(&mut stats_api_service);
+
         let current_transparency = Rc::new(RefCell::new(app_data.app_settings.transparency));
-        RlBuddyApp {
+        let app = RlBuddyApp {
             settings_widget: SettingsWidget::new(
                 &hotkey_service,
                 &match_notificator_service,
@@ -208,9 +229,6 @@ impl RlBuddyApp {
                 discord_service.state_handle(),
             ),
             discord_service,
-
-            music_control_widget: MusicControlWidget::new(&music_control_service),
-            music_control_service,
 
             my_stats_widget: MyStatsWidget::new(
                 matches_service.state_handle(),
@@ -244,7 +262,15 @@ impl RlBuddyApp {
             toast_service,
             auto_setup_widget: AutoSetupWidget::new(),
             open_panels: app_data.open_panels,
-        }
+
+            services: Vec::new(),
+            features: vec![music_control]
+                .into_iter()
+                .map(AppFeature::new)
+                .collect(),
+        };
+
+        app
     }
 
     fn show(&mut self, ctx: &egui::Context) {
@@ -288,6 +314,10 @@ impl RlBuddyApp {
     }
 
     fn on_close(&self, ctx: &egui::Context) {
+        for feature in &self.features {
+            feature.feature.save();
+        }
+
         AppData {
             app_settings: AppSettings {
                 transparency: *self.current_transparency.borrow(),
@@ -297,7 +327,6 @@ impl RlBuddyApp {
             open_panels: self.open_panels.clone(),
             matches: self.matches_service.stripped_history(),
             my_stats_settings: self.my_stats_widget.clone_settings(),
-            music_control_settings: self.music_control_service.settings_handle().read().clone(),
             match_notification_settings: self
                 .match_notificator_service
                 .settings_handle()
@@ -319,6 +348,15 @@ impl RlBuddyApp {
         }
         .save();
     }
+
+    fn update_services(&mut self) {
+        for s in &mut self.services {
+            s.update();
+        }
+        for f in &mut self.features {
+            f.feature.update();
+        }
+    }
 }
 
 impl eframe::App for RlBuddyApp {
@@ -329,11 +367,12 @@ impl eframe::App for RlBuddyApp {
         self.matches_service.update();
         self.player_info_service.update();
         self.discord_service.update();
-        self.music_control_service.update();
         self.match_notificator_service.update();
         self.toast_service.update();
         self.map_loader_service.update();
         self.gamepad_overlay_service.update();
+
+        self.update_services();
 
         while let Some(event) = self.stats_api_events.try_recv() {
             match *event {
@@ -379,6 +418,12 @@ impl eframe::App for RlBuddyApp {
                             } else {
                                 self.open_panels.push(panel);
                             }
+                        }
+                    }
+
+                    for feature in &mut self.features {
+                        if ui.selectable_label(feature.open, feature.name).clicked() {
+                            feature.open = !feature.open;
                         }
                     }
                 });
@@ -429,7 +474,6 @@ impl eframe::App for RlBuddyApp {
                                 Panel::CurrentMatch => ui.add(&mut self.current_match),
                                 Panel::Discord => ui.add(&mut self.discord_widget),
                                 Panel::MyStats => ui.add(&mut self.my_stats_widget),
-                                Panel::MusicControl => ui.add(&mut self.music_control_widget),
                                 Panel::PastMatches => ui.add(&mut self.past_matches),
                                 Panel::PlayerSearch => ui.add(&mut self.player_search_widget),
                                 Panel::MapLoader => ui.add(&mut self.map_loader_widget),
@@ -437,6 +481,31 @@ impl eframe::App for RlBuddyApp {
                                 Panel::GamepadOverlay => ui.add(&mut self.gamepad_overlay_widget),
                                 Panel::Settings => ui.add(&mut self.settings_widget),
                             };
+                        });
+
+                        ui.add_space(4.0);
+                    }
+
+                    for feature in self.features.iter_mut().filter(|f| f.open) {
+                        let frame =
+                            egui::Frame::group(ui.style()).fill(ui.style().visuals.faint_bg_color);
+
+                        frame.show(ui, |ui| {
+                            ui.columns_const(|[c1, c2]| {
+                                c1.label(egui::RichText::new(feature.name).strong());
+                                c2.with_layout(
+                                    egui::Layout::right_to_left(egui::Align::Min),
+                                    |c2| {
+                                        if c2.small_button("X").clicked() {
+                                            feature.open = false;
+                                        }
+                                    },
+                                );
+                            });
+
+                            ui.separator();
+
+                            feature.feature.ui(ui);
                         });
 
                         ui.add_space(4.0);

@@ -1,11 +1,10 @@
-use crate::common::data_dir::rlbuddy_data_dir;
+use crate::common::savedata::rlbuddy_data_dir;
 use crate::core::app::OpenPanelList;
 use crate::discord;
 use crate::gamepad::overlay::service::GamepadOverlayServiceSettings;
 use crate::hotkey::HotkeySettings;
 use crate::map_loader::MapLoaderServiceSavedata;
 use crate::matches::StrippedMatchInfo;
-use crate::music_control::MusicControlSettings;
 use crate::my_stats::MyStatsWidgetSettings;
 use crate::toast_alert::MatchNotificatorSettings;
 use eframe::egui;
@@ -20,7 +19,6 @@ pub struct AppData {
     pub open_panels: OpenPanelList,
     pub matches: Vec<StrippedMatchInfo>,
     pub my_stats_settings: MyStatsWidgetSettings,
-    pub music_control_settings: MusicControlSettings,
     pub match_notification_settings: MatchNotificatorSettings,
     pub saved_window_dimensions: Option<(egui::Pos2, egui::Vec2)>, // outer pos, inner size
     pub gamepad_overlay_savedata: GamepadOverlayServiceSettings,
@@ -40,7 +38,6 @@ impl AppData {
             open_panels: Self::load_setting(&data_dir, "open_panel_list"),
             matches: Self::load_setting(&data_dir, "matches"),
             my_stats_settings: Self::load_setting(&data_dir, "my_stats_settings"),
-            music_control_settings: Self::load_setting(&data_dir, "music_control_settings"),
             match_notification_settings: Self::load_setting(
                 &data_dir,
                 "match_notifications_settings",
@@ -75,11 +72,6 @@ impl AppData {
         Self::write_setting(&data_dir, "open_panel_list", self.open_panels);
         Self::write_setting(&data_dir, "matches", self.matches);
         Self::write_setting(&data_dir, "my_stats_settings", self.my_stats_settings);
-        Self::write_setting(
-            &data_dir,
-            "music_control_settings",
-            self.music_control_settings,
-        );
         Self::write_setting(
             &data_dir,
             "match_notifications_settings",

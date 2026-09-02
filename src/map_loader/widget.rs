@@ -1,5 +1,5 @@
 use crate::{
-    common::{ThreadedReadonlyStateHandle, data_dir::rlbuddy_data_dir},
+    common::{ThreadedReadonlyStateHandle, savedata::rlbuddy_data_dir},
     map_loader::{
         downloader::MapDownloaderWidget,
         map_card_widget::MapCardWidget,

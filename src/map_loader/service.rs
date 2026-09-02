@@ -1,6 +1,6 @@
 use crate::{
     common::{
-        ThreadedReadWriteStateHandle, ThreadedReadonlyStateHandle, data_dir::rlbuddy_data_dir,
+        ThreadedReadWriteStateHandle, ThreadedReadonlyStateHandle, savedata::rlbuddy_data_dir,
     },
     map_loader::service::MapLoaderCommand::ClearError,
 };
@@ -336,10 +336,7 @@ where
 
     fs::write(custom_map_dir.join("map.upk"), rl_pkg_data)?;
     if !preview_image_data.is_empty() {
-        fs::write(
-            custom_map_dir.join("preview.jpg"),
-            preview_image_data,
-        )?;
+        fs::write(custom_map_dir.join("preview.jpg"), preview_image_data)?;
     }
 
     {
