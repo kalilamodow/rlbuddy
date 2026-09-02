@@ -1,5 +1,5 @@
+mod feature;
+pub use feature::HotkeyFeature;
+
 mod service;
 mod widget;
-
-pub use service::{HotkeyService, HotkeySettings};
-pub use widget::HotkeySettingsWidget;

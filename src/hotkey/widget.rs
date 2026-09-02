@@ -1,16 +1,16 @@
-use eframe::egui;
-
+use super::service::{HotkeyService, HotkeySettings, SelectableHotkey};
 use crate::{common::ThreadedReadWriteStateHandle, hotkey::service::SelectableControllerButton};
-
-use super::service::{HotkeySettings, SelectableHotkey};
+use eframe::egui;
 
 pub struct HotkeySettingsWidget {
     settings: ThreadedReadWriteStateHandle<HotkeySettings>,
 }
 
 impl HotkeySettingsWidget {
-    pub fn new(settings: ThreadedReadWriteStateHandle<HotkeySettings>) -> Self {
-        HotkeySettingsWidget { settings }
+    pub fn new(service: &HotkeyService) -> Self {
+        HotkeySettingsWidget {
+            settings: service.settings_handle(),
+        }
     }
 }
 

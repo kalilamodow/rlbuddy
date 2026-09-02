@@ -2,12 +2,12 @@ use crate::core::persistence::AppData;
 use crate::gamepad::GamepadService;
 use crate::gamepad::overlay::service::GamepadOverlayService;
 use crate::gamepad::overlay::widget::GamepadOverlayWidget;
+use crate::hotkey::HotkeyFeature;
 use crate::music_control::feature::MusicControlFeature;
 use crate::{
     auto_setup::AutoSetupWidget,
     common::eventsource::EventReceiver,
     discord,
-    hotkey::HotkeyService,
     map_loader::{MapLoaderService, MapLoaderWidget},
     matches::{CurrentMatchWidget, MatchesService, PastMatchesWidget},
     my_stats::MyStatsWidget,
@@ -161,7 +161,6 @@ pub struct RlBuddyApp {
     gamepad_overlay_widget: GamepadOverlayWidget,
 
     gamepad_service: GamepadService,
-    hotkey_service: HotkeyService,
     auto_setup_widget: AutoSetupWidget,
     settings_widget: SettingsWidget,
 
@@ -203,17 +202,15 @@ impl RlBuddyApp {
             ctx.clone(),
             &gamepad_service,
         );
-        let hotkey_service =
-            HotkeyService::new(&mut gamepad_service, &overlay_tx, app_data.hotkey_settings);
         let player_info_service = PlayerInfoService::new(ctx.clone());
         let map_loader_service = MapLoaderService::new(app_data.map_loader_savedata);
 
+        let hotkey = HotkeyFeature::new(&mut gamepad_service, &overlay_tx);
         let music_control = MusicControlFeature::new(&mut stats_api_service);
 
         let current_transparency = Rc::new(RefCell::new(app_data.app_settings.transparency));
         let app = RlBuddyApp {
             settings_widget: SettingsWidget::new(
-                &hotkey_service,
                 &match_notificator_service,
                 &toast_service,
                 Rc::clone(&current_transparency),
@@ -254,7 +251,6 @@ impl RlBuddyApp {
             gamepad_overlay_widget: GamepadOverlayWidget::new(&gamepad_overlay_service),
             gamepad_overlay_service,
 
-            hotkey_service,
             gamepad_service,
             player_search_widget: PlayerSearchWidget::new(player_info_service.sender()),
             player_info_service,
@@ -264,10 +260,7 @@ impl RlBuddyApp {
             open_panels: app_data.open_panels,
 
             services: Vec::new(),
-            features: vec![music_control]
-                .into_iter()
-                .map(AppFeature::new)
-                .collect(),
+            features: vec![AppFeature::new(hotkey), AppFeature::new(music_control)],
         };
 
         app
@@ -322,7 +315,6 @@ impl RlBuddyApp {
             app_settings: AppSettings {
                 transparency: *self.current_transparency.borrow(),
             },
-            hotkey_settings: self.hotkey_service.settings_handle().read().clone(),
             rich_presence_settings: self.discord_service.settings_handle().read().clone(),
             open_panels: self.open_panels.clone(),
             matches: self.matches_service.stripped_history(),
@@ -362,7 +354,6 @@ impl RlBuddyApp {
 impl eframe::App for RlBuddyApp {
     fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.gamepad_service.update();
-        self.hotkey_service.update();
         self.stats_api_service.update();
         self.matches_service.update();
         self.player_info_service.update();

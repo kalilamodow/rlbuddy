@@ -1,16 +1,12 @@
-use std::{cell::RefCell, rc::Rc};
-
-use eframe::egui;
-
 use crate::{
-    hotkey::{HotkeyService, HotkeySettingsWidget},
     settings::app_settings::AppSettingsWidget,
     toast_alert::{MatchNotificatorService, MatchNotificatorSettingsWidget, ToastAlertService},
 };
+use eframe::egui;
+use std::{cell::RefCell, rc::Rc};
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 enum Panel {
-    HotkeySettings,
     AppSettings,
     MatchNotificator,
 }
@@ -21,7 +17,6 @@ impl std::fmt::Display for Panel {
             f,
             "{}",
             match self {
-                Panel::HotkeySettings => "Keybind",
                 Panel::AppSettings => "App",
                 Panel::MatchNotificator => "Toast",
             }
@@ -29,27 +24,20 @@ impl std::fmt::Display for Panel {
     }
 }
 
-const ALL_PANELS: [Panel; 3] = [
-    Panel::HotkeySettings,
-    Panel::AppSettings,
-    Panel::MatchNotificator,
-];
+const ALL_PANELS: [Panel; 2] = [Panel::AppSettings, Panel::MatchNotificator];
 
 pub struct SettingsWidget {
-    hotkey: HotkeySettingsWidget,
     app: AppSettingsWidget,
     notificator: MatchNotificatorSettingsWidget,
 }
 
 impl SettingsWidget {
     pub fn new(
-        hotkey_service: &HotkeyService,
         match_notificator_service: &MatchNotificatorService,
         toast_service: &ToastAlertService,
         transparency: Rc<RefCell<u8>>,
     ) -> Self {
         Self {
-            hotkey: HotkeySettingsWidget::new(hotkey_service.settings_handle()),
             app: AppSettingsWidget::new(transparency),
             notificator: MatchNotificatorSettingsWidget::new(
                 match_notificator_service,
@@ -69,7 +57,6 @@ impl egui::Widget for &mut SettingsWidget {
                     ui.add_space(4.0);
 
                     match panel {
-                        Panel::HotkeySettings => ui.add(&self.hotkey),
                         Panel::AppSettings => ui.add(&self.app),
                         Panel::MatchNotificator => ui.add(&mut self.notificator),
                     };
