@@ -1,29 +1,21 @@
-use crate::common::savedata::{load_service_data, rlbuddy_data_dir, save_service_data};
+use crate::common::savedata::{load_service_data, save_service_data};
+use crate::core::app::PanelId;
 use eframe::egui;
-use std::fs;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct AppData {
     pub app_settings: crate::core::app::AppSettings,
     pub saved_window_dimensions: Option<(egui::Pos2, egui::Vec2)>, // outer pos, inner size
+    pub open_panels: Vec<PanelId>,
 }
 
 impl AppData {
     pub fn load() -> Self {
-        Self {
-            app_settings: load_service_data("app_settings"),
-            saved_window_dimensions: load_service_data("saved_window_dimensions"),
-        }
+        load_service_data("global_data")
     }
 
     pub fn save(self) {
-        let Some(data_dir) = rlbuddy_data_dir() else {
-            return;
-        };
-
-        let _ = fs::create_dir_all(&data_dir);
-
-        save_service_data("app_settings", self.app_settings);
-        save_service_data("saved_window_dimensions", self.saved_window_dimensions);
+        save_service_data("global_data", self);
     }
 }

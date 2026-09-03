@@ -43,7 +43,11 @@ where
         return;
     };
 
-    if let Err(error) = fs::write(path, string) {
-        eprintln!("Failed to write settings for {name}: {error:?}");
+    if let Some(parent) = path.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+
+    if let Err(error) = fs::write(&path, string) {
+        eprintln!("Failed to write settings for {name}: {error:?} ({path:?})");
     }
 }

@@ -16,8 +16,9 @@ use crate::{
     toast_alert::{MatchNotificatorService, ToastAlertService},
 };
 use discord::DiscordService;
-use eframe::egui::{self, Ui, ViewportCommand};
+use eframe::egui::{self, Response, Ui, ViewportCommand};
 use serde::{Deserialize, Serialize};
+use std::hash::{DefaultHasher, Hasher};
 use std::thread;
 use std::{sync::mpsc, time::Duration};
 
@@ -49,9 +50,20 @@ fn visuals_with_transparency(visuals: &mut egui::Visuals, transparency: u8) {
     );
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PanelId(u64);
+
+impl PanelId {
+    fn from_name(name: &str) -> PanelId {
+        let mut hasher = DefaultHasher::new();
+        hasher.write(name.as_bytes());
+        PanelId(hasher.finish())
+    }
+}
+
 struct AppPanel {
     name: &'static str,
-    open: bool,
+    id: PanelId,
     panel: Box<dyn Panel>,
 }
 
@@ -62,7 +74,7 @@ impl AppPanel {
     {
         Self {
             name: feature.name(),
-            open: false,
+            id: PanelId::from_name(feature.name()),
             panel: Box::new(feature),
         }
     }
@@ -81,6 +93,7 @@ pub struct AppSettings {
 
 pub struct RlBuddyApp {
     app_settings: ReadWriteStateHandle<AppSettings>,
+    open_panels: Vec<PanelId>,
 
     overlay_tx: mpsc::Sender<bool>,
     overlay_rx: mpsc::Receiver<bool>,
@@ -123,6 +136,7 @@ impl RlBuddyApp {
             overlay_tx,
             overlay_rx,
             prev_hide_pos: None,
+            open_panels: app_data.open_panels,
 
             stats_api_events: stats_api_service.subscribe(),
             panels: vec![
@@ -219,6 +233,7 @@ impl RlBuddyApp {
                         .map(|inner| (outer.left_top(), inner.size()))
                 })
             }),
+            open_panels: self.open_panels.clone(),
         }
         .save();
     }
@@ -269,9 +284,14 @@ impl eframe::App for RlBuddyApp {
             egui::ComboBox::from_label("")
                 .selected_text("Widgets")
                 .show_ui(ui, |ui| {
-                    for feature in &mut self.panels {
-                        if ui.selectable_label(feature.open, feature.name).clicked() {
-                            feature.open = !feature.open;
+                    for panel in &mut self.panels {
+                        let is_open = self.open_panels.contains(&panel.id);
+                        if ui.selectable_label(is_open, panel.name).clicked() {
+                            if is_open {
+                                self.open_panels.retain(|p| *p != panel.id);
+                            } else {
+                                self.open_panels.push(panel.id);
+                            }
                         }
                     }
                 });
@@ -279,31 +299,10 @@ impl eframe::App for RlBuddyApp {
 
         egui::CentralPanel::default().show_inside(ui, |ui| {
             egui::ScrollArea::vertical().show(ui, |ui| {
-                ui.vertical_centered_justified(|ui| {
-                    for panel in self.panels.iter_mut().filter(|f| f.open) {
-                        let frame =
-                            egui::Frame::group(ui.style()).fill(ui.style().visuals.faint_bg_color);
-
-                        frame.show(ui, |ui| {
-                            ui.columns_const(|[c1, c2]| {
-                                c1.label(egui::RichText::new(panel.name).strong());
-                                c2.with_layout(
-                                    egui::Layout::right_to_left(egui::Align::Min),
-                                    |c2| {
-                                        if c2.small_button("X").clicked() {
-                                            panel.open = false;
-                                        }
-                                    },
-                                );
-                            });
-
-                            ui.separator();
-                            ui.add(panel);
-                        });
-
-                        ui.add_space(4.0);
-                    }
-                })
+                ui.add(PanelsWidget {
+                    open_panels: &mut self.open_panels,
+                    panels: &mut self.panels,
+                });
             });
         });
 
@@ -339,6 +338,65 @@ impl Panel for AppSettingsWidget {
                 egui::Slider::new(&mut settings.transparency, u8::MIN..=u8::MAX)
                     .text("App transparency"),
             );
+        })
+        .response
+    }
+}
+
+pub struct PanelsWidget<'a> {
+    open_panels: &'a mut Vec<PanelId>,
+    panels: &'a mut Vec<AppPanel>,
+}
+
+impl<'a> egui::Widget for PanelsWidget<'a> {
+    fn ui(self, ui: &mut Ui) -> Response {
+        ui.vertical_centered_justified(|ui| {
+            let mut to_close: Option<usize> = None;
+            let mut to_swap: Option<(usize, usize)> = None;
+
+            for (index, panel_id) in self.open_panels.iter().enumerate() {
+                let Some(panel) = self.panels.iter_mut().find(|p| p.id == *panel_id) else {
+                    eprintln!("could not find panel with id '{panel_id:?}'");
+                    continue;
+                };
+
+                let frame = egui::Frame::group(ui.style()).fill(ui.style().visuals.faint_bg_color);
+
+                frame.show(ui, |ui| {
+                    ui.columns_const(|[c1, c2]| {
+                        c1.label(egui::RichText::new(panel.name).strong());
+                        c2.with_layout(egui::Layout::right_to_left(egui::Align::Min), |c2| {
+                            if c2.small_button("X").clicked() {
+                                to_close = Some(index);
+                            }
+
+                            c2.add_enabled_ui(index != self.open_panels.len() - 1, |c2| {
+                                if c2.small_button("\\/").clicked() {
+                                    to_swap = Some((index, index + 1));
+                                }
+                            });
+
+                            c2.add_enabled_ui(index != 0, |c2| {
+                                if c2.small_button("/\\").clicked() {
+                                    to_swap = Some((index, index - 1));
+                                }
+                            });
+                        });
+                    });
+
+                    ui.separator();
+                    ui.add(panel);
+                });
+
+                ui.add_space(4.0);
+            }
+
+            if let Some(to_close) = to_close {
+                self.open_panels.remove(to_close);
+            }
+            if let Some(to_swap) = to_swap {
+                self.open_panels.swap(to_swap.0, to_swap.1);
+            }
         })
         .response
     }
