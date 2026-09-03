@@ -1,4 +1,9 @@
 use super::rpc::{PresenceData, RichPresenceController};
+use crate::common::savedata::{load_service_data, save_service_data};
+use crate::core::app::{Panel, Service, ServiceWithUi};
+use crate::discord::widget::DiscordWidget;
+use crate::matches::MatchesService;
+use crate::stats_api::StatsApi;
 use crate::{
     common::{ReadWriteStateHandle, ReadonlyStateHandle, eventsource::EventReceiver},
     matches::MatchesServiceState,
@@ -60,6 +65,8 @@ pub struct DiscordServiceState {
     pub busy: bool,
 }
 
+const DATA_ID: &str = "drpc_settings";
+
 pub struct DiscordService {
     state: ReadWriteStateHandle<DiscordServiceState>,
     settings: ReadWriteStateHandle<DiscordSettings>,
@@ -71,18 +78,14 @@ pub struct DiscordService {
 }
 
 impl DiscordService {
-    pub fn new(
-        settings: DiscordSettings,
-        matches_handle: ReadonlyStateHandle<MatchesServiceState>,
-        stats_api: EventReceiver<RLEvent>,
-    ) -> Self {
+    pub fn new(matches: &MatchesService, stats_api: &mut StatsApi) -> Self {
         DiscordService {
             state: ReadWriteStateHandle::new(DiscordServiceState::default()),
-            settings: ReadWriteStateHandle::new(settings),
+            settings: ReadWriteStateHandle::new(load_service_data(DATA_ID)),
             controller: RichPresenceController::new(),
             current: GameState::Lobby,
-            matches_handle,
-            stats_api,
+            matches_handle: matches.state_handle(),
+            stats_api: stats_api.subscribe(),
             is_rl_open: false,
         }
     }
@@ -142,5 +145,21 @@ impl DiscordService {
 
     pub fn settings_handle(&self) -> ReadWriteStateHandle<DiscordSettings> {
         ReadWriteStateHandle::clone(&self.settings)
+    }
+}
+
+impl Service for DiscordService {
+    fn update(&mut self) {
+        self.update()
+    }
+
+    fn save(&self) {
+        save_service_data(DATA_ID, self.settings.read().clone())
+    }
+}
+
+impl ServiceWithUi for DiscordService {
+    fn panel(&self) -> impl Panel + 'static {
+        DiscordWidget::new(self.settings_handle(), self.state_handle())
     }
 }

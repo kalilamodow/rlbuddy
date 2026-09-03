@@ -1,6 +1,5 @@
 use crate::common::savedata::rlbuddy_data_dir;
 use crate::core::app::OpenLegacyPanelList;
-use crate::discord;
 use crate::gamepad::overlay::service::GamepadOverlayServiceSettings;
 use crate::map_loader::MapLoaderServiceSavedata;
 use crate::my_stats::MyStatsWidgetSettings;
@@ -11,7 +10,6 @@ use std::path::Path;
 #[derive(Debug, Default)]
 pub struct AppData {
     pub app_settings: crate::core::app::AppSettings,
-    pub rich_presence_settings: discord::DiscordSettings,
     pub open_panels: OpenLegacyPanelList,
     pub my_stats_settings: MyStatsWidgetSettings,
     pub saved_window_dimensions: Option<(egui::Pos2, egui::Vec2)>, // outer pos, inner size
@@ -27,7 +25,6 @@ impl AppData {
 
         Self {
             app_settings: Self::load_setting(&data_dir, "app_settings"),
-            rich_presence_settings: Self::load_setting(&data_dir, "drpc_settings"),
             open_panels: Self::load_setting(&data_dir, "open_panel_list"),
             my_stats_settings: Self::load_setting(&data_dir, "my_stats_settings"),
             saved_window_dimensions: Self::load_setting(&data_dir, "saved_window_dimensions"),
@@ -55,7 +52,6 @@ impl AppData {
         let _ = fs::create_dir_all(&data_dir);
 
         Self::write_setting(&data_dir, "app_settings", self.app_settings);
-        Self::write_setting(&data_dir, "drpc_settings", self.rich_presence_settings);
         Self::write_setting(&data_dir, "open_panel_list", self.open_panels);
         Self::write_setting(&data_dir, "my_stats_settings", self.my_stats_settings);
         Self::write_setting(

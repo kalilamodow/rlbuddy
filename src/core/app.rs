@@ -16,6 +16,7 @@ use crate::{
     stats_api::{RLEvent, StatsApi},
     toast_alert::{MatchNotificatorService, ToastAlertService},
 };
+use discord::DiscordService;
 use eframe::egui::{self, Ui, ViewportCommand};
 use serde::{Deserialize, Serialize};
 use std::{cell::RefCell, rc::Rc, thread};
@@ -45,7 +46,6 @@ pub enum LegacyPanel {
     CurrentMatch,
     PastMatches,
     MyStats,
-    Discord,
     MapLoader,
     GamepadOverlay,
     Settings,
@@ -60,7 +60,6 @@ impl std::fmt::Display for LegacyPanel {
                 LegacyPanel::CurrentMatch => "Lobby",
                 LegacyPanel::PastMatches => "History",
                 LegacyPanel::MyStats => "Session",
-                LegacyPanel::Discord => "Discord",
                 LegacyPanel::MapLoader => "Custom Maps",
                 LegacyPanel::GamepadOverlay => "Gamepad Overlay",
                 LegacyPanel::Settings => "Settings",
@@ -69,9 +68,8 @@ impl std::fmt::Display for LegacyPanel {
     }
 }
 
-const OPENABLE_LEGAGY_PANELS: [LegacyPanel; 7] = [
+const OPENABLE_LEGAGY_PANELS: [LegacyPanel; 6] = [
     LegacyPanel::CurrentMatch,
-    LegacyPanel::Discord,
     LegacyPanel::MyStats,
     LegacyPanel::PastMatches,
     LegacyPanel::MapLoader,
@@ -148,11 +146,7 @@ pub struct RlBuddyApp {
     overlay_rx: mpsc::Receiver<bool>,
     prev_hide_pos: Option<egui::Pos2>,
     open_panels: OpenLegacyPanelList,
-
     stats_api_events: EventReceiver<RLEvent>,
-
-    discord_service: discord::DiscordService,
-    discord_widget: discord::DiscordWidget,
 
     current_match: CurrentMatchWidget,
     past_matches: PastMatchesWidget,
@@ -190,11 +184,7 @@ impl RlBuddyApp {
         let match_notificator_service =
             MatchNotificatorService::new(&matches_service, &mut stats_api_service, &toast_service);
 
-        let discord_service = discord::DiscordService::new(
-            app_data.rich_presence_settings,
-            matches_service.state_handle(),
-            stats_api_service.subscribe(),
-        );
+        let discord_service = DiscordService::new(&matches_service, &mut stats_api_service);
         let mut gamepad_service = GamepadService::new();
         let gamepad_overlay_service = GamepadOverlayService::new(
             app_data.gamepad_overlay_savedata,
@@ -215,12 +205,6 @@ impl RlBuddyApp {
             overlay_rx,
             current_transparency,
             prev_hide_pos: None,
-
-            discord_widget: discord::DiscordWidget::new(
-                discord_service.settings_handle(),
-                discord_service.state_handle(),
-            ),
-            discord_service,
 
             my_stats_widget: MyStatsWidget::new(
                 matches_service.state_handle(),
@@ -252,6 +236,7 @@ impl RlBuddyApp {
                 AppPanel::new(player_info_service.panel()),
                 AppPanel::new(AutoSetupWidget::new()),
                 AppPanel::new(match_notificator_service.panel()),
+                AppPanel::new(discord_service.panel()),
             ],
             services: vec![
                 Box::new(hotkey_service),
@@ -261,6 +246,7 @@ impl RlBuddyApp {
                 Box::new(matches_service),
                 Box::new(toast_service),
                 Box::new(match_notificator_service),
+                Box::new(discord_service),
             ],
         };
 
@@ -316,7 +302,6 @@ impl RlBuddyApp {
             app_settings: AppSettings {
                 transparency: *self.current_transparency.borrow(),
             },
-            rich_presence_settings: self.discord_service.settings_handle().read().clone(),
             open_panels: self.open_panels.clone(),
             my_stats_settings: self.my_stats_widget.clone_settings(),
             saved_window_dimensions: ctx.input(|i| {
@@ -346,7 +331,6 @@ impl RlBuddyApp {
 impl eframe::App for RlBuddyApp {
     fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.gamepad_service.update();
-        self.discord_service.update();
         self.map_loader_service.update();
         self.gamepad_overlay_service.update();
 
@@ -450,7 +434,6 @@ impl eframe::App for RlBuddyApp {
 
                             match panel {
                                 LegacyPanel::CurrentMatch => ui.add(&mut self.current_match),
-                                LegacyPanel::Discord => ui.add(&mut self.discord_widget),
                                 LegacyPanel::MyStats => ui.add(&mut self.my_stats_widget),
                                 LegacyPanel::PastMatches => ui.add(&mut self.past_matches),
                                 LegacyPanel::MapLoader => ui.add(&mut self.map_loader_widget),

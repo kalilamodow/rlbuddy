@@ -1,8 +1,7 @@
-use eframe::egui;
-
-use crate::common::{ReadWriteStateHandle, ReadonlyStateHandle};
-
 use super::service::{DiscordServiceState, DiscordSettings};
+use crate::common::{ReadWriteStateHandle, ReadonlyStateHandle};
+use crate::core::app::Panel;
+use eframe::egui;
 
 pub struct DiscordWidget {
     settings: ReadWriteStateHandle<DiscordSettings>,
@@ -18,8 +17,12 @@ impl DiscordWidget {
     }
 }
 
-impl egui::Widget for &mut DiscordWidget {
-    fn ui(self, ui: &mut egui::Ui) -> egui::Response {
+impl Panel for DiscordWidget {
+    fn name(&self) -> &'static str {
+        "Discord Presence"
+    }
+
+    fn ui(&mut self, ui: &mut egui::Ui) -> egui::Response {
         ui.horizontal(|ui| {
             let state = self.state.read();
 
