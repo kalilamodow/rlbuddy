@@ -49,13 +49,6 @@ impl MatchType<'_> {
         }
     }
 
-    pub fn is_over(&self) -> bool {
-        match self {
-            Self::Old(_) => true,
-            Self::Session(s) => s.finish.is_some(),
-        }
-    }
-
     pub fn player_qty(&self) -> usize {
         match self {
             Self::Old(o) => o.players.len(),

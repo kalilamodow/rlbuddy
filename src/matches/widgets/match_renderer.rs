@@ -280,14 +280,10 @@ impl<'a> MatchRenderer<'a> {
                 ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
             }
 
-            if name_label.clicked() {
-                self.player_info_sender.send(PlayerInfoServiceCommand::Open(
-                    player.platform,
-                    match player.platform {
-                        Platform::Steam => player.player_id.split('|').nth(1).unwrap().to_string(),
-                        _ => player.name.clone(),
-                    },
-                ));
+            if name_label.clicked()
+                && let Some(cmd) = player.open_player_info_command()
+            {
+                self.player_info_sender.send(cmd);
             }
         }
 

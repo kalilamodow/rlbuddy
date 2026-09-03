@@ -43,10 +43,6 @@ impl MyStatsWidget {
         }
     }
 
-    pub fn clone_settings(&self) -> MyStatsWidgetSettings {
-        self.settings.clone()
-    }
-
     fn render_streak_header(&self, ui: &mut egui::Ui) {
         let state = self.matches_state.read();
         let get_session_matches = || session_matches(&state);

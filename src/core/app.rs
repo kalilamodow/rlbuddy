@@ -38,7 +38,7 @@ pub trait ServiceWithUi: Service {
 
 pub trait Panel {
     fn name(&self) -> &'static str;
-    fn ui(&mut self, ui: &mut Ui) -> egui::Response;
+    fn ui(&mut self, ui: &mut Ui) -> Response;
 }
 
 fn visuals_with_transparency(visuals: &mut egui::Visuals, transparency: u8) {
@@ -81,7 +81,7 @@ impl AppPanel {
 }
 
 impl egui::Widget for &mut AppPanel {
-    fn ui(self, ui: &mut Ui) -> egui::Response {
+    fn ui(self, ui: &mut Ui) -> Response {
         self.panel.ui(ui)
     }
 }
@@ -331,7 +331,7 @@ impl Panel for AppSettingsWidget {
         "Settings"
     }
 
-    fn ui(&mut self, ui: &mut Ui) -> egui::Response {
+    fn ui(&mut self, ui: &mut Ui) -> Response {
         ui.vertical_centered_justified(|ui| {
             let mut settings = self.handle.write();
             ui.add(
