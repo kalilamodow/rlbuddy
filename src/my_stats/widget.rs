@@ -1,4 +1,3 @@
-use crate::common::savedata::load_service_data;
 use crate::core::app::Panel;
 use crate::matches::{MatchInfo, MatchesService};
 use crate::{
@@ -8,7 +7,6 @@ use crate::{
 };
 use eframe::egui;
 use egui_plot::{Line, Plot, PlotPoint, PlotPoints};
-use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::{
     collections::HashSet,
@@ -23,23 +21,16 @@ pub struct PlayerLongtimeStats {
     shots: u64,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct MyStatsWidgetSettings {
-    pub selected_playlist: Option<Playlist>,
-}
-
 pub struct MyStatsWidget {
     matches_state: ReadonlyStateHandle<MatchesServiceState>,
-    settings: MyStatsWidgetSettings,
+    selected_graph_playlist: Option<Playlist>,
 }
-
-const DATA_ID: &str = "my_stats_settings";
 
 impl MyStatsWidget {
     pub fn new(matches_service: &MatchesService) -> Self {
         Self {
             matches_state: matches_service.state_handle(),
-            settings: load_service_data(DATA_ID),
+            selected_graph_playlist: None,
         }
     }
 
@@ -86,14 +77,13 @@ impl MyStatsWidget {
         ui.horizontal(|ui| {
             egui::ComboBox::from_label("Choose playlist")
                 .selected_text(
-                    self.settings
-                        .selected_playlist
+                    self.selected_graph_playlist
                         .map_or("None", Playlist::as_str),
                 )
                 .show_ui(ui, |ui| {
                     for playlist in choosable_playlists {
                         ui.selectable_value(
-                            &mut self.settings.selected_playlist,
+                            &mut self.selected_graph_playlist,
                             Some(playlist),
                             playlist.as_str(),
                         );
@@ -109,7 +99,7 @@ impl MyStatsWidget {
             return;
         }
 
-        let Some(selected_playlist) = self.settings.selected_playlist else {
+        let Some(selected_playlist) = self.selected_graph_playlist else {
             ui.label("Select a playlist");
             return;
         };
