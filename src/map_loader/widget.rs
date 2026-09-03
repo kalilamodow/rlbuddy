@@ -1,3 +1,4 @@
+use crate::core::app::Panel;
 use crate::{
     common::{ThreadedReadonlyStateHandle, savedata::rlbuddy_data_dir},
     map_loader::{
@@ -160,8 +161,12 @@ impl MapLoaderWidget {
     }
 }
 
-impl egui::Widget for &mut MapLoaderWidget {
-    fn ui(self, ui: &mut egui::Ui) -> egui::Response {
+impl Panel for MapLoaderWidget {
+    fn name(&self) -> &'static str {
+        "Custom Maps"
+    }
+
+    fn ui(&mut self, ui: &mut egui::Ui) -> egui::Response {
         ui.vertical(|ui| {
             {
                 let set_up = self.state.read().underpass_path.is_some();

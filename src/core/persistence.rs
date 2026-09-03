@@ -1,6 +1,5 @@
 use crate::common::savedata::rlbuddy_data_dir;
 use crate::core::app::OpenLegacyPanelList;
-use crate::map_loader::MapLoaderServiceSavedata;
 use crate::my_stats::MyStatsWidgetSettings;
 use eframe::egui;
 use std::fs;
@@ -12,7 +11,6 @@ pub struct AppData {
     pub open_panels: OpenLegacyPanelList,
     pub my_stats_settings: MyStatsWidgetSettings,
     pub saved_window_dimensions: Option<(egui::Pos2, egui::Vec2)>, // outer pos, inner size
-    pub map_loader_savedata: MapLoaderServiceSavedata,
 }
 
 impl AppData {
@@ -26,7 +24,6 @@ impl AppData {
             open_panels: Self::load_setting(&data_dir, "open_panel_list"),
             my_stats_settings: Self::load_setting(&data_dir, "my_stats_settings"),
             saved_window_dimensions: Self::load_setting(&data_dir, "saved_window_dimensions"),
-            map_loader_savedata: Self::load_setting(&data_dir, "map_loader_savedata"),
         }
     }
 
@@ -56,7 +53,6 @@ impl AppData {
             "saved_window_dimensions",
             self.saved_window_dimensions,
         );
-        Self::write_setting(&data_dir, "map_loader_savedata", self.map_loader_savedata);
     }
 
     fn write_setting<T>(data_dir: &Path, name: &str, new: T)

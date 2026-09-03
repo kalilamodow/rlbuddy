@@ -1,3 +1,6 @@
+use crate::common::savedata::{load_service_data, save_service_data};
+use crate::core::app::{Panel, Service, ServiceWithUi};
+use crate::map_loader::widget::MapLoaderWidget;
 use crate::{
     common::{
         ThreadedReadWriteStateHandle, ThreadedReadonlyStateHandle, savedata::rlbuddy_data_dir,
@@ -86,8 +89,11 @@ pub struct MapLoaderService {
     command_sender: mpsc::Sender<MapLoaderCommand>,
 }
 
+const DATA_ID: &str = "map_loader_savedata";
+
 impl MapLoaderService {
-    pub fn new(savedata: MapLoaderServiceSavedata) -> Self {
+    pub fn new() -> Self {
+        let savedata: MapLoaderServiceSavedata = load_service_data(DATA_ID);
         let underpass_path = {
             savedata
                 .underpass_path
@@ -130,7 +136,7 @@ impl MapLoaderService {
         }
     }
 
-    pub fn update(&self) {
+    pub fn update(&mut self) {
         for command in self.command_receiver.try_iter() {
             self.handle_command(command);
         }
@@ -238,6 +244,22 @@ impl MapLoaderService {
         state.maps.retain(|map| map.id.as_str() != id.as_str());
 
         Ok(())
+    }
+}
+
+impl Service for MapLoaderService {
+    fn update(&mut self) {
+        self.update();
+    }
+
+    fn save(&self) {
+        save_service_data(DATA_ID, self.save())
+    }
+}
+
+impl ServiceWithUi for MapLoaderService {
+    fn panel(&self) -> impl Panel + 'static {
+        MapLoaderWidget::new(self)
     }
 }
 
