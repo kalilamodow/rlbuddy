@@ -47,7 +47,6 @@ pub enum LegacyPanel {
     MyStats,
     Discord,
     MapLoader,
-    AutoSetup,
     GamepadOverlay,
     Settings,
 }
@@ -63,7 +62,6 @@ impl std::fmt::Display for LegacyPanel {
                 LegacyPanel::MyStats => "Session",
                 LegacyPanel::Discord => "Discord",
                 LegacyPanel::MapLoader => "Custom Maps",
-                LegacyPanel::AutoSetup => "Stats API Setup",
                 LegacyPanel::GamepadOverlay => "Gamepad Overlay",
                 LegacyPanel::Settings => "Settings",
             }
@@ -71,13 +69,12 @@ impl std::fmt::Display for LegacyPanel {
     }
 }
 
-const OPENABLE_LEGAGY_PANELS: [LegacyPanel; 8] = [
+const OPENABLE_LEGAGY_PANELS: [LegacyPanel; 7] = [
     LegacyPanel::CurrentMatch,
     LegacyPanel::Discord,
     LegacyPanel::MyStats,
     LegacyPanel::PastMatches,
     LegacyPanel::MapLoader,
-    LegacyPanel::AutoSetup,
     LegacyPanel::GamepadOverlay,
     LegacyPanel::Settings,
 ];
@@ -87,7 +84,7 @@ pub struct OpenLegacyPanelList(Vec<LegacyPanel>);
 
 impl Default for OpenLegacyPanelList {
     fn default() -> Self {
-        Self(vec![LegacyPanel::CurrentMatch, LegacyPanel::AutoSetup])
+        Self(vec![LegacyPanel::CurrentMatch])
     }
 }
 
@@ -172,7 +169,6 @@ pub struct RlBuddyApp {
     gamepad_overlay_widget: GamepadOverlayWidget,
 
     gamepad_service: GamepadService,
-    auto_setup_widget: AutoSetupWidget,
     settings_widget: SettingsWidget,
 
     services: Vec<Box<dyn Service>>,
@@ -264,13 +260,13 @@ impl RlBuddyApp {
             gamepad_service,
 
             toast_service,
-            auto_setup_widget: AutoSetupWidget::new(),
             open_panels: app_data.open_panels,
 
             panels: vec![
                 AppPanel::new(music_service.panel()),
                 AppPanel::new(hotkey_service.panel()),
                 AppPanel::new(player_info_service.panel()),
+                AppPanel::new(AutoSetupWidget::new()),
             ],
             services: vec![
                 Box::new(hotkey_service),
@@ -479,7 +475,6 @@ impl eframe::App for RlBuddyApp {
                                 LegacyPanel::MyStats => ui.add(&mut self.my_stats_widget),
                                 LegacyPanel::PastMatches => ui.add(&mut self.past_matches),
                                 LegacyPanel::MapLoader => ui.add(&mut self.map_loader_widget),
-                                LegacyPanel::AutoSetup => ui.add(&mut self.auto_setup_widget),
                                 LegacyPanel::GamepadOverlay => {
                                     ui.add(&mut self.gamepad_overlay_widget)
                                 }

@@ -1,3 +1,4 @@
+use crate::core::app::Panel;
 use eframe::egui;
 use rfd::FileDialog;
 use std::{fs, io, path::PathBuf};
@@ -62,8 +63,12 @@ impl AutoSetupWidget {
     }
 }
 
-impl egui::Widget for &mut AutoSetupWidget {
-    fn ui(self, ui: &mut egui::Ui) -> egui::Response {
+impl Panel for AutoSetupWidget {
+    fn name(&self) -> &'static str {
+        "Stats API Setup"
+    }
+
+    fn ui(&mut self, ui: &mut egui::Ui) -> egui::Response {
         ui.vertical(|ui| {
             if let Some(result) = &self.success {
                 match result {
