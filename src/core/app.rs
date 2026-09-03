@@ -3,13 +3,13 @@ use crate::gamepad::GamepadService;
 use crate::gamepad::overlay::GamepadOverlayService;
 use crate::hotkey::HotkeyService;
 use crate::music_control::MusicControlService;
+use crate::my_stats::MyStatsWidget;
 use crate::{
     auto_setup::AutoSetupWidget,
     common::eventsource::EventReceiver,
     discord,
     map_loader::MapLoaderService,
     matches::{CurrentMatchWidget, MatchesService, PastMatchesWidget},
-    my_stats::MyStatsWidget,
     player_info::PlayerInfoService,
     settings::SettingsWidget,
     stats_api::{RLEvent, StatsApi},
@@ -42,7 +42,6 @@ pub trait Panel {
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub enum LegacyPanel {
-    MyStats,
     Settings,
 }
 
@@ -52,14 +51,13 @@ impl std::fmt::Display for LegacyPanel {
             f,
             "{}",
             match self {
-                LegacyPanel::MyStats => "Session",
                 LegacyPanel::Settings => "Settings",
             }
         )
     }
 }
 
-const OPENABLE_LEGAGY_PANELS: [LegacyPanel; 2] = [LegacyPanel::MyStats, LegacyPanel::Settings];
+const OPENABLE_LEGAGY_PANELS: [LegacyPanel; 1] = [LegacyPanel::Settings];
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct OpenLegacyPanelList(Vec<LegacyPanel>);
@@ -126,8 +124,6 @@ pub struct RlBuddyApp {
     open_panels: OpenLegacyPanelList,
     stats_api_events: EventReceiver<RLEvent>,
 
-    my_stats_widget: MyStatsWidget,
-
     settings_widget: SettingsWidget,
 
     services: Vec<Box<dyn Service>>,
@@ -171,11 +167,6 @@ impl RlBuddyApp {
             current_transparency,
             prev_hide_pos: None,
 
-            my_stats_widget: MyStatsWidget::new(
-                matches_service.state_handle(),
-                app_data.my_stats_settings,
-            ),
-
             stats_api_events: stats_api_service.subscribe(),
             open_panels: app_data.open_panels,
 
@@ -190,6 +181,7 @@ impl RlBuddyApp {
                 )),
                 AppPanel::new(music_service.panel()),
                 AppPanel::new(hotkey_service.panel()),
+                AppPanel::new(MyStatsWidget::new(&matches_service)),
                 AppPanel::new(player_info_service.panel()),
                 AppPanel::new(AutoSetupWidget::new()),
                 AppPanel::new(match_notificator_service.panel()),
@@ -265,7 +257,6 @@ impl RlBuddyApp {
                 transparency: *self.current_transparency.borrow(),
             },
             open_panels: self.open_panels.clone(),
-            my_stats_settings: self.my_stats_widget.clone_settings(),
             saved_window_dimensions: ctx.input(|i| {
                 i.viewport().outer_rect.and_then(|outer| {
                     i.viewport()
@@ -385,7 +376,6 @@ impl eframe::App for RlBuddyApp {
                             ui.separator();
 
                             match panel {
-                                LegacyPanel::MyStats => ui.add(&mut self.my_stats_widget),
                                 LegacyPanel::Settings => ui.add(&mut self.settings_widget),
                             };
                         });

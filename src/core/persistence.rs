@@ -1,6 +1,5 @@
 use crate::common::savedata::rlbuddy_data_dir;
 use crate::core::app::OpenLegacyPanelList;
-use crate::my_stats::MyStatsWidgetSettings;
 use eframe::egui;
 use std::fs;
 use std::path::Path;
@@ -9,7 +8,6 @@ use std::path::Path;
 pub struct AppData {
     pub app_settings: crate::core::app::AppSettings,
     pub open_panels: OpenLegacyPanelList,
-    pub my_stats_settings: MyStatsWidgetSettings,
     pub saved_window_dimensions: Option<(egui::Pos2, egui::Vec2)>, // outer pos, inner size
 }
 
@@ -22,7 +20,6 @@ impl AppData {
         Self {
             app_settings: Self::load_setting(&data_dir, "app_settings"),
             open_panels: Self::load_setting(&data_dir, "open_panel_list"),
-            my_stats_settings: Self::load_setting(&data_dir, "my_stats_settings"),
             saved_window_dimensions: Self::load_setting(&data_dir, "saved_window_dimensions"),
         }
     }
@@ -47,7 +44,6 @@ impl AppData {
 
         Self::write_setting(&data_dir, "app_settings", self.app_settings);
         Self::write_setting(&data_dir, "open_panel_list", self.open_panels);
-        Self::write_setting(&data_dir, "my_stats_settings", self.my_stats_settings);
         Self::write_setting(
             &data_dir,
             "saved_window_dimensions",

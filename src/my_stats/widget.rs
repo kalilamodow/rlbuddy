@@ -1,4 +1,6 @@
-use crate::matches::MatchInfo;
+use crate::common::savedata::load_service_data;
+use crate::core::app::Panel;
+use crate::matches::{MatchInfo, MatchesService};
 use crate::{
     common::{ReadonlyStateHandle, timefmt::format_seconds},
     matches::{MatchType, MatchesServiceState},
@@ -31,14 +33,13 @@ pub struct MyStatsWidget {
     settings: MyStatsWidgetSettings,
 }
 
+const DATA_ID: &str = "my_stats_settings";
+
 impl MyStatsWidget {
-    pub fn new(
-        matches_state: ReadonlyStateHandle<MatchesServiceState>,
-        settings: MyStatsWidgetSettings,
-    ) -> Self {
+    pub fn new(matches_service: &MatchesService) -> Self {
         Self {
-            matches_state,
-            settings,
+            matches_state: matches_service.state_handle(),
+            settings: load_service_data(DATA_ID),
         }
     }
 
@@ -234,8 +235,12 @@ impl MyStatsWidget {
     }
 }
 
-impl egui::Widget for &mut MyStatsWidget {
-    fn ui(self, ui: &mut egui::Ui) -> egui::Response {
+impl Panel for MyStatsWidget {
+    fn name(&self) -> &'static str {
+        "Session Stats"
+    }
+
+    fn ui(&mut self, ui: &mut egui::Ui) -> egui::Response {
         ui.vertical(|ui| {
             self.render_streak_header(ui);
             ui.horizontal(|ui| {
