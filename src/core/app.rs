@@ -42,8 +42,6 @@ pub trait Panel {
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub enum LegacyPanel {
-    CurrentMatch,
-    PastMatches,
     MyStats,
     Settings,
 }
@@ -54,8 +52,6 @@ impl std::fmt::Display for LegacyPanel {
             f,
             "{}",
             match self {
-                LegacyPanel::CurrentMatch => "Lobby",
-                LegacyPanel::PastMatches => "History",
                 LegacyPanel::MyStats => "Session",
                 LegacyPanel::Settings => "Settings",
             }
@@ -63,21 +59,10 @@ impl std::fmt::Display for LegacyPanel {
     }
 }
 
-const OPENABLE_LEGAGY_PANELS: [LegacyPanel; 4] = [
-    LegacyPanel::CurrentMatch,
-    LegacyPanel::MyStats,
-    LegacyPanel::PastMatches,
-    LegacyPanel::Settings,
-];
+const OPENABLE_LEGAGY_PANELS: [LegacyPanel; 2] = [LegacyPanel::MyStats, LegacyPanel::Settings];
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct OpenLegacyPanelList(Vec<LegacyPanel>);
-
-impl Default for OpenLegacyPanelList {
-    fn default() -> Self {
-        Self(vec![LegacyPanel::CurrentMatch])
-    }
-}
 
 impl std::ops::Deref for OpenLegacyPanelList {
     type Target = Vec<LegacyPanel>;
@@ -141,8 +126,6 @@ pub struct RlBuddyApp {
     open_panels: OpenLegacyPanelList,
     stats_api_events: EventReceiver<RLEvent>,
 
-    current_match: CurrentMatchWidget,
-    past_matches: PastMatchesWidget,
     my_stats_widget: MyStatsWidget,
 
     settings_widget: SettingsWidget,
@@ -192,19 +175,19 @@ impl RlBuddyApp {
                 matches_service.state_handle(),
                 app_data.my_stats_settings,
             ),
-            current_match: CurrentMatchWidget::new(
-                matches_service.state_handle(),
-                player_info_service.sender(),
-            ),
-            past_matches: PastMatchesWidget::new(
-                matches_service.state_handle(),
-                player_info_service.sender(),
-            ),
 
             stats_api_events: stats_api_service.subscribe(),
             open_panels: app_data.open_panels,
 
             panels: vec![
+                AppPanel::new(CurrentMatchWidget::new(
+                    &matches_service,
+                    &player_info_service,
+                )),
+                AppPanel::new(PastMatchesWidget::new(
+                    &matches_service,
+                    &player_info_service,
+                )),
                 AppPanel::new(music_service.panel()),
                 AppPanel::new(hotkey_service.panel()),
                 AppPanel::new(player_info_service.panel()),
@@ -402,9 +385,7 @@ impl eframe::App for RlBuddyApp {
                             ui.separator();
 
                             match panel {
-                                LegacyPanel::CurrentMatch => ui.add(&mut self.current_match),
                                 LegacyPanel::MyStats => ui.add(&mut self.my_stats_widget),
-                                LegacyPanel::PastMatches => ui.add(&mut self.past_matches),
                                 LegacyPanel::Settings => ui.add(&mut self.settings_widget),
                             };
                         });

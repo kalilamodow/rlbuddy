@@ -1,4 +1,7 @@
 use super::{super::service::MatchesServiceState, match_renderer::MatchRenderer};
+use crate::core::app::Panel;
+use crate::matches::MatchesService;
+use crate::player_info::PlayerInfoService;
 use crate::{
     common::{ReadonlyStateHandle, channel::Sender},
     matches::widgets::match_renderer::BuddyStatsOption,
@@ -15,21 +18,22 @@ pub struct PastMatchesWidget {
 }
 
 impl PastMatchesWidget {
-    pub fn new(
-        state: ReadonlyStateHandle<MatchesServiceState>,
-        player_info_sender: Sender<PlayerInfoServiceCommand>,
-    ) -> Self {
+    pub fn new(matches_service: &MatchesService, player_info_service: &PlayerInfoService) -> Self {
         PastMatchesWidget {
-            state,
+            state: matches_service.state_handle(),
             open: HashMap::new(),
-            player_info_sender,
+            player_info_sender: player_info_service.sender(),
             opened_stats: HashMap::new(),
         }
     }
 }
 
-impl egui::Widget for &mut PastMatchesWidget {
-    fn ui(self, ui: &mut egui::Ui) -> egui::Response {
+impl Panel for PastMatchesWidget {
+    fn name(&self) -> &'static str {
+        "History"
+    }
+
+    fn ui(&mut self, ui: &mut egui::Ui) -> egui::Response {
         ui.vertical(|ui| {
             ui.vertical(|ui| {
                 for prev_match in self.state.read().prev_matches.iter().rev() {
