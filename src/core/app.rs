@@ -40,34 +40,6 @@ pub trait Panel {
     fn ui(&mut self, ui: &mut Ui) -> egui::Response;
 }
 
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, Serialize, Deserialize)]
-pub enum LegacyPanel {}
-
-impl std::fmt::Display for LegacyPanel {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "")
-    }
-}
-
-const OPENABLE_LEGAGY_PANELS: [LegacyPanel; 0] = [];
-
-#[derive(Debug, Default, Clone, Serialize, Deserialize)]
-pub struct OpenLegacyPanelList(Vec<LegacyPanel>);
-
-impl std::ops::Deref for OpenLegacyPanelList {
-    type Target = Vec<LegacyPanel>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl std::ops::DerefMut for OpenLegacyPanelList {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
 fn visuals_with_transparency(visuals: &mut egui::Visuals, transparency: u8) {
     visuals.panel_fill = egui::Color32::from_rgba_unmultiplied(
         visuals.panel_fill.r(),
@@ -113,7 +85,6 @@ pub struct RlBuddyApp {
     overlay_tx: mpsc::Sender<bool>,
     overlay_rx: mpsc::Receiver<bool>,
     prev_hide_pos: Option<egui::Pos2>,
-    open_panels: OpenLegacyPanelList,
     stats_api_events: EventReceiver<RLEvent>,
 
     services: Vec<Box<dyn Service>>,
@@ -154,8 +125,6 @@ impl RlBuddyApp {
             prev_hide_pos: None,
 
             stats_api_events: stats_api_service.subscribe(),
-            open_panels: app_data.open_panels,
-
             panels: vec![
                 AppPanel::new(CurrentMatchWidget::new(
                     &matches_service,
@@ -165,15 +134,15 @@ impl RlBuddyApp {
                     &matches_service,
                     &player_info_service,
                 )),
-                AppPanel::new(music_service.panel()),
-                AppPanel::new(hotkey_service.panel()),
                 AppPanel::new(MyStatsWidget::new(&matches_service)),
+                AppPanel::new(music_service.panel()),
                 AppPanel::new(player_info_service.panel()),
                 AppPanel::new(AutoSetupWidget::new()),
-                AppPanel::new(match_notificator_service.panel()),
-                AppPanel::new(discord_service.panel()),
-                AppPanel::new(gamepad_overlay_service.panel()),
                 AppPanel::new(map_loader_service.panel()),
+                AppPanel::new(gamepad_overlay_service.panel()),
+                AppPanel::new(match_notificator_service.panel()),
+                AppPanel::new(hotkey_service.panel()),
+                AppPanel::new(discord_service.panel()),
                 AppPanel::new(AppSettingsWidget::new(app_settings.clone())),
             ],
             services: vec![
@@ -243,7 +212,6 @@ impl RlBuddyApp {
 
         AppData {
             app_settings: self.app_settings.read().clone(),
-            open_panels: self.open_panels.clone(),
             saved_window_dimensions: ctx.input(|i| {
                 i.viewport().outer_rect.and_then(|outer| {
                     i.viewport()
@@ -301,18 +269,6 @@ impl eframe::App for RlBuddyApp {
             egui::ComboBox::from_label("")
                 .selected_text("Widgets")
                 .show_ui(ui, |ui| {
-                    for panel in OPENABLE_LEGAGY_PANELS {
-                        let open = self.open_panels.contains(&panel);
-
-                        if ui.selectable_label(open, panel.to_string()).clicked() {
-                            if open {
-                                self.open_panels.retain(|p| p != &panel);
-                            } else {
-                                self.open_panels.push(panel);
-                            }
-                        }
-                    }
-
                     for feature in &mut self.panels {
                         if ui.selectable_label(feature.open, feature.name).clicked() {
                             feature.open = !feature.open;
@@ -324,48 +280,6 @@ impl eframe::App for RlBuddyApp {
         egui::CentralPanel::default().show_inside(ui, |ui| {
             egui::ScrollArea::vertical().show(ui, |ui| {
                 ui.vertical_centered_justified(|ui| {
-                    let mut to_swap: Option<(usize, usize)> = None; // index, move to
-                    let mut to_close: Option<LegacyPanel> = None;
-
-                    for (index, panel) in self.open_panels.iter().enumerate() {
-                        let frame =
-                            egui::Frame::group(ui.style()).fill(ui.style().visuals.faint_bg_color);
-
-                        frame.show(ui, |ui| {
-                            ui.columns_const(|[c1, c2]| {
-                                c1.label(egui::RichText::new(panel.to_string()).strong());
-
-                                c2.with_layout(
-                                    egui::Layout::right_to_left(egui::Align::Min),
-                                    |c2| {
-                                        if c2.small_button("X").clicked() {
-                                            to_close = Some(*panel);
-                                        }
-
-                                        c2.add_enabled_ui(
-                                            index != self.open_panels.len() - 1,
-                                            |c2| {
-                                                if c2.small_button("\\/").clicked() {
-                                                    to_swap = Some((index, index + 1));
-                                                }
-                                            },
-                                        );
-
-                                        c2.add_enabled_ui(index != 0, |c2| {
-                                            if c2.small_button("/\\").clicked() {
-                                                to_swap = Some((index, index - 1));
-                                            }
-                                        });
-                                    },
-                                );
-                            });
-
-                            ui.separator();
-                        });
-
-                        ui.add_space(4.0);
-                    }
-
                     for panel in self.panels.iter_mut().filter(|f| f.open) {
                         let frame =
                             egui::Frame::group(ui.style()).fill(ui.style().visuals.faint_bg_color);
@@ -388,13 +302,6 @@ impl eframe::App for RlBuddyApp {
                         });
 
                         ui.add_space(4.0);
-                    }
-
-                    if let Some(to_close) = to_close {
-                        self.open_panels.retain(|p| p != &to_close);
-                    }
-                    if let Some(to_shift) = to_swap {
-                        self.open_panels.swap(to_shift.0, to_shift.1);
                     }
                 })
             });
