@@ -1,13 +1,15 @@
 use super::apis::{NameAPI, RankAPI};
 use super::{MatchInfo, MatchOverInfo};
 use crate::common::eventsource::EventReceiver;
+use crate::common::savedata::{load_service_data, save_service_data};
 use crate::common::{ReadWriteStateHandle, ReadonlyStateHandle};
+use crate::core::app::Service;
 use crate::matches::StrippedMatchInfo;
 use crate::matches::apis::{
     AvatarAPI, EpicIdAPI, new_avatar_api, new_epic_id_api, new_name_api, new_rank_api,
 };
 use crate::rocket_league::{Playlist, Team};
-use crate::stats_api::{RLEvent, TeamScores};
+use crate::stats_api::{RLEvent, StatsApi, TeamScores};
 use eframe::egui;
 use std::borrow::Cow;
 use std::time::SystemTime;
@@ -68,6 +70,8 @@ pub struct MatchesServiceState {
     pub prev_matches: Vec<MatchType<'static>>,
 }
 
+const DATA_ID: &str = "matches";
+
 pub struct MatchesService {
     state: ReadWriteStateHandle<MatchesServiceState>,
     stats_api: EventReceiver<RLEvent>,
@@ -80,20 +84,16 @@ pub struct MatchesService {
 }
 
 impl MatchesService {
-    pub fn new(
-        ctx: &egui::Context,
-        stats_api: EventReceiver<RLEvent>,
-        prev_matches: Vec<StrippedMatchInfo>,
-    ) -> Self {
+    pub fn new(ctx: &egui::Context, stats_api: &mut StatsApi) -> Self {
         MatchesService {
             state: ReadWriteStateHandle::new(MatchesServiceState {
                 current_match: None,
-                prev_matches: prev_matches
+                prev_matches: load_service_data::<Vec<StrippedMatchInfo>>(DATA_ID)
                     .into_iter()
                     .map(|m| MatchType::Old(Cow::Owned(m)))
                     .collect(),
             }),
-            stats_api,
+            stats_api: stats_api.subscribe(),
             ctx: ctx.clone(),
             local_player_id: None,
             rank_api: new_rank_api(ctx.clone()),
@@ -186,5 +186,15 @@ impl MatchesService {
                 MatchType::Old(old) => old.clone().into_owned(),
             })
             .collect()
+    }
+}
+
+impl Service for MatchesService {
+    fn update(&mut self) {
+        self.update();
+    }
+
+    fn save(&self) {
+        save_service_data(DATA_ID, self.stripped_history())
     }
 }

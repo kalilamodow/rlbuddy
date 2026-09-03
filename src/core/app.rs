@@ -154,7 +154,6 @@ pub struct RlBuddyApp {
     discord_service: discord::DiscordService,
     discord_widget: discord::DiscordWidget,
 
-    matches_service: MatchesService,
     current_match: CurrentMatchWidget,
     past_matches: PastMatchesWidget,
     my_stats_widget: MyStatsWidget,
@@ -190,8 +189,7 @@ impl RlBuddyApp {
         let (overlay_tx, overlay_rx) = mpsc::channel();
         let mut stats_api_service = StatsApi::new();
         let toast_service = ToastAlertService::new(ctx.clone());
-        let matches_service =
-            MatchesService::new(&ctx, stats_api_service.subscribe(), app_data.matches);
+        let matches_service = MatchesService::new(&ctx, &mut stats_api_service);
         let match_notificator_service = MatchNotificatorService::new(
             app_data.match_notification_settings,
             matches_service.state_handle(),
@@ -209,9 +207,9 @@ impl RlBuddyApp {
             ctx.clone(),
             &gamepad_service,
         );
-        let player_info_service = PlayerInfoService::new(ctx.clone());
         let map_loader_service = MapLoaderService::new(app_data.map_loader_savedata);
 
+        let player_info_service = PlayerInfoService::new(ctx.clone());
         let hotkey_service = HotkeyService::new(&mut gamepad_service, &overlay_tx);
         let music_service = MusicControlService::new(&mut stats_api_service);
 
@@ -247,7 +245,6 @@ impl RlBuddyApp {
                 player_info_service.sender(),
             ),
             match_notificator_service,
-            matches_service,
 
             stats_api_events: stats_api_service.subscribe(),
 
@@ -273,6 +270,7 @@ impl RlBuddyApp {
                 Box::new(music_service),
                 Box::new(stats_api_service),
                 Box::new(player_info_service),
+                Box::new(matches_service),
             ],
         };
 
@@ -330,7 +328,6 @@ impl RlBuddyApp {
             },
             rich_presence_settings: self.discord_service.settings_handle().read().clone(),
             open_panels: self.open_panels.clone(),
-            matches: self.matches_service.stripped_history(),
             my_stats_settings: self.my_stats_widget.clone_settings(),
             match_notification_settings: self
                 .match_notificator_service
@@ -364,7 +361,6 @@ impl RlBuddyApp {
 impl eframe::App for RlBuddyApp {
     fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.gamepad_service.update();
-        self.matches_service.update();
         self.discord_service.update();
         self.match_notificator_service.update();
         self.toast_service.update();
