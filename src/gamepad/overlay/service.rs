@@ -1,5 +1,8 @@
 use crate::common::ReadWriteStateHandle;
+use crate::common::savedata::{load_service_data, save_service_data};
+use crate::core::app::{Panel, Service, ServiceWithUi};
 use crate::gamepad::GamepadService;
+use crate::gamepad::overlay::widget::GamepadOverlayWidget;
 use crate::gamepad::service::GamepadStateHandle;
 use eframe::egui;
 use eframe::egui::{Color32, CornerRadius, Frame, Stroke, ViewportBuilder, ViewportId};
@@ -19,14 +22,12 @@ pub struct GamepadOverlayService {
     ctx: egui::Context,
 }
 
+const DATA_ID: &str = "gamepad_overlay_savedata";
+
 impl GamepadOverlayService {
-    pub fn new(
-        savedata: GamepadOverlayServiceSettings,
-        ctx: egui::Context,
-        gamepad_service: &GamepadService,
-    ) -> Self {
+    pub fn new(ctx: egui::Context, gamepad_service: &GamepadService) -> Self {
         Self {
-            settings: ReadWriteStateHandle::new(savedata),
+            settings: ReadWriteStateHandle::new(load_service_data(DATA_ID)),
             gamepad: gamepad_service.gamepad_state_handle(),
             ctx,
         }
@@ -40,10 +41,10 @@ impl GamepadOverlayService {
             }
         }
 
-        self.render();
+        self.render_viewport();
     }
 
-    fn render(&self) {
+    fn render_viewport(&self) {
         let gamepad_state = self.gamepad.read();
         let mut settings = self.settings.write();
 
@@ -146,5 +147,21 @@ impl GamepadOverlayService {
 
     pub fn settings_handle(&self) -> ReadWriteStateHandle<GamepadOverlayServiceSettings> {
         self.settings.clone()
+    }
+}
+
+impl Service for GamepadOverlayService {
+    fn update(&mut self) {
+        self.update();
+    }
+
+    fn save(&self) {
+        save_service_data(DATA_ID, self.settings.read().clone());
+    }
+}
+
+impl ServiceWithUi for GamepadOverlayService {
+    fn panel(&self) -> impl Panel + 'static {
+        GamepadOverlayWidget::new(self)
     }
 }

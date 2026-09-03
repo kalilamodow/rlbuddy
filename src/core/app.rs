@@ -1,7 +1,6 @@
 use crate::core::persistence::AppData;
 use crate::gamepad::GamepadService;
-use crate::gamepad::overlay::service::GamepadOverlayService;
-use crate::gamepad::overlay::widget::GamepadOverlayWidget;
+use crate::gamepad::overlay::GamepadOverlayService;
 use crate::hotkey::HotkeyService;
 use crate::music_control::MusicControlService;
 use crate::{
@@ -47,7 +46,6 @@ pub enum LegacyPanel {
     PastMatches,
     MyStats,
     MapLoader,
-    GamepadOverlay,
     Settings,
 }
 
@@ -61,19 +59,17 @@ impl std::fmt::Display for LegacyPanel {
                 LegacyPanel::PastMatches => "History",
                 LegacyPanel::MyStats => "Session",
                 LegacyPanel::MapLoader => "Custom Maps",
-                LegacyPanel::GamepadOverlay => "Gamepad Overlay",
                 LegacyPanel::Settings => "Settings",
             }
         )
     }
 }
 
-const OPENABLE_LEGAGY_PANELS: [LegacyPanel; 6] = [
+const OPENABLE_LEGAGY_PANELS: [LegacyPanel; 5] = [
     LegacyPanel::CurrentMatch,
     LegacyPanel::MyStats,
     LegacyPanel::PastMatches,
     LegacyPanel::MapLoader,
-    LegacyPanel::GamepadOverlay,
     LegacyPanel::Settings,
 ];
 
@@ -154,11 +150,6 @@ pub struct RlBuddyApp {
 
     map_loader_widget: MapLoaderWidget,
     map_loader_service: MapLoaderService,
-
-    gamepad_overlay_service: GamepadOverlayService,
-    gamepad_overlay_widget: GamepadOverlayWidget,
-
-    gamepad_service: GamepadService,
     settings_widget: SettingsWidget,
 
     services: Vec<Box<dyn Service>>,
@@ -186,11 +177,7 @@ impl RlBuddyApp {
 
         let discord_service = DiscordService::new(&matches_service, &mut stats_api_service);
         let mut gamepad_service = GamepadService::new();
-        let gamepad_overlay_service = GamepadOverlayService::new(
-            app_data.gamepad_overlay_savedata,
-            ctx.clone(),
-            &gamepad_service,
-        );
+        let gamepad_overlay_service = GamepadOverlayService::new(ctx.clone(), &gamepad_service);
         let map_loader_service = MapLoaderService::new(app_data.map_loader_savedata);
 
         let player_info_service = PlayerInfoService::new(ctx.clone());
@@ -224,10 +211,6 @@ impl RlBuddyApp {
             map_loader_widget: MapLoaderWidget::new(&map_loader_service),
             map_loader_service,
 
-            gamepad_overlay_widget: GamepadOverlayWidget::new(&gamepad_overlay_service),
-            gamepad_overlay_service,
-
-            gamepad_service,
             open_panels: app_data.open_panels,
 
             panels: vec![
@@ -237,6 +220,7 @@ impl RlBuddyApp {
                 AppPanel::new(AutoSetupWidget::new()),
                 AppPanel::new(match_notificator_service.panel()),
                 AppPanel::new(discord_service.panel()),
+                AppPanel::new(gamepad_overlay_service.panel()),
             ],
             services: vec![
                 Box::new(hotkey_service),
@@ -247,6 +231,8 @@ impl RlBuddyApp {
                 Box::new(toast_service),
                 Box::new(match_notificator_service),
                 Box::new(discord_service),
+                Box::new(gamepad_service),
+                Box::new(gamepad_overlay_service),
             ],
         };
 
@@ -311,11 +297,6 @@ impl RlBuddyApp {
                         .map(|inner| (outer.left_top(), inner.size()))
                 })
             }),
-            gamepad_overlay_savedata: self
-                .gamepad_overlay_service
-                .settings_handle()
-                .read()
-                .clone(),
             map_loader_savedata: self.map_loader_service.save(),
         }
         .save();
@@ -330,9 +311,7 @@ impl RlBuddyApp {
 
 impl eframe::App for RlBuddyApp {
     fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        self.gamepad_service.update();
         self.map_loader_service.update();
-        self.gamepad_overlay_service.update();
 
         self.update_services();
 
@@ -437,9 +416,6 @@ impl eframe::App for RlBuddyApp {
                                 LegacyPanel::MyStats => ui.add(&mut self.my_stats_widget),
                                 LegacyPanel::PastMatches => ui.add(&mut self.past_matches),
                                 LegacyPanel::MapLoader => ui.add(&mut self.map_loader_widget),
-                                LegacyPanel::GamepadOverlay => {
-                                    ui.add(&mut self.gamepad_overlay_widget)
-                                }
                                 LegacyPanel::Settings => ui.add(&mut self.settings_widget),
                             };
                         });

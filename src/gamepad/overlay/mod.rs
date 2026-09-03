@@ -1,3 +1,3 @@
-pub mod service;
-
-pub mod widget;
+mod service;
+mod widget;
+pub use service::GamepadOverlayService;

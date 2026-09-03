@@ -1,6 +1,5 @@
 use crate::common::savedata::rlbuddy_data_dir;
 use crate::core::app::OpenLegacyPanelList;
-use crate::gamepad::overlay::service::GamepadOverlayServiceSettings;
 use crate::map_loader::MapLoaderServiceSavedata;
 use crate::my_stats::MyStatsWidgetSettings;
 use eframe::egui;
@@ -13,7 +12,6 @@ pub struct AppData {
     pub open_panels: OpenLegacyPanelList,
     pub my_stats_settings: MyStatsWidgetSettings,
     pub saved_window_dimensions: Option<(egui::Pos2, egui::Vec2)>, // outer pos, inner size
-    pub gamepad_overlay_savedata: GamepadOverlayServiceSettings,
     pub map_loader_savedata: MapLoaderServiceSavedata,
 }
 
@@ -28,7 +26,6 @@ impl AppData {
             open_panels: Self::load_setting(&data_dir, "open_panel_list"),
             my_stats_settings: Self::load_setting(&data_dir, "my_stats_settings"),
             saved_window_dimensions: Self::load_setting(&data_dir, "saved_window_dimensions"),
-            gamepad_overlay_savedata: Self::load_setting(&data_dir, "gamepad_overlay_savedata"),
             map_loader_savedata: Self::load_setting(&data_dir, "map_loader_savedata"),
         }
     }
@@ -58,11 +55,6 @@ impl AppData {
             &data_dir,
             "saved_window_dimensions",
             self.saved_window_dimensions,
-        );
-        Self::write_setting(
-            &data_dir,
-            "gamepad_overlay_savedata",
-            self.gamepad_overlay_savedata,
         );
         Self::write_setting(&data_dir, "map_loader_savedata", self.map_loader_savedata);
     }

@@ -1,5 +1,6 @@
 use crate::common::eventsource::{EventReceiver, EventSource};
 use crate::common::{ReadWriteStateHandle, ReadonlyStateHandle};
+use crate::core::app::Service;
 use gilrs::ev::state::ButtonData;
 use gilrs::{Axis, Button, EventType, Gamepad, Gilrs};
 
@@ -119,5 +120,11 @@ impl GamepadService {
 
     pub(crate) fn gamepad_state_handle(&self) -> GamepadStateHandle {
         ReadonlyStateHandle::over(&self.gamepad_state)
+    }
+}
+
+impl Service for GamepadService {
+    fn update(&mut self) {
+        self.update();
     }
 }
