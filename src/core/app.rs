@@ -1,3 +1,4 @@
+use crate::common::ReadWriteStateHandle;
 use crate::core::persistence::AppData;
 use crate::gamepad::GamepadService;
 use crate::gamepad::overlay::GamepadOverlayService;
@@ -11,14 +12,13 @@ use crate::{
     map_loader::MapLoaderService,
     matches::{CurrentMatchWidget, MatchesService, PastMatchesWidget},
     player_info::PlayerInfoService,
-    settings::SettingsWidget,
     stats_api::{RLEvent, StatsApi},
     toast_alert::{MatchNotificatorService, ToastAlertService},
 };
 use discord::DiscordService;
 use eframe::egui::{self, Ui, ViewportCommand};
 use serde::{Deserialize, Serialize};
-use std::{cell::RefCell, rc::Rc, thread};
+use std::thread;
 use std::{sync::mpsc, time::Duration};
 
 pub trait Service {
@@ -41,23 +41,15 @@ pub trait Panel {
 }
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, Serialize, Deserialize)]
-pub enum LegacyPanel {
-    Settings,
-}
+pub enum LegacyPanel {}
 
 impl std::fmt::Display for LegacyPanel {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                LegacyPanel::Settings => "Settings",
-            }
-        )
+        write!(f, "")
     }
 }
 
-const OPENABLE_LEGAGY_PANELS: [LegacyPanel; 1] = [LegacyPanel::Settings];
+const OPENABLE_LEGAGY_PANELS: [LegacyPanel; 0] = [];
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct OpenLegacyPanelList(Vec<LegacyPanel>);
@@ -110,21 +102,19 @@ impl egui::Widget for &mut AppPanel {
     }
 }
 
-#[derive(Debug, Default, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct AppSettings {
     pub transparency: u8,
 }
 
 pub struct RlBuddyApp {
-    current_transparency: Rc<RefCell<u8>>,
+    app_settings: ReadWriteStateHandle<AppSettings>,
 
     overlay_tx: mpsc::Sender<bool>,
     overlay_rx: mpsc::Receiver<bool>,
     prev_hide_pos: Option<egui::Pos2>,
     open_panels: OpenLegacyPanelList,
     stats_api_events: EventReceiver<RLEvent>,
-
-    settings_widget: SettingsWidget,
 
     services: Vec<Box<dyn Service>>,
     panels: Vec<AppPanel>,
@@ -142,29 +132,25 @@ impl RlBuddyApp {
             ctx.send_viewport_cmd(ViewportCommand::InnerSize(remembered_dimensions.1));
         }
 
+        let app_settings = ReadWriteStateHandle::new(app_data.app_settings);
         let (overlay_tx, overlay_rx) = mpsc::channel();
+
         let mut stats_api_service = StatsApi::new();
         let toast_service = ToastAlertService::new(ctx.clone());
         let matches_service = MatchesService::new(&ctx, &mut stats_api_service);
         let match_notificator_service =
             MatchNotificatorService::new(&matches_service, &mut stats_api_service, &toast_service);
-
         let discord_service = DiscordService::new(&matches_service, &mut stats_api_service);
         let mut gamepad_service = GamepadService::new();
         let gamepad_overlay_service = GamepadOverlayService::new(ctx.clone(), &gamepad_service);
         let map_loader_service = MapLoaderService::new();
-
         let player_info_service = PlayerInfoService::new(ctx.clone());
         let hotkey_service = HotkeyService::new(&mut gamepad_service, &overlay_tx);
         let music_service = MusicControlService::new(&mut stats_api_service);
 
-        let current_transparency = Rc::new(RefCell::new(app_data.app_settings.transparency));
         let app = RlBuddyApp {
-            settings_widget: SettingsWidget::new(Rc::clone(&current_transparency)),
-
             overlay_tx,
             overlay_rx,
-            current_transparency,
             prev_hide_pos: None,
 
             stats_api_events: stats_api_service.subscribe(),
@@ -188,6 +174,7 @@ impl RlBuddyApp {
                 AppPanel::new(discord_service.panel()),
                 AppPanel::new(gamepad_overlay_service.panel()),
                 AppPanel::new(map_loader_service.panel()),
+                AppPanel::new(AppSettingsWidget::new(app_settings.clone())),
             ],
             services: vec![
                 Box::new(hotkey_service),
@@ -202,6 +189,8 @@ impl RlBuddyApp {
                 Box::new(gamepad_overlay_service),
                 Box::new(map_loader_service),
             ],
+
+            app_settings,
         };
 
         app
@@ -253,9 +242,7 @@ impl RlBuddyApp {
         }
 
         AppData {
-            app_settings: AppSettings {
-                transparency: *self.current_transparency.borrow(),
-            },
+            app_settings: self.app_settings.read().clone(),
             open_panels: self.open_panels.clone(),
             saved_window_dimensions: ctx.input(|i| {
                 i.viewport().outer_rect.and_then(|outer| {
@@ -308,7 +295,7 @@ impl eframe::App for RlBuddyApp {
     }
 
     fn ui(&mut self, ui: &mut Ui, _frame: &mut eframe::Frame) {
-        visuals_with_transparency(ui.visuals_mut(), *self.current_transparency.borrow());
+        visuals_with_transparency(ui.visuals_mut(), self.app_settings.read().transparency);
 
         egui::Panel::bottom("bottom_panel").show_inside(ui, |ui| {
             egui::ComboBox::from_label("")
@@ -374,10 +361,6 @@ impl eframe::App for RlBuddyApp {
                             });
 
                             ui.separator();
-
-                            match panel {
-                                LegacyPanel::Settings => ui.add(&mut self.settings_widget),
-                            };
                         });
 
                         ui.add_space(4.0);
@@ -424,5 +407,32 @@ impl eframe::App for RlBuddyApp {
 
     fn clear_color(&self, _visuals: &egui::Visuals) -> [f32; 4] {
         egui::Rgba::TRANSPARENT.to_array()
+    }
+}
+
+pub struct AppSettingsWidget {
+    handle: ReadWriteStateHandle<AppSettings>,
+}
+
+impl AppSettingsWidget {
+    pub fn new(handle: ReadWriteStateHandle<AppSettings>) -> Self {
+        AppSettingsWidget { handle }
+    }
+}
+
+impl Panel for AppSettingsWidget {
+    fn name(&self) -> &'static str {
+        "Settings"
+    }
+
+    fn ui(&mut self, ui: &mut Ui) -> egui::Response {
+        ui.vertical_centered_justified(|ui| {
+            let mut settings = self.handle.write();
+            ui.add(
+                egui::Slider::new(&mut settings.transparency, u8::MIN..=u8::MAX)
+                    .text("App transparency"),
+            );
+        })
+        .response
     }
 }
