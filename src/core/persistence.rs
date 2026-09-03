@@ -4,7 +4,6 @@ use crate::discord;
 use crate::gamepad::overlay::service::GamepadOverlayServiceSettings;
 use crate::map_loader::MapLoaderServiceSavedata;
 use crate::my_stats::MyStatsWidgetSettings;
-use crate::toast_alert::MatchNotificatorSettings;
 use eframe::egui;
 use std::fs;
 use std::path::Path;
@@ -15,7 +14,6 @@ pub struct AppData {
     pub rich_presence_settings: discord::DiscordSettings,
     pub open_panels: OpenLegacyPanelList,
     pub my_stats_settings: MyStatsWidgetSettings,
-    pub match_notification_settings: MatchNotificatorSettings,
     pub saved_window_dimensions: Option<(egui::Pos2, egui::Vec2)>, // outer pos, inner size
     pub gamepad_overlay_savedata: GamepadOverlayServiceSettings,
     pub map_loader_savedata: MapLoaderServiceSavedata,
@@ -32,10 +30,6 @@ impl AppData {
             rich_presence_settings: Self::load_setting(&data_dir, "drpc_settings"),
             open_panels: Self::load_setting(&data_dir, "open_panel_list"),
             my_stats_settings: Self::load_setting(&data_dir, "my_stats_settings"),
-            match_notification_settings: Self::load_setting(
-                &data_dir,
-                "match_notifications_settings",
-            ),
             saved_window_dimensions: Self::load_setting(&data_dir, "saved_window_dimensions"),
             gamepad_overlay_savedata: Self::load_setting(&data_dir, "gamepad_overlay_savedata"),
             map_loader_savedata: Self::load_setting(&data_dir, "map_loader_savedata"),
@@ -64,11 +58,6 @@ impl AppData {
         Self::write_setting(&data_dir, "drpc_settings", self.rich_presence_settings);
         Self::write_setting(&data_dir, "open_panel_list", self.open_panels);
         Self::write_setting(&data_dir, "my_stats_settings", self.my_stats_settings);
-        Self::write_setting(
-            &data_dir,
-            "match_notifications_settings",
-            self.match_notification_settings,
-        );
         Self::write_setting(
             &data_dir,
             "saved_window_dimensions",

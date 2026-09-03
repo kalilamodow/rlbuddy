@@ -1,4 +1,5 @@
 use crate::common::channel::{Receiver, Sender};
+use crate::core::app::Service;
 use eframe::egui;
 use std::time::{Duration, Instant};
 
@@ -116,5 +117,11 @@ impl ToastAlertService {
                 toast.closed_at = Some(Instant::now());
             }
         }
+    }
+}
+
+impl Service for ToastAlertService {
+    fn update(&mut self) {
+        self.update();
     }
 }

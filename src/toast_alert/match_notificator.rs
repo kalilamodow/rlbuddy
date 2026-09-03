@@ -1,3 +1,8 @@
+use crate::common::savedata::{load_service_data, save_service_data};
+use crate::core::app::{Panel, Service, ServiceWithUi};
+use crate::matches::MatchesService;
+use crate::stats_api::StatsApi;
+use crate::toast_alert::ToastAlertService;
 use crate::{
     common::{
         ReadWriteStateHandle, ReadonlyStateHandle, channel::Sender, eventsource::EventReceiver,
@@ -25,18 +30,19 @@ pub struct MatchNotificatorService {
     toasts: Sender<Toast>,
 }
 
+const DATA_ID: &str = "match_notifications_settings";
+
 impl MatchNotificatorService {
     pub fn new(
-        settings: MatchNotificatorSettings,
-        matches_handle: ReadonlyStateHandle<MatchesServiceState>,
-        stats_api: EventReceiver<RLEvent>,
-        toasts: Sender<Toast>,
+        matches: &MatchesService,
+        stats_api: &mut StatsApi,
+        toasts: &ToastAlertService,
     ) -> Self {
         Self {
-            settings_handle: ReadWriteStateHandle::new(settings),
-            matches_handle,
-            stats_api,
-            toasts,
+            settings_handle: ReadWriteStateHandle::new(load_service_data(DATA_ID)),
+            matches_handle: matches.state_handle(),
+            stats_api: stats_api.subscribe(),
+            toasts: toasts.sender(),
         }
     }
 
@@ -44,7 +50,7 @@ impl MatchNotificatorService {
         self.settings_handle.clone()
     }
 
-    pub fn update(&self) {
+    pub fn update(&mut self) {
         let matches_state = self.matches_handle.read();
 
         if self.settings_handle.read().training_only
@@ -78,6 +84,22 @@ impl MatchNotificatorService {
     }
 }
 
+impl Service for MatchNotificatorService {
+    fn update(&mut self) {
+        self.update();
+    }
+
+    fn save(&self) {
+        save_service_data(DATA_ID, self.settings_handle.read().clone())
+    }
+}
+
+impl ServiceWithUi for MatchNotificatorService {
+    fn panel(&self) -> impl Panel + 'static {
+        MatchNotificatorSettingsWidget::new(self, self.toasts.clone())
+    }
+}
+
 pub struct MatchNotificatorSettingsWidget {
     settings_handle: ReadWriteStateHandle<MatchNotificatorSettings>,
     toasts: Sender<Toast>,
@@ -94,8 +116,12 @@ impl MatchNotificatorSettingsWidget {
     }
 }
 
-impl egui::Widget for &mut MatchNotificatorSettingsWidget {
-    fn ui(self, ui: &mut egui::Ui) -> egui::Response {
+impl Panel for MatchNotificatorSettingsWidget {
+    fn name(&self) -> &'static str {
+        "Toast Settings"
+    }
+
+    fn ui(&mut self, ui: &mut egui::Ui) -> egui::Response {
         ui.vertical(|ui| {
             let mut settings = self.settings_handle.write();
             ui.columns_const(|[c1, c2]| {

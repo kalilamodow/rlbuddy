@@ -161,9 +161,6 @@ pub struct RlBuddyApp {
     map_loader_widget: MapLoaderWidget,
     map_loader_service: MapLoaderService,
 
-    match_notificator_service: MatchNotificatorService,
-    toast_service: ToastAlertService,
-
     gamepad_overlay_service: GamepadOverlayService,
     gamepad_overlay_widget: GamepadOverlayWidget,
 
@@ -190,12 +187,9 @@ impl RlBuddyApp {
         let mut stats_api_service = StatsApi::new();
         let toast_service = ToastAlertService::new(ctx.clone());
         let matches_service = MatchesService::new(&ctx, &mut stats_api_service);
-        let match_notificator_service = MatchNotificatorService::new(
-            app_data.match_notification_settings,
-            matches_service.state_handle(),
-            stats_api_service.subscribe(),
-            toast_service.sender(),
-        );
+        let match_notificator_service =
+            MatchNotificatorService::new(&matches_service, &mut stats_api_service, &toast_service);
+
         let discord_service = discord::DiscordService::new(
             app_data.rich_presence_settings,
             matches_service.state_handle(),
@@ -215,11 +209,7 @@ impl RlBuddyApp {
 
         let current_transparency = Rc::new(RefCell::new(app_data.app_settings.transparency));
         let app = RlBuddyApp {
-            settings_widget: SettingsWidget::new(
-                &match_notificator_service,
-                &toast_service,
-                Rc::clone(&current_transparency),
-            ),
+            settings_widget: SettingsWidget::new(Rc::clone(&current_transparency)),
 
             overlay_tx,
             overlay_rx,
@@ -244,7 +234,6 @@ impl RlBuddyApp {
                 matches_service.state_handle(),
                 player_info_service.sender(),
             ),
-            match_notificator_service,
 
             stats_api_events: stats_api_service.subscribe(),
 
@@ -255,8 +244,6 @@ impl RlBuddyApp {
             gamepad_overlay_service,
 
             gamepad_service,
-
-            toast_service,
             open_panels: app_data.open_panels,
 
             panels: vec![
@@ -264,6 +251,7 @@ impl RlBuddyApp {
                 AppPanel::new(hotkey_service.panel()),
                 AppPanel::new(player_info_service.panel()),
                 AppPanel::new(AutoSetupWidget::new()),
+                AppPanel::new(match_notificator_service.panel()),
             ],
             services: vec![
                 Box::new(hotkey_service),
@@ -271,6 +259,8 @@ impl RlBuddyApp {
                 Box::new(stats_api_service),
                 Box::new(player_info_service),
                 Box::new(matches_service),
+                Box::new(toast_service),
+                Box::new(match_notificator_service),
             ],
         };
 
@@ -329,11 +319,6 @@ impl RlBuddyApp {
             rich_presence_settings: self.discord_service.settings_handle().read().clone(),
             open_panels: self.open_panels.clone(),
             my_stats_settings: self.my_stats_widget.clone_settings(),
-            match_notification_settings: self
-                .match_notificator_service
-                .settings_handle()
-                .read()
-                .clone(),
             saved_window_dimensions: ctx.input(|i| {
                 i.viewport().outer_rect.and_then(|outer| {
                     i.viewport()
@@ -362,8 +347,6 @@ impl eframe::App for RlBuddyApp {
     fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.gamepad_service.update();
         self.discord_service.update();
-        self.match_notificator_service.update();
-        self.toast_service.update();
         self.map_loader_service.update();
         self.gamepad_overlay_service.update();
 

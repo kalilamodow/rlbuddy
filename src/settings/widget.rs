@@ -1,14 +1,10 @@
-use crate::{
-    settings::app_settings::AppSettingsWidget,
-    toast_alert::{MatchNotificatorService, MatchNotificatorSettingsWidget, ToastAlertService},
-};
+use crate::settings::app_settings::AppSettingsWidget;
 use eframe::egui;
 use std::{cell::RefCell, rc::Rc};
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 enum Panel {
     AppSettings,
-    MatchNotificator,
 }
 
 impl std::fmt::Display for Panel {
@@ -18,31 +14,21 @@ impl std::fmt::Display for Panel {
             "{}",
             match self {
                 Panel::AppSettings => "App",
-                Panel::MatchNotificator => "Toast",
             }
         )
     }
 }
 
-const ALL_PANELS: [Panel; 2] = [Panel::AppSettings, Panel::MatchNotificator];
+const ALL_PANELS: [Panel; 1] = [Panel::AppSettings];
 
 pub struct SettingsWidget {
     app: AppSettingsWidget,
-    notificator: MatchNotificatorSettingsWidget,
 }
 
 impl SettingsWidget {
-    pub fn new(
-        match_notificator_service: &MatchNotificatorService,
-        toast_service: &ToastAlertService,
-        transparency: Rc<RefCell<u8>>,
-    ) -> Self {
+    pub fn new(transparency: Rc<RefCell<u8>>) -> Self {
         Self {
             app: AppSettingsWidget::new(transparency),
-            notificator: MatchNotificatorSettingsWidget::new(
-                match_notificator_service,
-                toast_service.sender(),
-            ),
         }
     }
 }
@@ -58,7 +44,6 @@ impl egui::Widget for &mut SettingsWidget {
 
                     match panel {
                         Panel::AppSettings => ui.add(&self.app),
-                        Panel::MatchNotificator => ui.add(&mut self.notificator),
                     };
                 });
             }
