@@ -112,7 +112,7 @@ impl Service for MusicControlService {
 }
 
 impl ServiceWithUi for MusicControlService {
-    fn settings_panel(&self) -> impl Panel + 'static {
+    fn panel(&self) -> impl Panel + 'static {
         MusicControlWidget::new(self)
     }
 }

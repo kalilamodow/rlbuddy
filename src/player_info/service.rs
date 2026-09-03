@@ -1,4 +1,6 @@
 use super::trn::{PlayerKey, TrackerAPI, new_tracker_api};
+use crate::core::app::{Panel, Service, ServiceWithUi};
+use crate::player_info::PlayerSearchWidget;
 use crate::{
     common::channel::{Receiver, Sender},
     player_info::{trn::TRNError, trn_widget::TrackerWidget},
@@ -56,8 +58,12 @@ impl PlayerInfoService {
     }
 }
 
-impl egui::Widget for &mut PlayerInfoService {
-    fn ui(self, ui: &mut egui::Ui) -> egui::Response {
+impl Service for PlayerInfoService {
+    fn update(&mut self) {
+        self.update();
+    }
+
+    fn render(&mut self, ui: &mut egui::Ui) {
         for player in &mut self.open_players {
             let OpenedPlayer { open, data } = player;
             let profile = self.trn.get(data);
@@ -100,6 +106,11 @@ impl egui::Widget for &mut PlayerInfoService {
         }
 
         self.open_players.retain(|w| w.open);
-        ui.allocate_response(egui::Vec2::ZERO, egui::Sense::empty())
+    }
+}
+
+impl ServiceWithUi for PlayerInfoService {
+    fn panel(&self) -> impl Panel + 'static {
+        PlayerSearchWidget::new(self)
     }
 }

@@ -1,8 +1,9 @@
-use eframe::egui;
-
+use crate::core::app::Panel;
+use crate::player_info::PlayerInfoService;
 use crate::{
     common::channel::Sender, player_info::PlayerInfoServiceCommand, rocket_league::Platform,
 };
+use eframe::egui;
 
 pub struct PlayerSearchWidget {
     selected_platform: Platform,
@@ -11,17 +12,21 @@ pub struct PlayerSearchWidget {
 }
 
 impl PlayerSearchWidget {
-    pub fn new(sender: Sender<PlayerInfoServiceCommand>) -> Self {
+    pub fn new(service: &PlayerInfoService) -> Self {
         Self {
             player_name: String::new(),
             selected_platform: Platform::Epic,
-            sender,
+            sender: service.sender(),
         }
     }
 }
 
-impl egui::Widget for &mut PlayerSearchWidget {
-    fn ui(self, ui: &mut egui::Ui) -> egui::Response {
+impl Panel for PlayerSearchWidget {
+    fn name(&self) -> &'static str {
+        "Player Search"
+    }
+
+    fn ui(&mut self, ui: &mut egui::Ui) -> egui::Response {
         ui.vertical_centered_justified(|ui| {
             ui.horizontal(|ui| {
                 egui::ComboBox::from_id_salt("player search platform selector")

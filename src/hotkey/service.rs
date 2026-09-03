@@ -177,7 +177,7 @@ impl Service for HotkeyService {
 }
 
 impl ServiceWithUi for HotkeyService {
-    fn settings_panel(&self) -> impl Panel + 'static {
+    fn panel(&self) -> impl Panel + 'static {
         HotkeySettingsWidget::new(&self)
     }
 }
