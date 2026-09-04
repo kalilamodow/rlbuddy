@@ -88,6 +88,13 @@ Underpass in training. If you want to actually play underpass again, you can jus
 
 Additionally, you can download + import them straight from Bakkesplugins in the app as well.
 
+### Gamepad overlay
+
+<img src="readme-images/gamepad-overlay.gif" alt="The gamepad overlay working perfectly">
+
+rlbuddy can also show a gamepad overlay window that always stays on top of the game window. It only includes
+commonly-used bindings. It'll save its window position, so you don't need to move it to the right place every time.
+
 ### Discord rich presence
 
 <img src="readme-images/discord.jpg" alt="Discord rich presence demo image">
