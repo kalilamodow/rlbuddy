@@ -19,6 +19,7 @@ pub struct PlayerLongtimeStats {
     assists: u64,
     saves: u64,
     shots: u64,
+    demos: u64,
 }
 
 pub struct MyStatsWidget {
@@ -202,6 +203,7 @@ impl MyStatsWidget {
                 total.shots += u64::from(stats.shots);
                 total.assists += u64::from(stats.assists);
                 total.saves += u64::from(stats.saves);
+                total.demos += u64::from(stats.demos);
                 total
             });
 
