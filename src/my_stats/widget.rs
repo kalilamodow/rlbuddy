@@ -15,6 +15,7 @@ use std::{
 
 #[derive(Debug, Default)]
 pub struct PlayerLongtimeStats {
+    games: u64,
     goals: u64,
     assists: u64,
     saves: u64,
@@ -137,6 +138,7 @@ impl MyStatsWidget {
             .expect("its before 1970")
             .as_secs_f64();
 
+        #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
         Plot::new("mmr graph plot")
             .allow_axis_zoom_drag(false)
             .allow_zoom(false)
@@ -158,7 +160,7 @@ impl MyStatsWidget {
                     })
                     .collect()
             })
-            .x_axis_formatter(|point, _| format_seconds((now - point.value).round() as u64, true).0)
+            .x_axis_formatter(|point, _| format_seconds((now - point.value) as u64, true).0)
             .show(ui, |ui| {
                 ui.line(Line::new("MMR", PlotPoints::Borrowed(&points)));
             });
@@ -199,6 +201,7 @@ impl MyStatsWidget {
 
         let totals: PlayerLongtimeStats =
             all_stats.fold(PlayerLongtimeStats::default(), |mut total, stats| {
+                total.games += 1;
                 total.goals += u64::from(stats.goals);
                 total.shots += u64::from(stats.shots);
                 total.assists += u64::from(stats.assists);
@@ -207,18 +210,21 @@ impl MyStatsWidget {
                 total
             });
 
+        #[allow(clippy::cast_precision_loss)]
+        let stat_text = |text: &str, val: u64| {
+            format!("{text}: {val} ({}pg)", val as f32 / totals.games as f32)
+        };
+
         ui.horizontal(|ui| {
-            ui.label("Goals:");
-            ui.label(totals.goals.to_string());
+            // also prevents a div by 0 error in stat_text()
+            if totals.games == 0 {
+                return;
+            }
 
-            ui.label("Assists:");
-            ui.label(totals.assists.to_string());
-
-            ui.label("Shots:");
-            ui.label(totals.shots.to_string());
-
-            ui.label("Saves:");
-            ui.label(totals.saves.to_string());
+            ui.label(stat_text("Goals", totals.goals));
+            ui.label(stat_text("Assists", totals.assists));
+            ui.label(stat_text("Shots", totals.shots));
+            ui.label(stat_text("Saves", totals.saves));
         });
     }
 }
