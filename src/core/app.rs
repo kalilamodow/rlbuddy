@@ -250,7 +250,9 @@ impl eframe::App for RlBuddyApp {
         while let Some(event) = self.stats_api_events.try_recv() {
             match *event {
                 RLEvent::Connected => {
-                    ctx.send_viewport_cmd(ViewportCommand::Title("rlbuddy (connected)".to_string()));
+                    ctx.send_viewport_cmd(ViewportCommand::Title(
+                        "rlbuddy (connected)".to_string(),
+                    ));
                 }
                 RLEvent::Disconnected => ctx.send_viewport_cmd(ViewportCommand::Title(
                     "rlbuddy (not connected)".to_string(),
@@ -355,6 +357,7 @@ impl egui::Widget for PanelsWidget<'_> {
             for (index, panel_id) in self.open_panels.iter().enumerate() {
                 let Some(panel) = self.panels.iter_mut().find(|p| p.id == *panel_id) else {
                     eprintln!("could not find panel with id '{panel_id:?}'");
+                    to_close = Some(index);
                     continue;
                 };
 
