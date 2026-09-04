@@ -69,11 +69,10 @@ impl TryFrom<&MatchPlayer> for AvatarKey {
         Ok(Self {
             id: match platform {
                 AvatarPlatform::Xbox => {
-                    if !value.display_name_is_censored() {
-                        value.display_name().to_owned()
-                    } else {
+                    if value.display_name_is_censored() {
                         return Err(());
                     }
+                    value.display_name().to_owned()
                 }
                 _ => get_platform_id(&value.data.platform_id).to_owned(),
             },

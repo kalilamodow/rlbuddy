@@ -188,6 +188,6 @@ impl Service for MatchesService {
     }
 
     fn save(&self) {
-        save_service_data(DATA_ID, self.stripped_history())
+        save_service_data(DATA_ID, self.stripped_history());
     }
 }

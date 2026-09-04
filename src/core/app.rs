@@ -125,14 +125,14 @@ impl RlBuddyApp {
         let match_notificator_service =
             MatchNotificatorService::new(&matches_service, &mut stats_api_service, &toast_service);
         let discord_service = DiscordService::new(&matches_service, &mut stats_api_service);
-        let mut gamepad_service = GamepadService::new();
+        let mut gamepad_service = GamepadService::default();
         let gamepad_overlay_service = GamepadOverlayService::new(ctx.clone(), &gamepad_service);
         let map_loader_service = MapLoaderService::new();
         let player_info_service = PlayerInfoService::new(ctx.clone());
         let hotkey_service = HotkeyService::new(&mut gamepad_service, &overlay_tx);
         let music_service = MusicControlService::new(&mut stats_api_service);
 
-        let app = RlBuddyApp {
+        RlBuddyApp {
             overlay_tx,
             overlay_rx,
             prev_hide_pos: None,
@@ -174,9 +174,7 @@ impl RlBuddyApp {
             ],
 
             app_settings,
-        };
-
-        app
+        }
     }
 
     fn show(&mut self, ctx: &egui::Context) {
@@ -252,7 +250,7 @@ impl eframe::App for RlBuddyApp {
         while let Some(event) = self.stats_api_events.try_recv() {
             match *event {
                 RLEvent::Connected => {
-                    ctx.send_viewport_cmd(ViewportCommand::Title("rlbuddy (connected)".to_string()))
+                    ctx.send_viewport_cmd(ViewportCommand::Title("rlbuddy (connected)".to_string()));
                 }
                 RLEvent::Disconnected => ctx.send_viewport_cmd(ViewportCommand::Title(
                     "rlbuddy (not connected)".to_string(),
@@ -348,7 +346,7 @@ pub struct PanelsWidget<'a> {
     panels: &'a mut Vec<AppPanel>,
 }
 
-impl<'a> egui::Widget for PanelsWidget<'a> {
+impl egui::Widget for PanelsWidget<'_> {
     fn ui(self, ui: &mut Ui) -> Response {
         ui.vertical_centered_justified(|ui| {
             let mut to_close: Option<usize> = None;

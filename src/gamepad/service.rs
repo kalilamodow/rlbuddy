@@ -32,36 +32,28 @@ impl GamepadState {
         Self {
             trigger_left: gp
                 .button_data(Button::LeftTrigger2)
-                .map(ButtonData::is_pressed)
-                .unwrap_or_default(),
+                .is_some_and(ButtonData::is_pressed),
             trigger_right: gp
                 .button_data(Button::RightTrigger2)
-                .map(ButtonData::is_pressed)
-                .unwrap_or_default(),
+                .is_some_and(ButtonData::is_pressed),
             bumper_left: gp
                 .button_data(Button::LeftTrigger)
-                .map(ButtonData::is_pressed)
-                .unwrap_or_default(),
+                .is_some_and(ButtonData::is_pressed),
             bumper_right: gp
                 .button_data(Button::RightTrigger)
-                .map(ButtonData::is_pressed)
-                .unwrap_or_default(),
+                .is_some_and(ButtonData::is_pressed),
             north: gp
                 .button_data(Button::North)
-                .map(ButtonData::is_pressed)
-                .unwrap_or_default(),
+                .is_some_and(ButtonData::is_pressed),
             south: gp
                 .button_data(Button::South)
-                .map(ButtonData::is_pressed)
-                .unwrap_or_default(),
+                .is_some_and(ButtonData::is_pressed),
             west: gp
                 .button_data(Button::West)
-                .map(ButtonData::is_pressed)
-                .unwrap_or_default(),
+                .is_some_and(ButtonData::is_pressed),
             east: gp
                 .button_data(Button::East)
-                .map(ButtonData::is_pressed)
-                .unwrap_or_default(),
+                .is_some_and(ButtonData::is_pressed),
             joy_left_x: gp.value(Axis::LeftStickX),
             joy_left_y: gp.value(Axis::LeftStickY),
             joy_right_x: gp.value(Axis::RightStickX),
@@ -76,15 +68,17 @@ pub struct GamepadService {
     gilrs: Gilrs,
 }
 
-impl GamepadService {
-    pub fn new() -> Self {
+impl Default for GamepadService {
+    fn default() -> Self {
         Self {
             publisher: EventSource::new(),
             gilrs: Gilrs::new().unwrap(),
             gamepad_state: ReadWriteStateHandle::default(),
         }
     }
+}
 
+impl GamepadService {
     pub fn subscribe(&mut self) -> EventReceiver<GamepadEvent> {
         self.publisher.subscribe()
     }
@@ -108,10 +102,10 @@ impl GamepadService {
         while let Some(event) = self.gilrs.next_event() {
             match event.event {
                 EventType::ButtonPressed(button, _) => {
-                    self.publisher.publish(GamepadEvent::ButtonPressed(button))
+                    self.publisher.publish(GamepadEvent::ButtonPressed(button));
                 }
                 EventType::ButtonReleased(button, _) => {
-                    self.publisher.publish(GamepadEvent::ButtonReleased(button))
+                    self.publisher.publish(GamepadEvent::ButtonReleased(button));
                 }
                 _ => {}
             }

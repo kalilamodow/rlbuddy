@@ -59,7 +59,7 @@ impl MusicControlService {
 
     pub fn update(&mut self) {
         while let Some(cmd) = self.command_receiver.try_recv() {
-            self.handle_command(cmd);
+            self.handle_command(&cmd);
         }
 
         for new_info in self.playback_info_rx.try_iter() {
@@ -70,10 +70,10 @@ impl MusicControlService {
             while let Some(event) = self.stats_api.try_recv() {
                 match *event {
                     RLEvent::ReplayStart | RLEvent::MatchOver(_) => {
-                        self.handle_command(MusicControlCommand::Pause);
+                        self.handle_command(&MusicControlCommand::Pause);
                     }
                     RLEvent::ReplayDone | RLEvent::MatchLeft => {
-                        self.handle_command(MusicControlCommand::Play);
+                        self.handle_command(&MusicControlCommand::Play);
                     }
                     _ => {}
                 }
@@ -83,7 +83,7 @@ impl MusicControlService {
         }
     }
 
-    fn handle_command(&mut self, command: MusicControlCommand) {
+    fn handle_command(&mut self, command: &MusicControlCommand) {
         match command {
             MusicControlCommand::Next => self.controller.next(),
             MusicControlCommand::Previous => self.controller.previous(),

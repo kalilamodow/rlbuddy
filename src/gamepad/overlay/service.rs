@@ -25,6 +25,7 @@ pub struct GamepadOverlayService {
 const DATA_ID: &str = "gamepad_overlay_savedata";
 
 impl GamepadOverlayService {
+    #[must_use]
     pub fn new(ctx: egui::Context, gamepad_service: &GamepadService) -> Self {
         Self {
             settings: ReadWriteStateHandle::new(load_service_data(DATA_ID)),
@@ -145,6 +146,7 @@ impl GamepadOverlayService {
         );
     }
 
+    #[must_use]
     pub fn settings_handle(&self) -> ReadWriteStateHandle<GamepadOverlayServiceSettings> {
         self.settings.clone()
     }

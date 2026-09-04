@@ -149,13 +149,13 @@ impl MapLoaderService {
                 state.underpass_path = Some(path);
             }
             MapLoaderCommand::Import(path) => {
-                if !path.extension().is_some_and(|ext| ext == "zip") || !path.is_file() {
+                if path.extension().is_none_or(|ext| ext != "zip") || !path.is_file() {
                     return;
                 }
 
                 let state_handle = self.state.clone();
                 thread::spawn(move || {
-                    let result = import_archive_from_file(&path, state_handle.clone());
+                    let result = import_archive_from_file(&path, &state_handle);
 
                     if let Err(error) = result {
                         let mut state = state_handle.write();
@@ -173,7 +173,7 @@ impl MapLoaderService {
                     let result = import_archive_from_bytes(
                         info,
                         zip_archive_bytes,
-                        state_handle.clone(),
+                        &state_handle,
                         image_jpeg_bytes,
                     );
 
@@ -184,13 +184,13 @@ impl MapLoaderService {
                 });
             }
             MapLoaderCommand::Delete(id) => {
-                if let Err(error) = self.delete(id) {
+                if let Err(error) = self.delete(&id) {
                     let mut state = self.state.write();
                     state.current_error = Some(error.to_string());
                 }
             }
             MapLoaderCommand::Load(id) => {
-                if let Err(error) = self.load(id) {
+                if let Err(error) = self.load(&id) {
                     let mut state = self.state.write();
                     state.current_error = Some(error.to_string());
                 }
@@ -208,7 +208,7 @@ impl MapLoaderService {
         }
     }
 
-    fn load(&self, id: CustomMapId) -> Result<(), Box<dyn std::error::Error>> {
+    fn load(&self, id: &CustomMapId) -> Result<(), Box<dyn std::error::Error>> {
         let mut state = self.state.write();
         let Some(underpass_path) = &state.underpass_path else {
             return Err(string_to_error("no valid underpass path"));
@@ -216,7 +216,7 @@ impl MapLoaderService {
 
         back_up_old_underpass(underpass_path)?;
 
-        let map_directory = get_custom_map_directory(&id)?;
+        let map_directory = get_custom_map_directory(id)?;
         fs::copy(map_directory.join("map.upk"), underpass_path)?;
 
         state.loaded_map = Some(id.clone());
@@ -237,8 +237,8 @@ impl MapLoaderService {
         Ok(())
     }
 
-    fn delete(&self, id: CustomMapId) -> Result<(), Box<dyn std::error::Error>> {
-        fs::remove_dir_all(get_custom_map_directory(&id)?)?;
+    fn delete(&self, id: &CustomMapId) -> Result<(), Box<dyn std::error::Error>> {
+        fs::remove_dir_all(get_custom_map_directory(id)?)?;
 
         let mut state = self.state.write();
         state.maps.retain(|map| map.id.as_str() != id.as_str());
@@ -253,7 +253,7 @@ impl Service for MapLoaderService {
     }
 
     fn save(&self) {
-        save_service_data(DATA_ID, self.save())
+        save_service_data(DATA_ID, self.save());
     }
 }
 
@@ -265,7 +265,7 @@ impl ServiceWithUi for MapLoaderService {
 
 fn import_archive_from_file(
     zip_path: &Path,
-    state_handle: ThreadedReadWriteStateHandle<MapLoaderServiceState>,
+    state_handle: &ThreadedReadWriteStateHandle<MapLoaderServiceState>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let map_name = zip_path
         .file_prefix()
@@ -291,7 +291,7 @@ fn import_archive_from_file(
 fn import_archive_from_bytes(
     info: CustomMapInfo,
     archive_bytes: Vec<u8>,
-    state_handle: ThreadedReadWriteStateHandle<MapLoaderServiceState>,
+    state_handle: &ThreadedReadWriteStateHandle<MapLoaderServiceState>,
     image_jpeg_bytes: Vec<u8>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let archive = ZipArchive::new(io::Cursor::new(archive_bytes))?;
@@ -301,7 +301,7 @@ fn import_archive_from_bytes(
 fn import_archive<R>(
     mut info: CustomMapInfo,
     mut archive: ZipArchive<R>,
-    state_handle: ThreadedReadWriteStateHandle<MapLoaderServiceState>,
+    state_handle: &ThreadedReadWriteStateHandle<MapLoaderServiceState>,
     default_preview_image_jpeg_data: Option<Vec<u8>>,
 ) -> Result<(), Box<dyn std::error::Error>>
 where
@@ -332,7 +332,13 @@ where
             let info_json: CustomMapInfoJson = serde_json::from_reader(file)?;
             info.author = Some(info_json.author);
             info.description = Some(info_json.desc);
-        } else if filename.ends_with(".udk") || filename.ends_with(".upk") {
+        } else if path
+            .extension()
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("udk"))
+            || path
+                .extension()
+                .is_some_and(|ext| ext.eq_ignore_ascii_case("upk"))
+        {
             let total_size = usize::try_from(file.size())?;
             rl_pkg_data = vec![0u8; total_size];
 

@@ -171,7 +171,7 @@ impl MatchInfo {
     }
 
     pub fn uncensor_names(&mut self, api: &NameAPI) {
-        self.on_each_player(|p| p.uncensor_with(api), |c| c.display_name_is_censored());
+        self.on_each_player(|p| p.uncensor_with(api), MatchPlayer::display_name_is_censored);
     }
 
     pub fn load_avatar_urls(&mut self, api: &AvatarAPI) {

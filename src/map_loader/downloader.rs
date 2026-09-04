@@ -77,7 +77,7 @@ pub struct MapDownloaderWidget {
 impl MapDownloaderWidget {
     pub fn new(service: &MapLoaderService) -> Self {
         Self {
-            search_text: "".into(),
+            search_text: String::new(),
             results: Arc::new(Mutex::new(Some(Vec::new()))),
             currently_downloading: Arc::default(),
             service_command_sender: service.sender(),
@@ -90,8 +90,8 @@ impl MapDownloaderWidget {
 
         thread::spawn(move || {
             let response = ureq::get(format!(
-                "https://bakkesplugins.com/maps?search={}",
-                search_text_urlencoded
+                "https://bakkesplugins.com/maps?search={search_text_urlencoded}",
+                
             ))
             .call()
             .unwrap();
@@ -170,10 +170,10 @@ impl MapDownloaderWidget {
 
             // then we can actually download it
             let archive_bytes = download_with_progress::<65_535>(zip_url, |p| {
-                update_progress(DownloadProgressState::DownloadingZip, p)
+                update_progress(DownloadProgressState::DownloadingZip, p);
             });
             let image_bytes = download_with_progress::<4_096>(image_url, |p| {
-                update_progress(DownloadProgressState::DownloadingImage, p)
+                update_progress(DownloadProgressState::DownloadingImage, p);
             });
 
             let Some((map_info, _, _)) = ({
@@ -194,7 +194,7 @@ impl MapDownloaderWidget {
                     zip_archive_bytes: archive_bytes,
                     image_jpeg_bytes: image_bytes,
                 })
-                .unwrap()
+                .unwrap();
         });
     }
 }

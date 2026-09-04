@@ -150,11 +150,11 @@ impl DiscordService {
 
 impl Service for DiscordService {
     fn update(&mut self) {
-        self.update()
+        self.update();
     }
 
     fn save(&self) {
-        save_service_data(DATA_ID, self.settings.read().clone())
+        save_service_data(DATA_ID, self.settings.read().clone());
     }
 }
 

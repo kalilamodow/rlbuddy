@@ -56,7 +56,7 @@ where
                 ui.with_layout(egui::Layout::bottom_up(egui::Align::Min), |ui| {
                     ui.horizontal(|ui| {
                         if let Some(author) = self.author {
-                            ui.label(format!("By {}", author));
+                            ui.label(format!("By {author}"));
                         }
 
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Max), |ui| {
@@ -70,7 +70,7 @@ where
     }
 }
 
-impl<'a, ButtonsWidget> egui::Widget for MapCardWidget<'a, ButtonsWidget>
+impl<ButtonsWidget> egui::Widget for MapCardWidget<'_, ButtonsWidget>
 where
     ButtonsWidget: FnMut(&mut egui::Ui),
 {
@@ -104,7 +104,7 @@ where
                     .stroke(if self.highlight {
                         egui::Stroke::new(0.5f32, egui::Color32::WHITE)
                     } else {
-                        Default::default()
+                        egui::Stroke::default()
                     })
                     .paint(image_rect),
             );

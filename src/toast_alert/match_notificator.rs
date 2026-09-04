@@ -90,7 +90,7 @@ impl Service for MatchNotificatorService {
     }
 
     fn save(&self) {
-        save_service_data(DATA_ID, self.settings_handle.read().clone())
+        save_service_data(DATA_ID, self.settings_handle.read().clone());
     }
 }
 

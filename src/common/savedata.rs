@@ -48,6 +48,9 @@ where
     }
 
     if let Err(error) = fs::write(&path, string) {
-        eprintln!("Failed to write settings for {name}: {error:?} ({path:?})");
+        eprintln!(
+            "Failed to write settings for {name}: {error:?} ({})",
+            path.display()
+        );
     }
 }
