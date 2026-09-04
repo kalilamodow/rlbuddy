@@ -81,10 +81,12 @@ lot faster this way as well.
 
 ### Custom map loader
 
-<video width="600" src="https://github.com/user-attachments/assets/f5aee111-da51-4bc5-bb44-50b151023afe"></video>
+<img src="readme-images/custom-map-loader.gif" alt="Custom map loader demo" />
 
-You can download/import custom maps within rlbuddy. It replaces Underpass, so to play a custom map just load it and then
-play Underpass in training. If you want to actually play underpass again, you can just unload the map.
+You can import custom maps within rlbuddy. It replaces Underpass, so to play a custom map just load it and then play
+Underpass in training. If you want to actually play underpass again, you can just unload the map.
+
+Additionally, you can download + import them straight from Bakkesplugins in the app as well.
 
 ### Discord rich presence
 
