@@ -128,7 +128,7 @@ impl RlBuddyApp {
         let mut gamepad_service = GamepadService::default();
         let gamepad_overlay_service = GamepadOverlayService::new(ctx.clone(), &gamepad_service);
         let map_loader_service = MapLoaderService::new();
-        let player_info_service = PlayerInfoService::new(ctx.clone());
+        let player_info_service = PlayerInfoService::default();
         let hotkey_service = HotkeyService::new(&mut gamepad_service, &overlay_tx);
         let music_service = MusicControlService::new(&mut stats_api_service);
 
