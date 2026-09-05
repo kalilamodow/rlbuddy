@@ -159,7 +159,19 @@ rlbuddy is written in Rust and uses the `eframe` gui framework. The build script
 Fandom images server. It does use a couple of Windows-only features, but Linux support is totally possible if enough
 people want it (I'm on Windows so I'm not totally sure what works on other platforms).
 
-There are services and widgets. Services are the code-behind, they're state managers with `update` methods called every
+There are services and panels. Services are the code-behind, they're state managers with `update` methods called every
 tick. They usually connect to external programs (discord, rocket league, etc.) to give rlbuddy information. They're
-composable, so for example the Discord service relies on the Stats API service to show data from the game. Widgets are
-`egui::Widget`s and take service state handles, just graphical information relays.
+composable, so for example the Discord service relies on the Stats API service to show data from the game. Panels are
+basically named `egui::Widget`s and take service state handles/command senders.
+
+I made a basic diagram explaining their relationships.
+
+<img src="readme-images/cool-diagram.jpg" alt="Diagram">
+
+Here are some examples:
+
+- Music panel reading the current playback state from the music control service
+- Stats api service emitting events to the music service to play/pause during goal replay
+- Discord service talking to discord over ipc
+- Player info widget sending the OpenPlayerInfo command to the player info service
+- Lobby widget also sending OpenPlayerInfo when a player name is clicked
