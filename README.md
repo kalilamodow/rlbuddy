@@ -30,8 +30,8 @@ and shows their platform next to their name. It also shows each player's avatar 
 PlayStation.
 
 By default, it sources rank/name information from the game's API itself, so no Tracker is required, but you can click
-their name to get more detailed information. It attempts to fully resolve Switch player ids, but it's only guaranteed to
-be right if they're in a club.
+their name to open their Tracker profile. It attempts to fully resolve Switch player ids, but it's only guaranteed to be
+right if they're in a club.
 
 <details>
     <summary>"Only guaranteed if they're in a club? That seems... arbitrary."</summary>
@@ -59,14 +59,6 @@ more stripped down view as to not waste space.
 
 This widget gives a quick glance as to your current session's stats (eg. goals, winrate, MMR change). There's also a
 per-playlist MMR graph, which is pretty cool.
-
-### Player search
-
-<img src="readme-images/playersearch.jpg" alt="Player search demo image">
-
-Ever wanted to check if a player was smurfing without having to open a browser and go to Tracker? Hopefully not, but if
-you have then this solves that. It's basically what clicking a name of a player in your match does, opening a view which
-shows some of their all-time stats (sourced from Tracker).
 
 ### Music
 
