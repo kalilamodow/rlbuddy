@@ -51,7 +51,7 @@ impl Panel for PlayerSearchWidget {
                 ui.centered_and_justified(|ui| ui.text_edit_singleline(&mut self.player_name));
             });
 
-            if ui.button("Search").clicked() {
+            if ui.button("View in TRN").clicked() {
                 self.sender.send(PlayerInfoServiceCommand::Open(
                     self.selected_platform,
                     self.player_name.clone(),
