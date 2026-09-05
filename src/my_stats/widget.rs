@@ -212,7 +212,7 @@ impl MyStatsWidget {
 
         #[allow(clippy::cast_precision_loss)]
         let stat_text = |text: &str, val: u64| {
-            format!("{text}: {val} ({}pg)", val as f32 / totals.games as f32)
+            format!("{text}: {val} ({:.2}pg)", val as f32 / totals.games as f32)
         };
 
         ui.horizontal(|ui| {
