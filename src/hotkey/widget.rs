@@ -1,6 +1,7 @@
 use super::service::{HotkeyService, HotkeySettings, SelectableHotkey};
+use crate::common::ThreadedReadWriteStateHandle;
 use crate::core::app::Panel;
-use crate::{common::ThreadedReadWriteStateHandle, hotkey::service::SelectableControllerButton};
+use crate::hotkey::service::SelectedButtonState;
 use eframe::egui;
 
 pub struct HotkeySettingsWidget {
@@ -40,20 +41,40 @@ impl Panel for HotkeySettingsWidget {
                     }
                 });
 
-            egui::ComboBox::from_label("Hotkey (gamepad)")
-                .selected_text(settings.button.as_str())
-                .show_ui(ui, |ui| {
-                    for key in [
-                        SelectableControllerButton::LeftBumper,
-                        SelectableControllerButton::RightBumper,
-                        SelectableControllerButton::Select,
-                        SelectableControllerButton::Start,
-                        SelectableControllerButton::Disabled,
-                    ] {
-                        let key_str = key.as_str();
-                        ui.selectable_value(&mut settings.button, key, key_str);
+            ui.add_space(4.0);
+
+            ui.horizontal(|ui| {
+                let mut new_button: Option<SelectedButtonState> = None;
+                match &settings.button {
+                    SelectedButtonState::Selected(button) => {
+                        ui.label("Selected gamepad hotkey:");
+                        ui.strong(format!("{button:?}"));
+
+                        if ui.button("Change").clicked() {
+                            new_button = Some(SelectedButtonState::Choosing);
+                        }
+                        if ui.button("Remove").clicked() {
+                            new_button = Some(SelectedButtonState::Disabled);
+                        }
                     }
-                });
+                    SelectedButtonState::Choosing => {
+                        ui.label("Choosing gamepad hotkey...");
+                        if ui.button("Cancel").clicked() {
+                            new_button = Some(SelectedButtonState::Disabled);
+                        }
+                    }
+                    SelectedButtonState::Disabled => {
+                        ui.label("Gamepad hotkey disabled");
+                        if ui.button("Choose").clicked() {
+                            new_button = Some(SelectedButtonState::Choosing);
+                        }
+                    }
+                }
+
+                if let Some(new_button) = new_button {
+                    settings.button = new_button;
+                }
+            });
         })
         .response
     }

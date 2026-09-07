@@ -80,42 +80,18 @@ impl KeyboardInputManager {
     }
 }
 
-#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum SelectableControllerButton {
+#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum SelectedButtonState {
+    Selected(Button),
     #[default]
-    Select,
-    Start,
-    LeftBumper,
-    RightBumper,
     Disabled,
-}
-
-impl SelectableControllerButton {
-    pub fn to_gilrs_button(&self) -> Option<Button> {
-        Some(match self {
-            Self::Disabled => return None,
-            Self::Select => Button::Select,
-            Self::Start => Button::Start,
-            Self::LeftBumper => Button::LeftTrigger,
-            Self::RightBumper => Button::RightTrigger,
-        })
-    }
-
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            Self::Disabled => "Disabled",
-            Self::Select => "Select",
-            Self::Start => "Start",
-            Self::LeftBumper => "Left bumper",
-            Self::RightBumper => "Right bumper",
-        }
-    }
+    Choosing,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct HotkeySettings {
     pub key: SelectableHotkey,
-    pub button: SelectableControllerButton,
+    pub button: SelectedButtonState,
 }
 
 pub struct HotkeyService {
@@ -154,16 +130,21 @@ const DATA_ID: &str = "hotkey_settings";
 
 impl Service for HotkeyService {
     fn update(&mut self) {
-        let settings = self.settings.read();
+        let mut settings = self.settings.write();
         while let Some(event) = self.gamepad_rx.try_recv() {
             match event.as_ref() {
                 GamepadEvent::ButtonPressed(button) => {
-                    if Some(*button) == settings.button.to_gilrs_button() {
+                    if matches!(settings.button, SelectedButtonState::Choosing) {
+                        settings.button = SelectedButtonState::Selected(*button);
+                        return;
+                    }
+
+                    if SelectedButtonState::Selected(*button) == settings.button {
                         self.overlay_tx.send(true).unwrap();
                     }
                 }
                 GamepadEvent::ButtonReleased(button) => {
-                    if Some(*button) == settings.button.to_gilrs_button() {
+                    if SelectedButtonState::Selected(*button) == settings.button {
                         self.overlay_tx.send(false).unwrap();
                     }
                 }
