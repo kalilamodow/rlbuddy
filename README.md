@@ -140,11 +140,6 @@ have to open it manually.
 
 rlbuddy can be partially transparent. You can adjust the opacity through the settings widget.
 
-## Current roadmap
-
-- Custom/workshop map downloader
-- Controller overlay
-
 ## Development/project architecture
 
 rlbuddy is written in Rust and uses the `eframe` gui framework. The build script automatically downloads assets from the
