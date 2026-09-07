@@ -51,7 +51,7 @@ fn visuals_with_transparency(visuals: &mut egui::Visuals, transparency: u8) {
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
-pub struct PanelId(u64);
+struct PanelId(u64);
 
 impl PanelId {
     fn from_name(name: &str) -> PanelId {
@@ -83,6 +83,19 @@ impl AppPanel {
 impl egui::Widget for &mut AppPanel {
     fn ui(self, ui: &mut Ui) -> Response {
         self.panel.ui(ui)
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SavedOpenPanelList(Vec<PanelId>);
+
+impl Default for SavedOpenPanelList {
+    fn default() -> Self {
+        Self(vec![
+            // TODO: don't use magic values here
+            PanelId::from_name("Lobby"),
+            PanelId::from_name("Stats API Setup"),
+        ])
     }
 }
 
@@ -136,7 +149,7 @@ impl RlBuddyApp {
             overlay_tx,
             overlay_rx,
             prev_hide_pos: None,
-            open_panels: app_data.open_panels,
+            open_panels: app_data.open_panels.0,
 
             stats_api_events: stats_api_service.subscribe(),
             panels: vec![
@@ -231,7 +244,7 @@ impl RlBuddyApp {
                         .map(|inner| (outer.left_top(), inner.size()))
                 })
             }),
-            open_panels: self.open_panels.clone(),
+            open_panels: SavedOpenPanelList(self.open_panels.clone()),
         }
         .save();
     }

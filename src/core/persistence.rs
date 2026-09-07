@@ -1,5 +1,5 @@
 use crate::common::savedata::{load_service_data, save_service_data};
-use crate::core::app::PanelId;
+use crate::core::app::SavedOpenPanelList;
 use eframe::egui;
 use serde::{Deserialize, Serialize};
 
@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 pub struct AppData {
     pub app_settings: crate::core::app::AppSettings,
     pub saved_window_dimensions: Option<(egui::Pos2, egui::Vec2)>, // outer pos, inner size
-    pub open_panels: Vec<PanelId>,
+    pub open_panels: SavedOpenPanelList,
 }
 
 impl AppData {
