@@ -4,12 +4,16 @@ static NO_DURATION: Duration = Duration::ZERO;
 static ONE_SECOND: Duration = Duration::from_secs(1);
 static ONE_MINUTE: Duration = Duration::from_mins(1);
 static ONE_HOUR: Duration = Duration::from_hours(1);
+static ONE_DAY: Duration = Duration::from_hours(24);
+static ONE_WEEK: Duration = Duration::from_hours(24 * 7);
 
 #[derive(Debug, Clone, Copy)]
 enum TimeUnit {
     Second,
     Minute,
     Hour,
+    Day,
+    Week,
 }
 
 impl TimeUnit {
@@ -18,6 +22,8 @@ impl TimeUnit {
             Self::Second => "second",
             Self::Minute => "minute",
             Self::Hour => "hour",
+            Self::Day => "day",
+            Self::Week => "week",
         }
     }
 
@@ -26,6 +32,8 @@ impl TimeUnit {
             Self::Second => "s",
             Self::Minute => "m",
             Self::Hour => "h",
+            Self::Day => "d",
+            Self::Week => "w",
         }
     }
 
@@ -34,6 +42,8 @@ impl TimeUnit {
             Self::Second => &ONE_SECOND,
             Self::Minute => &ONE_MINUTE,
             Self::Hour => &ONE_HOUR,
+            Self::Day => &ONE_DAY,
+            Self::Week => &ONE_WEEK,
         }
     }
 }
@@ -72,13 +82,17 @@ impl TimePart {
 /// if it's in seconds, it'll tell you that you need to refresh in 1 second
 /// (because eguis immediate mode and doesnt update itself)
 pub fn format_seconds(total_seconds: u64, short: bool) -> (String, &'static Duration) {
+    let weeks = total_seconds / (60 * 60 * 24 * 7);
+    let days = total_seconds / (60 * 60 * 24);
     let hours = total_seconds / (60 * 60);
     let minutes = (total_seconds / 60) % 60;
     let seconds = total_seconds % 60;
 
     let parts: Vec<TimePart> = [
-        (hours > 0).then(|| TimePart::new(hours, TimeUnit::Hour)),
-        (minutes > 0).then(|| TimePart::new(minutes, TimeUnit::Minute)),
+        (weeks > 0).then(|| TimePart::new(weeks, TimeUnit::Week)),
+        (days > 0).then(|| TimePart::new(days, TimeUnit::Day)),
+        (days == 0 && hours > 0).then(|| TimePart::new(hours, TimeUnit::Hour)),
+        (days == 0 && minutes > 0).then(|| TimePart::new(minutes, TimeUnit::Minute)),
         (total_seconds < 60 && seconds > 0).then(|| TimePart::new(seconds, TimeUnit::Second)),
     ]
     .into_iter()
