@@ -113,8 +113,8 @@ impl<'a> MatchRenderer<'a> {
                     false,
                 );
 
-                ui.label(text);
-                ui.request_repaint_after(refresh_in);
+                ui.label(format!("{text} ago"));
+                ui.request_repaint_after(*refresh_in);
             }
 
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
