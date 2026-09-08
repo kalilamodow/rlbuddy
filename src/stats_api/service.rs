@@ -347,14 +347,16 @@ impl StatsApi {
     fn on_stats_api_event(&mut self, event: StatsApiEvent) -> Option<RLEvent> {
         Some(match event {
             StatsApiEvent::UpdateState(data) => {
-                if self.local_player_shortcut.is_none()
-                    && let Some(game_target) = data.game.target.as_ref()
-                {
+                // we dont do this only once because for example if the view switches from a bot to
+                // the real local player, then it would get stuck.
+                if let Some(game_target) = data.game.target.as_ref() {
                     let target_shortcut = game_target.shortcut;
                     let our_player = data.players.iter().find(|p| p.shortcut == target_shortcut);
-                    if let Some(player) = our_player {
-                        self.local_player_shortcut = Some(player.shortcut);
-                        return Some(RLEvent::OurPlayerId(player.primary_id.clone()));
+                    if let Some(our_player) = our_player
+                        && self.local_player_shortcut != Some(our_player.shortcut)
+                    {
+                        self.local_player_shortcut = Some(our_player.shortcut);
+                        return Some(RLEvent::OurPlayerId(our_player.primary_id.clone()));
                     }
                 }
 
