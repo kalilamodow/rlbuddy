@@ -4,6 +4,7 @@ use crate::core::app::{Panel, Service, ServiceWithUi};
 use crate::gamepad::GamepadService;
 use crate::gamepad::overlay::widget::GamepadOverlayWidget;
 use crate::gamepad::service::GamepadStateHandle;
+use crate::gamepad::service::NO_GAMEPAD_STATE;
 use eframe::egui;
 use eframe::egui::{Color32, CornerRadius, Frame, Stroke, ViewportBuilder, ViewportId};
 use eframe::epaint::StrokeKind;
@@ -81,9 +82,7 @@ impl GamepadOverlayService {
 
                         painter.hline(100.0..=200.0, 110.0, stroke); // bottom inner
 
-                        let Some(gp) = gamepad_state.as_ref() else {
-                            return;
-                        };
+                        let gp = gamepad_state.as_ref().unwrap_or(&NO_GAMEPAD_STATE);
 
                         let draw_joystick = |draw_x, joy_x: f32, joy_y: f32| {
                             painter.circle_stroke(egui::pos2(draw_x, 110.0), 15.0, stroke); // outline

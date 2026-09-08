@@ -25,6 +25,22 @@ pub struct GamepadState {
     pub joy_right_y: f32,
 }
 
+// use this instead of unwrap_or_default so it doesnt make a new object
+pub static NO_GAMEPAD_STATE: GamepadState = GamepadState {
+    trigger_left: false,
+    trigger_right: false,
+    bumper_left: false,
+    bumper_right: false,
+    north: false,
+    south: false,
+    west: false,
+    east: false,
+    joy_left_x: 0.0,
+    joy_left_y: 0.0,
+    joy_right_x: 0.0,
+    joy_right_y: 0.0,
+};
+
 pub type GamepadStateHandle = ReadonlyStateHandle<Option<GamepadState>>;
 
 impl GamepadState {
