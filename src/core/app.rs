@@ -21,6 +21,7 @@ use serde::{Deserialize, Serialize};
 use std::hash::{DefaultHasher, Hasher};
 use std::thread;
 use std::{sync::mpsc, time::Duration};
+use windows::Win32::System::SystemInformation::GetLocalTime;
 
 pub trait Service {
     fn update(&mut self);
@@ -294,20 +295,26 @@ impl eframe::App for RlBuddyApp {
         visuals_with_transparency(ui.visuals_mut(), self.app_settings.read().transparency);
 
         egui::Panel::bottom("bottom_panel").show_inside(ui, |ui| {
-            egui::ComboBox::from_label("")
-                .selected_text("Widgets")
-                .show_ui(ui, |ui| {
-                    for panel in &mut self.panels {
-                        let is_open = self.open_panels.contains(&panel.id);
-                        if ui.selectable_label(is_open, panel.name).clicked() {
-                            if is_open {
-                                self.open_panels.retain(|p| *p != panel.id);
-                            } else {
-                                self.open_panels.push(panel.id);
+            ui.horizontal(|ui| {
+                egui::ComboBox::from_label("")
+                    .selected_text("Widgets")
+                    .show_ui(ui, |ui| {
+                        for panel in &mut self.panels {
+                            let is_open = self.open_panels.contains(&panel.id);
+                            if ui.selectable_label(is_open, panel.name).clicked() {
+                                if is_open {
+                                    self.open_panels.retain(|p| *p != panel.id);
+                                } else {
+                                    self.open_panels.push(panel.id);
+                                }
                             }
                         }
-                    }
+                    });
+
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
+                    ui.label(clock_time());
                 });
+            })
         });
 
         egui::CentralPanel::default().show_inside(ui, |ui| {
@@ -414,4 +421,16 @@ impl egui::Widget for PanelsWidget<'_> {
         })
         .response
     }
+}
+
+fn clock_time() -> String {
+    let time = unsafe { GetLocalTime() };
+    let hour = match time.wHour {
+        0 => 12,
+        1..=12 => time.wHour,
+        _ => time.wHour - 12,
+    };
+
+    let am_or_pm = if time.wHour < 12 { "AM" } else { "PM" };
+    format!("{hour}:{:02} {am_or_pm}", time.wMinute)
 }
