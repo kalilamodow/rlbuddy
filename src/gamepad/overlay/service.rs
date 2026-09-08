@@ -141,6 +141,12 @@ impl GamepadOverlayService {
                             gp.trigger_right,
                         );
                     });
+
+                if ui.ctx().input(|i| {
+                    i.viewport().close_requested() || i.viewport().minimized.unwrap_or_default()
+                }) {
+                    settings.enabled = false;
+                }
             },
         );
     }
