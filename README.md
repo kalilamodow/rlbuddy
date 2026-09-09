@@ -10,6 +10,23 @@ automatic music control, player stats, custom map loading, and more!
 
 Each feature has its own widget, so you can customize it to your heart's desire :)
 
+**Table of contents**
+
+- [Installation](#installation)
+- [Features](#features)
+    - [Lobby](#lobby)
+    - [Match history](#match-history)
+    - [Session Stats](#session-stats)
+    - [Music](#music)
+    - [Custom map loader](#custom-map-loader)
+    - [Gamepad overlay](#gamepad-overlay)
+    - [Discord rich presence](#discord-rich-presence)
+    - [Hotkey](#hotkey)
+    - [Match toasts](#match-toasts)
+    - [Automatic setup](#automatic-setup)
+    - [Other](#other)
+- [Development/project architecture](#developmentproject-architecture)
+
 ## Installation
 
 Go to the [latest release](https://github.com/kalilamodow/rlbuddy/releases/latest), open the Assets dropdown, and
@@ -127,12 +144,14 @@ only appear in training.
 rlbuddy uses the stats api to get game information, and it can automatically set up the Rocket League stats api for you
 that way you don't have to manually edit the ini. The automatic setup widget is shown by default on first open.
 
-### Automatic popup-ing
+### Other
+
+#### Automatic popup-ing
 
 It automatically pops up (without taking away focus) in front of the game when a match starts until kickoff so you don't
 have to open it manually.
 
-### Other
+#### Transparency
 
 rlbuddy can be partially transparent. You can adjust the opacity through the settings widget.
 
