@@ -21,6 +21,9 @@ pub struct GamepadOverlayService {
     settings: ReadWriteStateHandle<GamepadOverlayServiceSettings>,
     gamepad: GamepadStateHandle,
     ctx: egui::Context,
+
+    // to only reposition when first opening which prevents glitchy movement
+    was_enabled_before: bool,
 }
 
 const DATA_ID: &str = "gamepad_overlay_savedata";
@@ -32,33 +35,47 @@ impl GamepadOverlayService {
             settings: ReadWriteStateHandle::new(load_service_data(DATA_ID)),
             gamepad: gamepad_service.gamepad_state_handle(),
             ctx,
+            was_enabled_before: false,
         }
     }
 
     pub fn update(&mut self) {
+        let mut reposition = false;
+
         {
             let settings = self.settings.read();
             if !settings.enabled {
+                self.was_enabled_before = false;
                 return;
             }
         }
 
-        self.render_viewport();
+        if !self.was_enabled_before {
+            reposition = true;
+            self.was_enabled_before = true;
+        }
+
+        self.render_viewport(reposition);
     }
 
-    fn render_viewport(&self) {
+    fn render_viewport(&self, reposition: bool) {
         let gamepad_state = self.gamepad.read();
         let mut settings = self.settings.write();
 
+        let mut viewport = ViewportBuilder::default()
+            .with_title("Gamepad Overlay")
+            .with_inner_size(egui::vec2(300.0, 175.0))
+            .with_transparent(true)
+            .with_taskbar(false)
+            .with_always_on_top();
+
+        if reposition {
+            viewport = viewport.with_position(settings.window_pos);
+        }
+
         self.ctx.show_viewport_immediate(
             ViewportId::from_hash_of("gamepad overlay"),
-            ViewportBuilder::default()
-                .with_title("Gamepad Overlay")
-                .with_inner_size(egui::vec2(300.0, 175.0))
-                .with_transparent(true)
-                .with_taskbar(false)
-                .with_position(settings.window_pos)
-                .with_always_on_top(),
+            viewport,
             |ui, _| {
                 egui::CentralPanel::default()
                     .frame(Frame::canvas(ui.style()))
