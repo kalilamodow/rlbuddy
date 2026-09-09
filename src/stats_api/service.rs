@@ -347,9 +347,19 @@ impl StatsApi {
     fn on_stats_api_event(&mut self, event: StatsApiEvent) -> Option<RLEvent> {
         Some(match event {
             StatsApiEvent::UpdateState(data) => {
-                // we dont do this only once because for example if the view switches from a bot to
+                let match_state = if data.game.replay {
+                    MatchState::Replay
+                } else if data.game.overtime {
+                    MatchState::Overtime
+                } else {
+                    MatchState::Game
+                };
+
+                // we DONT do this only once because for example if the view switches from a bot to
                 // the real local player, then it would get stuck.
-                if let Some(game_target) = data.game.target.as_ref() {
+                if matches!(match_state, MatchState::Game)
+                    && let Some(game_target) = data.game.target.as_ref()
+                {
                     let target_shortcut = game_target.shortcut;
                     let our_player = data.players.iter().find(|p| p.shortcut == target_shortcut);
                     if let Some(our_player) = our_player
@@ -361,13 +371,7 @@ impl StatsApi {
                 }
 
                 RLEvent::Update(MatchUpdate {
-                    state: if data.game.replay {
-                        MatchState::Replay
-                    } else if data.game.overtime {
-                        MatchState::Overtime
-                    } else {
-                        MatchState::Game
-                    },
+                    state: match_state,
                     score: data.game.scores(),
                     arena: asset_to_arena(&data.game.arena).unwrap_or("Unknown"),
                     players: data
