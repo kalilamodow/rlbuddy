@@ -91,7 +91,6 @@ impl MapDownloaderWidget {
         thread::spawn(move || {
             let response = ureq::get(format!(
                 "https://bakkesplugins.com/maps?search={search_text_urlencoded}",
-                
             ))
             .call()
             .unwrap();
