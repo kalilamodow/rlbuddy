@@ -17,6 +17,10 @@ pub struct GamepadState {
     pub trigger_right: bool,
     pub bumper_left: bool,
     pub bumper_right: bool,
+    pub up: bool,
+    pub down: bool,
+    pub left: bool,
+    pub right: bool,
     pub north: bool,
     pub south: bool,
     pub west: bool,
@@ -25,6 +29,8 @@ pub struct GamepadState {
     pub joy_left_y: f32,
     pub joy_right_x: f32,
     pub joy_right_y: f32,
+    pub select: bool,
+    pub start: bool,
 }
 
 // use this instead of unwrap_or_default so it doesnt make a new object
@@ -34,35 +40,27 @@ pub type GamepadStateHandle = ReadonlyStateHandle<Option<GamepadState>>;
 
 impl GamepadState {
     fn read_gamepad(gp: &Gamepad) -> Self {
+        let button_pressed = |b| gp.button_data(b).is_some_and(ButtonData::is_pressed);
+
         Self {
-            trigger_left: gp
-                .button_data(Button::LeftTrigger2)
-                .is_some_and(ButtonData::is_pressed),
-            trigger_right: gp
-                .button_data(Button::RightTrigger2)
-                .is_some_and(ButtonData::is_pressed),
-            bumper_left: gp
-                .button_data(Button::LeftTrigger)
-                .is_some_and(ButtonData::is_pressed),
-            bumper_right: gp
-                .button_data(Button::RightTrigger)
-                .is_some_and(ButtonData::is_pressed),
-            north: gp
-                .button_data(Button::North)
-                .is_some_and(ButtonData::is_pressed),
-            south: gp
-                .button_data(Button::South)
-                .is_some_and(ButtonData::is_pressed),
-            west: gp
-                .button_data(Button::West)
-                .is_some_and(ButtonData::is_pressed),
-            east: gp
-                .button_data(Button::East)
-                .is_some_and(ButtonData::is_pressed),
+            trigger_left: button_pressed(Button::LeftTrigger2),
+            trigger_right: button_pressed(Button::RightTrigger2),
+            bumper_left: button_pressed(Button::LeftTrigger),
+            bumper_right: button_pressed(Button::RightTrigger),
+            up: button_pressed(Button::DPadUp),
+            down: button_pressed(Button::DPadDown),
+            left: button_pressed(Button::DPadLeft),
+            right: button_pressed(Button::DPadRight),
+            north: button_pressed(Button::North),
+            south: button_pressed(Button::South),
+            west: button_pressed(Button::West),
+            east: button_pressed(Button::East),
             joy_left_x: gp.value(Axis::LeftStickX),
             joy_left_y: gp.value(Axis::LeftStickY),
             joy_right_x: gp.value(Axis::RightStickX),
             joy_right_y: gp.value(Axis::RightStickY),
+            select: button_pressed(Button::Select),
+            start: button_pressed(Button::Start),
         }
     }
 }

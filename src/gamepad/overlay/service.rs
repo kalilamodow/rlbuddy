@@ -123,6 +123,11 @@ impl GamepadOverlayService {
                             }
                         };
 
+                        circle_if(egui::pos2(72.5, 65.0), gp.up);
+                        circle_if(egui::pos2(72.5, 90.0), gp.down);
+                        circle_if(egui::pos2(60.0, 77.5), gp.left);
+                        circle_if(egui::pos2(85.0, 77.5), gp.right);
+
                         circle_if(egui::pos2(227.5, 65.0), gp.north);
                         circle_if(egui::pos2(227.5, 90.0), gp.south);
                         circle_if(egui::pos2(215.0, 77.5), gp.west);
@@ -157,6 +162,9 @@ impl GamepadOverlayService {
                             Rect::from_x_y_ranges(200.0..=230.0, 20.0..=38.0),
                             gp.trigger_right,
                         );
+
+                        rect_if(Rect::from_x_y_ranges(110.0..=130.0, 65.0..=75.0), gp.select);
+                        rect_if(Rect::from_x_y_ranges(170.0..=190.0, 65.0..=75.0), gp.start);
                     });
 
                 if ui.ctx().input(|i| {
