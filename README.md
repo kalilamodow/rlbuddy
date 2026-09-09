@@ -16,6 +16,8 @@ Go to the [latest release](https://github.com/kalilamodow/rlbuddy/releases/lates
 download and run rlbuddy.exe. It's self-contained and stores data in the user appdata directory, so you can put the executable
 wherever you want and it'll work.
 
+> You can disable it loading/saving data by running with the `--disable-persistence` flag if you want. It's mainly for testing.
+
 If you've never turned on the stats api before, on first run, make sure to enable it with the Stats API Setup widget.
 It's open by default.
 

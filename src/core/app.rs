@@ -108,6 +108,7 @@ pub struct AppSettings {
 pub struct RlBuddyApp {
     app_settings: ReadWriteStateHandle<AppSettings>,
     open_panels: Vec<PanelId>,
+    disable_persistence: bool,
 
     overlay_tx: mpsc::Sender<bool>,
     overlay_rx: mpsc::Receiver<bool>,
@@ -123,7 +124,12 @@ impl RlBuddyApp {
         let ctx = cc.egui_ctx.clone();
         egui_system_fonts::set_auto(&ctx, egui_system_fonts::FontStyle::Sans);
 
-        let app_data = AppData::load();
+        let disable_persistence = std::env::args().any(|a| &a == "--disable-persistence");
+        let app_data = if disable_persistence {
+            AppData::default()
+        } else {
+            AppData::load()
+        };
 
         if let Some(remembered_dimensions) = app_data.saved_window_dimensions {
             ctx.send_viewport_cmd(ViewportCommand::OuterPosition(remembered_dimensions.0));
@@ -150,6 +156,7 @@ impl RlBuddyApp {
             overlay_tx,
             overlay_rx,
             prev_hide_pos: None,
+            disable_persistence,
             open_panels: app_data.open_panels.0,
 
             stats_api_events: stats_api_service.subscribe(),
@@ -232,6 +239,10 @@ impl RlBuddyApp {
     }
 
     fn on_close(&self, ctx: &egui::Context) {
+        if self.disable_persistence {
+            return;
+        }
+
         for service in &self.services {
             service.save();
         }
