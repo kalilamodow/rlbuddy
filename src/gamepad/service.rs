@@ -1,3 +1,5 @@
+use std::sync::LazyLock;
+
 use crate::common::eventsource::{EventReceiver, EventSource};
 use crate::common::{ReadWriteStateHandle, ReadonlyStateHandle};
 use crate::core::app::Service;
@@ -9,7 +11,7 @@ pub enum GamepadEvent {
     ButtonReleased(Button),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Default, Clone)]
 pub struct GamepadState {
     pub trigger_left: bool,
     pub trigger_right: bool,
@@ -26,20 +28,7 @@ pub struct GamepadState {
 }
 
 // use this instead of unwrap_or_default so it doesnt make a new object
-pub static NO_GAMEPAD_STATE: GamepadState = GamepadState {
-    trigger_left: false,
-    trigger_right: false,
-    bumper_left: false,
-    bumper_right: false,
-    north: false,
-    south: false,
-    west: false,
-    east: false,
-    joy_left_x: 0.0,
-    joy_left_y: 0.0,
-    joy_right_x: 0.0,
-    joy_right_y: 0.0,
-};
+pub static NO_GAMEPAD_STATE: LazyLock<GamepadState> = LazyLock::new(GamepadState::default);
 
 pub type GamepadStateHandle = ReadonlyStateHandle<Option<GamepadState>>;
 
