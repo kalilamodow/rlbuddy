@@ -147,6 +147,14 @@ impl GamepadOverlayService {
                 }) {
                     settings.enabled = false;
                 }
+
+                // NO maximize >:(
+                if ui
+                    .ctx()
+                    .input(|i| i.viewport().maximized.unwrap_or_default())
+                {
+                    ui.send_viewport_cmd(egui::ViewportCommand::Maximized(false));
+                }
             },
         );
     }
