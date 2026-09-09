@@ -31,6 +31,10 @@ impl Panel for CurrentMatchWidget {
         "Lobby"
     }
 
+    fn open_by_default(&self) -> bool {
+        true
+    }
+
     fn ui(&mut self, ui: &mut egui::Ui) -> egui::Response {
         ui.vertical(|ui| {
             if let Some(current_match) = &self.state.read().current_match {

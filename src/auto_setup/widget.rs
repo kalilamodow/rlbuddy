@@ -68,6 +68,10 @@ impl Panel for AutoSetupWidget {
         "Stats API Setup"
     }
 
+    fn open_by_default(&self) -> bool {
+        true
+    }
+
     fn ui(&mut self, ui: &mut egui::Ui) -> egui::Response {
         ui.vertical(|ui| {
             if let Some(result) = &self.success {

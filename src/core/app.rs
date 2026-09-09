@@ -39,6 +39,10 @@ pub trait ServiceWithUi: Service {
 
 pub trait Panel {
     fn name(&self) -> &'static str;
+    fn open_by_default(&self) -> bool {
+        false
+    }
+
     fn ui(&mut self, ui: &mut Ui) -> Response;
 }
 
@@ -87,18 +91,9 @@ impl egui::Widget for &mut AppPanel {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct SavedOpenPanelList(Vec<PanelId>);
-
-impl Default for SavedOpenPanelList {
-    fn default() -> Self {
-        Self(vec![
-            // TODO: don't use magic values here
-            PanelId::from_name("Lobby"),
-            PanelId::from_name("Stats API Setup"),
-        ])
-    }
-}
+#[derive(Debug, Default, Serialize, Deserialize)]
+// Option implements Default, then RlBuddyApp can do its own wtv logic with unwrap_or_default
+pub struct SavedOpenPanelList(Option<Vec<PanelId>>);
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct AppSettings {
@@ -152,34 +147,41 @@ impl RlBuddyApp {
         let hotkey_service = HotkeyService::new(&mut gamepad_service, &overlay_tx);
         let music_service = MusicControlService::new(&mut stats_api_service);
 
+        let panels = vec![
+            AppPanel::new(CurrentMatchWidget::new(
+                &matches_service,
+                &player_info_service,
+            )),
+            AppPanel::new(PastMatchesWidget::new(
+                &matches_service,
+                &player_info_service,
+            )),
+            AppPanel::new(MyStatsWidget::new(&matches_service)),
+            AppPanel::new(music_service.panel()),
+            AppPanel::new(player_info_service.panel()),
+            AppPanel::new(AutoSetupWidget::new()),
+            AppPanel::new(map_loader_service.panel()),
+            AppPanel::new(gamepad_overlay_service.panel()),
+            AppPanel::new(match_notificator_service.panel()),
+            AppPanel::new(hotkey_service.panel()),
+            AppPanel::new(discord_service.panel()),
+            AppPanel::new(AppSettingsWidget::new(app_settings.clone())),
+        ];
+
         RlBuddyApp {
             overlay_tx,
             overlay_rx,
             prev_hide_pos: None,
             disable_persistence,
-            open_panels: app_data.open_panels.0,
+            open_panels: app_data.open_panels.0.unwrap_or_else(|| {
+                panels
+                    .iter()
+                    .filter_map(|p| p.panel.open_by_default().then_some(p.id))
+                    .collect()
+            }),
 
             stats_api_events: stats_api_service.subscribe(),
-            panels: vec![
-                AppPanel::new(CurrentMatchWidget::new(
-                    &matches_service,
-                    &player_info_service,
-                )),
-                AppPanel::new(PastMatchesWidget::new(
-                    &matches_service,
-                    &player_info_service,
-                )),
-                AppPanel::new(MyStatsWidget::new(&matches_service)),
-                AppPanel::new(music_service.panel()),
-                AppPanel::new(player_info_service.panel()),
-                AppPanel::new(AutoSetupWidget::new()),
-                AppPanel::new(map_loader_service.panel()),
-                AppPanel::new(gamepad_overlay_service.panel()),
-                AppPanel::new(match_notificator_service.panel()),
-                AppPanel::new(hotkey_service.panel()),
-                AppPanel::new(discord_service.panel()),
-                AppPanel::new(AppSettingsWidget::new(app_settings.clone())),
-            ],
+            panels,
             services: vec![
                 Box::new(hotkey_service),
                 Box::new(music_service),
@@ -256,7 +258,7 @@ impl RlBuddyApp {
                         .map(|inner| (outer.left_top(), inner.size()))
                 })
             }),
-            open_panels: SavedOpenPanelList(self.open_panels.clone()),
+            open_panels: SavedOpenPanelList(Some(self.open_panels.clone())),
         }
         .save();
     }
