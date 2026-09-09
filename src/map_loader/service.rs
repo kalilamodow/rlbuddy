@@ -124,18 +124,6 @@ impl MapLoaderService {
         ThreadedReadonlyStateHandle::over(&self.state)
     }
 
-    pub fn save(&self) -> MapLoaderServiceSavedata {
-        let state = self.state.read();
-        MapLoaderServiceSavedata {
-            maps: state.maps.clone(),
-            loaded_map: state.loaded_map.clone(),
-            underpass_path: state
-                .underpass_path
-                .clone()
-                .and_then(|p| p.to_str().map(str::to_owned)),
-        }
-    }
-
     pub fn update(&mut self) {
         for command in self.command_receiver.try_iter() {
             self.handle_command(command);
@@ -253,7 +241,18 @@ impl Service for MapLoaderService {
     }
 
     fn save(&self) {
-        save_service_data(DATA_ID, self.save());
+        let state = self.state.read();
+        save_service_data(
+            DATA_ID,
+            &MapLoaderServiceSavedata {
+                maps: state.maps.clone(),
+                loaded_map: state.loaded_map.clone(),
+                underpass_path: state
+                    .underpass_path
+                    .clone()
+                    .and_then(|p| p.to_str().map(str::to_owned)),
+            },
+        );
     }
 }
 

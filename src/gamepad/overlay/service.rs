@@ -188,7 +188,7 @@ impl Service for GamepadOverlayService {
     }
 
     fn save(&self) {
-        save_service_data(DATA_ID, self.settings.read().clone());
+        save_service_data(DATA_ID, &*self.settings.read());
     }
 }
 

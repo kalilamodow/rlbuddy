@@ -15,7 +15,7 @@ impl AppData {
         load_service_data("global_data")
     }
 
-    pub fn save(self) {
+    pub fn save(&self) {
         save_service_data("global_data", self);
     }
 }

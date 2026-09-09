@@ -26,7 +26,7 @@ where
     serde_json::from_str(&string).unwrap_or_default()
 }
 
-pub fn save_service_data<T>(name: &str, new: T)
+pub fn save_service_data<T>(name: &str, new: &T)
 where
     T: serde::Serialize + Default,
 {
