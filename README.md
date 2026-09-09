@@ -13,7 +13,7 @@ Each feature has its own widget, so you can customize it to your heart's desire 
 ## Installation
 
 Go to the [latest release](https://github.com/kalilamodow/rlbuddy/releases/latest), open the Assets dropdown, and
-download rlbuddy.exe. It's self-contained and stores data in the user appdata directory, so you can put the executable
+download and run rlbuddy.exe. It's self-contained and stores data in the user appdata directory, so you can put the executable
 wherever you want and it'll work.
 
 If you've never turned on the stats api before, on first run, make sure to enable it with the Stats API Setup widget.
@@ -101,20 +101,13 @@ Of course, you can disable it or just hide the current score.
 rlbuddy is usually opened with a hotkey/controller button, so you don't have to go through the taskbar or alt tab or
 anything. It kind of just pops up on top of the game window.
 
-The supported keyboard hotkeys are:
+You can configure the controller button to be basically whatever, but the only supported keyboard hotkeys are:
 
 - Alt (default)
 - Left shift
 - Left control
 - Tab
 - Windows/Super
-
-It also has controller buttons, being:
-
-- Options (default)
-- Start
-- Left bumper
-- Right bumper
 
 It stays up as long as you are holding the hotkey or while the window stays in focus. It's also disable-able.
 
