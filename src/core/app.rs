@@ -127,7 +127,6 @@ pub struct RlBuddyApp {
 impl RlBuddyApp {
     pub fn new(cc: &eframe::CreationContext) -> Self {
         let ctx = cc.egui_ctx.clone();
-        egui_system_fonts::set_auto(&ctx, egui_system_fonts::FontStyle::Sans);
 
         let disable_persistence = std::env::args().any(|a| &a == "--disable-persistence");
         let app_data = if disable_persistence {
