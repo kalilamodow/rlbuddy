@@ -19,6 +19,7 @@ use discord::DiscordService;
 use eframe::egui::{self, FontData, FontDefinitions, Response, Ui, ViewportCommand};
 use serde::{Deserialize, Serialize};
 use std::hash::{DefaultHasher, Hasher};
+use std::time::Instant;
 use std::{fs, thread};
 use std::{sync::mpsc, time::Duration};
 use windows::Win32::System::SystemInformation::GetLocalTime;
@@ -110,6 +111,30 @@ impl Default for AppSettings {
     }
 }
 
+struct FPSLimiter {
+    prev: Instant,
+    target_frametime: Duration,
+}
+
+impl FPSLimiter {
+    fn new(target_fps: u64) -> Self {
+        Self {
+            prev: Instant::now(),
+            target_frametime: Duration::from_millis(1000 / target_fps),
+        }
+    }
+
+    // returns how long to sleep
+    fn update(&mut self) -> Duration {
+        let prev = self.prev;
+        self.prev = Instant::now();
+
+        self.target_frametime
+            .checked_sub(prev.elapsed())
+            .unwrap_or(Duration::ZERO)
+    }
+}
+
 #[cfg(windows)]
 fn load_fonts(ctx: &egui::Context) -> Result<(), Box<dyn std::error::Error>> {
     const FONT_PATH: &str = "C:\\Windows\\Fonts\\segoeui.ttf";
@@ -136,6 +161,7 @@ pub struct RlBuddyApp {
     app_settings: ReadWriteStateHandle<AppSettings>,
     open_panels: Vec<PanelId>,
     disable_persistence: bool,
+    fps: FPSLimiter,
 
     overlay_tx: mpsc::Sender<bool>,
     overlay_rx: mpsc::Receiver<bool>,
@@ -204,6 +230,7 @@ impl RlBuddyApp {
             overlay_tx,
             overlay_rx,
             prev_hide_pos: None,
+            fps: FPSLimiter::new(60),
             disable_persistence,
             open_panels: app_data.open_panels.0.unwrap_or_else(|| {
                 panels
@@ -341,6 +368,8 @@ impl eframe::App for RlBuddyApp {
 
     fn ui(&mut self, ui: &mut Ui, _frame: &mut eframe::Frame) {
         visuals_with_transparency(ui.visuals_mut(), self.app_settings.read().transparency);
+        let wait_for_next_frame = self.fps.update();
+        thread::sleep(wait_for_next_frame);
 
         egui::Panel::bottom("bottom_panel").show_inside(ui, |ui| {
             ui.horizontal(|ui| {
