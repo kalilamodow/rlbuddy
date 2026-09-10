@@ -16,10 +16,11 @@ use crate::{
     toast_alert::{MatchNotificatorService, ToastAlertService},
 };
 use discord::DiscordService;
-use eframe::egui::{self, Response, Ui, ViewportCommand};
+use eframe::egui::{self, FontData, FontDefinitions, Response, Ui, ViewportCommand};
 use serde::{Deserialize, Serialize};
 use std::hash::{DefaultHasher, Hasher};
-use std::thread;
+use std::io::Read;
+use std::{fs, thread};
 use std::{sync::mpsc, time::Duration};
 use windows::Win32::System::SystemInformation::GetLocalTime;
 
@@ -110,6 +111,30 @@ impl Default for AppSettings {
     }
 }
 
+#[cfg(windows)]
+fn load_fonts(ctx: &egui::Context) -> Result<(), Box<dyn std::error::Error>> {
+    const FONT_PATH: &str = "C:\\Windows\\Fonts\\segoeui.ttf";
+
+    let mut file = fs::File::open(FONT_PATH)?;
+    let mut file_content = Vec::with_capacity(1_000_000);
+    file.read_to_end(&mut file_content)?;
+    let font_data = FontData::from_owned(file_content);
+
+    let mut fonts = FontDefinitions::default();
+    fonts
+        .font_data
+        .insert("Segoe UI".to_string(), font_data.into());
+
+    fonts
+        .families
+        .get_mut(&egui::FontFamily::Proportional)
+        .unwrap()
+        .insert(0, "Segoe UI".to_owned());
+
+    ctx.set_fonts(fonts);
+    Ok(())
+}
+
 pub struct RlBuddyApp {
     app_settings: ReadWriteStateHandle<AppSettings>,
     open_panels: Vec<PanelId>,
@@ -127,6 +152,7 @@ pub struct RlBuddyApp {
 impl RlBuddyApp {
     pub fn new(cc: &eframe::CreationContext) -> Self {
         let ctx = cc.egui_ctx.clone();
+        load_fonts(&ctx).unwrap();
 
         let disable_persistence = std::env::args().any(|a| &a == "--disable-persistence");
         let app_data = if disable_persistence {
