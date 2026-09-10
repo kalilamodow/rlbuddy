@@ -95,9 +95,19 @@ impl egui::Widget for &mut AppPanel {
 // Option implements Default, then RlBuddyApp can do its own wtv logic with unwrap_or_default
 pub struct SavedOpenPanelList(Option<Vec<PanelId>>);
 
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct AppSettings {
     pub transparency: u8,
+    pub loop_time: u16,
+}
+
+impl Default for AppSettings {
+    fn default() -> Self {
+        Self {
+            transparency: 20,
+            loop_time: 65,
+        }
+    }
 }
 
 pub struct RlBuddyApp {
@@ -297,10 +307,13 @@ impl eframe::App for RlBuddyApp {
             }
         }
 
-        ctx.request_repaint_after(Duration::from_millis(10));
-
         if ctx.input(|i| i.viewport().close_requested()) {
             self.on_close(ctx);
+        }
+
+        {
+            let settings = self.app_settings.read();
+            ctx.request_repaint_after(Duration::from_millis(settings.loop_time as u64));
         }
     }
 
@@ -365,11 +378,31 @@ impl Panel for AppSettingsWidget {
     }
 
     fn ui(&mut self, ui: &mut Ui) -> Response {
-        ui.vertical_centered_justified(|ui| {
+        ui.vertical(|ui| {
             let mut settings = self.handle.write();
             ui.add(
                 egui::Slider::new(&mut settings.transparency, u8::MIN..=u8::MAX)
                     .text("App transparency"),
+            );
+            ui.small(
+                "Changes how transparent the app is. Lower makes it easier to read, \
+                but it'll be harder to see the game behind it!",
+            );
+            ui.add_space(6.0);
+            ui.horizontal(|ui| {
+                ui.add(egui::Slider::new(&mut settings.loop_time, 5..=1000).text("Loop time (ms)"));
+
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
+                    if ui.button("Reset").clicked() {
+                        settings.loop_time = AppSettings::default().loop_time;
+                    }
+                });
+            });
+            ui.small(
+                "Changes rlbuddy's polling rate. \
+                Lower values will make rlbuddy a bit faster, but will use exponentially more CPU.\
+                You'll get diminishing returns before around 20ms and after about 100ms.\
+                This won't affect UI performance.",
             );
         })
         .response
