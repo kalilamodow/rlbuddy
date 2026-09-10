@@ -19,7 +19,6 @@ use discord::DiscordService;
 use eframe::egui::{self, FontData, FontDefinitions, Response, Ui, ViewportCommand};
 use serde::{Deserialize, Serialize};
 use std::hash::{DefaultHasher, Hasher};
-use std::io::Read;
 use std::{fs, thread};
 use std::{sync::mpsc, time::Duration};
 use windows::Win32::System::SystemInformation::GetLocalTime;
@@ -115,9 +114,7 @@ impl Default for AppSettings {
 fn load_fonts(ctx: &egui::Context) -> Result<(), Box<dyn std::error::Error>> {
     const FONT_PATH: &str = "C:\\Windows\\Fonts\\segoeui.ttf";
 
-    let mut file = fs::File::open(FONT_PATH)?;
-    let mut file_content = Vec::with_capacity(1_000_000);
-    file.read_to_end(&mut file_content)?;
+    let file_content = fs::read(FONT_PATH)?;
     let font_data = FontData::from_owned(file_content);
 
     let mut fonts = FontDefinitions::default();
