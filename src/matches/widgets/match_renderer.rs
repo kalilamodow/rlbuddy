@@ -105,7 +105,7 @@ impl<'a> MatchRenderer<'a> {
                 MatchType::Old(o) => Some(o.end_time),
                 MatchType::Session(s) => s.finish.as_ref().map(|f| f.timestamp),
             } {
-                let (text, refresh_in) = format_seconds(
+                let text = format_seconds(
                     SystemTime::now()
                         .duration_since(end_time)
                         .unwrap()
@@ -114,7 +114,6 @@ impl<'a> MatchRenderer<'a> {
                 );
 
                 ui.label(format!("{text} ago"));
-                ui.request_repaint_after(*refresh_in);
             }
 
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {

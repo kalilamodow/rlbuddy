@@ -1,11 +1,4 @@
-use std::time::Duration;
-
-static NO_DURATION: Duration = Duration::ZERO;
-static ONE_SECOND: Duration = Duration::from_secs(1);
-static ONE_MINUTE: Duration = Duration::from_mins(1);
-static ONE_HOUR: Duration = Duration::from_hours(1);
-static ONE_DAY: Duration = Duration::from_hours(24);
-static ONE_WEEK: Duration = Duration::from_hours(24 * 7);
+use std::borrow::Cow;
 
 #[derive(Debug, Clone, Copy)]
 enum TimeUnit {
@@ -17,7 +10,7 @@ enum TimeUnit {
 }
 
 impl TimeUnit {
-    fn normal(&self) -> &'static str {
+    fn normal(self) -> &'static str {
         match self {
             Self::Second => "second",
             Self::Minute => "minute",
@@ -27,23 +20,13 @@ impl TimeUnit {
         }
     }
 
-    fn short(&self) -> &'static str {
+    fn short(self) -> &'static str {
         match self {
             Self::Second => "s",
             Self::Minute => "m",
             Self::Hour => "h",
             Self::Day => "d",
             Self::Week => "w",
-        }
-    }
-
-    fn duration(&self) -> &'static Duration {
-        match self {
-            Self::Second => &ONE_SECOND,
-            Self::Minute => &ONE_MINUTE,
-            Self::Hour => &ONE_HOUR,
-            Self::Day => &ONE_DAY,
-            Self::Week => &ONE_WEEK,
         }
     }
 }
@@ -78,10 +61,7 @@ impl TimePart {
     }
 }
 
-/// Returns a formatted string and how long itll take to need to update. Like
-/// if it's in seconds, it'll tell you that you need to refresh in 1 second
-/// (because eguis immediate mode and doesnt update itself)
-pub fn format_seconds(total_seconds: u64, short: bool) -> (String, &'static Duration) {
+pub fn format_seconds(total_seconds: u64, short: bool) -> Cow<'static, str> {
     let weeks = total_seconds / (60 * 60 * 24 * 7);
     let days = total_seconds / (60 * 60 * 24);
     let hours = total_seconds / (60 * 60);
@@ -99,16 +79,15 @@ pub fn format_seconds(total_seconds: u64, short: bool) -> (String, &'static Dura
     .flatten()
     .collect();
 
-    let Some(last) = parts.last() else {
-        return ("Just now".into(), &NO_DURATION);
-    };
+    if parts.is_empty() {
+        return Cow::Borrowed(&"Just now");
+    }
 
-    let output_duration = last.unit.duration();
     let output_string = parts
         .into_iter()
         .map(|t| t.format(short))
         .collect::<Vec<_>>()
         .join(" ");
 
-    (output_string, output_duration)
+    Cow::Owned(output_string)
 }

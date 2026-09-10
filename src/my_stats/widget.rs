@@ -160,7 +160,9 @@ impl MyStatsWidget {
                     })
                     .collect()
             })
-            .x_axis_formatter(|point, _| format_seconds((now - point.value) as u64, true).0)
+            .x_axis_formatter(|point, _| {
+                format_seconds((now - point.value) as u64, true).into_owned()
+            })
             .show(ui, |ui| {
                 ui.line(Line::new("MMR", PlotPoints::Borrowed(&points)));
             });
