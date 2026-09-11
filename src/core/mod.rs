@@ -1,2 +1,3 @@
 pub mod app;
-pub mod persistence;
+mod fonts;
+mod persistence;

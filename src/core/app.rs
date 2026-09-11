@@ -1,4 +1,5 @@
 use crate::common::ReadWriteStateHandle;
+use crate::core::fonts::load_fonts;
 use crate::core::persistence::AppData;
 use crate::gamepad::GamepadService;
 use crate::gamepad::overlay::GamepadOverlayService;
@@ -16,13 +17,14 @@ use crate::{
     toast_alert::{MatchNotificatorService, ToastAlertService},
 };
 use discord::DiscordService;
-use eframe::egui::{self, FontData, FontDefinitions, Response, Ui, ViewportCommand};
+use eframe::egui::{self, Response, Ui, ViewportCommand};
 use serde::{Deserialize, Serialize};
 use std::hash::{DefaultHasher, Hasher};
+use std::thread;
 use std::time::Instant;
-use std::{fs, thread};
 use std::{sync::mpsc, time::Duration};
-use windows::Win32::System::SystemInformation::GetLocalTime;
+use time::OffsetDateTime;
+use time::macros::format_description;
 
 pub trait Service {
     fn update(&mut self);
@@ -133,28 +135,6 @@ impl FPSLimiter {
             .checked_sub(prev.elapsed())
             .unwrap_or(Duration::ZERO)
     }
-}
-
-#[cfg(windows)]
-fn load_fonts(ctx: &egui::Context) -> Result<(), Box<dyn std::error::Error>> {
-    const FONT_PATH: &str = "C:\\Windows\\Fonts\\segoeui.ttf";
-
-    let file_content = fs::read(FONT_PATH)?;
-    let font_data = FontData::from_owned(file_content);
-
-    let mut fonts = FontDefinitions::default();
-    fonts
-        .font_data
-        .insert("Segoe UI".to_string(), font_data.into());
-
-    fonts
-        .families
-        .get_mut(&egui::FontFamily::Proportional)
-        .unwrap()
-        .insert(0, "Segoe UI".to_owned());
-
-    ctx.set_fonts(fonts);
-    Ok(())
 }
 
 pub struct RlBuddyApp {
@@ -389,7 +369,9 @@ impl eframe::App for RlBuddyApp {
                     });
 
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
-                    ui.label(clock_time());
+                    if let Some(time) = clock_time() {
+                        ui.label(time);
+                    }
                 });
             })
         });
@@ -520,14 +502,10 @@ impl egui::Widget for PanelsWidget<'_> {
     }
 }
 
-fn clock_time() -> String {
-    let time = unsafe { GetLocalTime() };
-    let hour = match time.wHour {
-        0 => 12,
-        1..=12 => time.wHour,
-        _ => time.wHour - 12,
-    };
-
-    let am_or_pm = if time.wHour < 12 { "AM" } else { "PM" };
-    format!("{hour}:{:02} {am_or_pm}", time.wMinute)
+fn clock_time() -> Option<String> {
+    let now = OffsetDateTime::now_local().ok()?;
+    now.format(format_description!(
+        "[hour repr:12 padding:none]:[minute] [period]"
+    ))
+    .ok()
 }
