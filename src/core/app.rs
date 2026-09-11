@@ -102,6 +102,7 @@ pub struct SavedOpenPanelList(Option<Vec<PanelId>>);
 pub struct AppSettings {
     pub transparency: u8,
     pub loop_time: u16,
+    pub ui_fps_limit: bool,
 }
 
 impl Default for AppSettings {
@@ -109,6 +110,7 @@ impl Default for AppSettings {
         Self {
             transparency: 20,
             loop_time: 65,
+            ui_fps_limit: true,
         }
     }
 }
@@ -137,11 +139,13 @@ impl FPSLimiter {
     }
 }
 
+const DEFAULT_FPS_LIMIT: u64 = 60;
+
 pub struct RlBuddyApp {
     app_settings: ReadWriteStateHandle<AppSettings>,
     open_panels: Vec<PanelId>,
     disable_persistence: bool,
-    fps: FPSLimiter,
+    fps: Option<FPSLimiter>,
 
     overlay_tx: mpsc::Sender<bool>,
     overlay_rx: mpsc::Receiver<bool>,
@@ -169,6 +173,7 @@ impl RlBuddyApp {
             ctx.send_viewport_cmd(ViewportCommand::InnerSize(remembered_dimensions.1));
         }
 
+        let ui_fps_limit = app_data.app_settings.ui_fps_limit;
         let app_settings = ReadWriteStateHandle::new(app_data.app_settings);
         let (overlay_tx, overlay_rx) = mpsc::channel();
 
@@ -210,7 +215,7 @@ impl RlBuddyApp {
             overlay_tx,
             overlay_rx,
             prev_hide_pos: None,
-            fps: FPSLimiter::new(60),
+            fps: ui_fps_limit.then(|| FPSLimiter::new(DEFAULT_FPS_LIMIT)),
             disable_persistence,
             open_panels: app_data.open_panels.0.unwrap_or_else(|| {
                 panels
@@ -348,8 +353,19 @@ impl eframe::App for RlBuddyApp {
 
     fn ui(&mut self, ui: &mut Ui, _frame: &mut eframe::Frame) {
         visuals_with_transparency(ui.visuals_mut(), self.app_settings.read().transparency);
-        let wait_for_next_frame = self.fps.update();
-        thread::sleep(wait_for_next_frame);
+        {
+            let settings = self.app_settings.read();
+            if let Some(limiter) = &mut self.fps {
+                if settings.ui_fps_limit {
+                    let wait_for_next_frame = limiter.update();
+                    thread::sleep(wait_for_next_frame);
+                } else {
+                    self.fps = None;
+                }
+            } else if settings.ui_fps_limit {
+                self.fps = Some(FPSLimiter::new(DEFAULT_FPS_LIMIT));
+            }
+        }
 
         egui::Panel::bottom("bottom_panel").show_inside(ui, |ui| {
             ui.horizontal(|ui| {
@@ -421,6 +437,23 @@ impl Panel for AppSettingsWidget {
                 "Changes how transparent the app is. Lower makes it easier to read, \
                 but it'll be harder to see the game behind it!",
             );
+
+            ui.add_space(6.0);
+            ui.horizontal(|ui| {
+                ui.checkbox(&mut settings.ui_fps_limit, "Limit UI framerate");
+
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
+                    if ui.button("Reset").clicked() {
+                        settings.ui_fps_limit = AppSettings::default().ui_fps_limit;
+                    }
+                });
+            });
+            ui.small(
+                "Limit rlbuddy's user interface refresh rate? Disabling the limit will make \
+                the app appear a bit smoother if you have a high refresh rate screen, but it \
+                will use a lot more resources while open.",
+            );
+
             ui.add_space(6.0);
             ui.horizontal(|ui| {
                 ui.add(egui::Slider::new(&mut settings.loop_time, 5..=1000).text("Loop time (ms)"));
@@ -433,8 +466,8 @@ impl Panel for AppSettingsWidget {
             });
             ui.small(
                 "Changes rlbuddy's polling rate. \
-                Lower values will make rlbuddy a bit faster, but will use exponentially more CPU.\
-                You'll get diminishing returns before around 20ms and after about 100ms.\
+                Lower values will make rlbuddy a bit faster, but will use exponentially more CPU. \
+                You'll get diminishing returns before around 20ms and after about 100ms. \
                 This won't affect UI performance.",
             );
         })
