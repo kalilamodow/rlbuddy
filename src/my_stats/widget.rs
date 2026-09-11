@@ -197,7 +197,7 @@ impl MyStatsWidget {
             MatchType::Session(s) => s
                 .players
                 .iter()
-                .find_map(|p| p.is_local_player.then_some(&p.data.stats)),
+                .find_map(|p| p.is_local_player.then_some(&p.stats)),
             MatchType::Old(_) => None,
         });
 

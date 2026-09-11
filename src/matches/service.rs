@@ -123,7 +123,7 @@ impl MatchesService {
                     };
 
                     self.rank_api
-                        .invalidate(current_match.players.iter().map(|p| &p.data.platform_id));
+                        .invalidate(current_match.players.iter().map(|p| &p.player_id));
 
                     if current_match.playlist.is_singleplayer() {
                         return;

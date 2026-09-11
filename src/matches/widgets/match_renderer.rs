@@ -145,7 +145,7 @@ impl<'a> MatchRenderer<'a> {
                 } else if match_player.is_local_player {
                     ui.visuals().strong_text_color()
                 } else {
-                    match match_player.data.team {
+                    match match_player.team {
                         Team::Blue => Color32::from_rgb(64, 128, 255),
                         Team::Orange => Color32::ORANGE,
                     }
@@ -163,7 +163,7 @@ impl<'a> MatchRenderer<'a> {
 
                 name_label.context_menu(|ui| {
                     if ui.button("Copy player id").clicked() {
-                        ui.ctx().copy_text(match_player.data.platform_id.clone());
+                        ui.ctx().copy_text(match_player.player_id.clone());
                     }
 
                     if ui
@@ -184,7 +184,7 @@ impl<'a> MatchRenderer<'a> {
                     }
                 });
 
-                if !matches!(match_player.data.platform, Platform::Bot) {
+                if !matches!(match_player.platform, Platform::Bot) {
                     if name_label.hovered() {
                         ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
                     }
@@ -199,7 +199,7 @@ impl<'a> MatchRenderer<'a> {
                 self.show_buddy_stat_icon_maybe(ui, match_player);
 
                 ui.label(
-                    egui::RichText::new(match_player.data.platform.to_string())
+                    egui::RichText::new(match_player.platform.to_string())
                         .color(ui.visuals().weak_text_color()),
                 );
             });
@@ -209,18 +209,18 @@ impl<'a> MatchRenderer<'a> {
             }
         });
 
-        center_label(ui, match_player.data.stats.score.to_string());
+        center_label(ui, match_player.stats.score.to_string());
 
         if ui
             .add_enabled(
-                !matches!(match_player.data.platform, Platform::Bot),
+                !matches!(match_player.platform, Platform::Bot),
                 egui::Button::new("More"),
             )
             .clicked()
         {
             *self.showing_stats_for = Some((
                 match_player.display_name().to_owned(),
-                match_player.data.platform_id.clone(),
+                match_player.player_id.clone(),
             ));
         }
 
@@ -407,8 +407,8 @@ impl<'a> MatchRenderer<'a> {
             MatchType::Session(s) => s
                 .players
                 .iter()
-                .find(|p| p.data.platform_id == player.1)
-                .map(|p| &p.data.stats),
+                .find(|p| p.player_id == player.1)
+                .map(|p| &p.stats),
             MatchType::Old(o) => o
                 .players
                 .iter()
@@ -513,11 +513,9 @@ impl egui::Widget for MatchRenderer<'_> {
                             }
                         }
                         MatchType::Session(s) => {
-                            for player in filter_useless_bots(
-                                &s.players,
-                                |p| p.data.platform,
-                                |p| p.data.stats.score,
-                            ) {
+                            for player in
+                                filter_useless_bots(&s.players, |p| p.platform, |p| p.stats.score)
+                            {
                                 self.render_player(ui, player);
                             }
                         }

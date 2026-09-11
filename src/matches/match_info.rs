@@ -11,10 +11,14 @@ use std::{sync::Arc, time::SystemTime};
 
 #[derive(Debug, Clone)]
 pub struct MatchPlayer {
+    pub name: String,
+    pub platform: Platform,
+    pub player_id: String,
+    pub team: Team,
+    pub stats: PlayerStats,
     pub left: bool,
     pub uncensored_name: Option<Arc<String>>,
     pub epic_name: Option<Arc<String>>,
-    pub data: PlayerData,
     pub skill: Option<Arc<PlayerSkillInformation>>,
     pub avatar_url: Option<Arc<String>>,
     pub is_local_player: bool,
@@ -23,14 +27,26 @@ pub struct MatchPlayer {
 impl MatchPlayer {
     fn from_data(value: PlayerData, local_player_id: Option<&String>) -> Self {
         Self {
+            name: value.name,
+            platform: value.platform,
             is_local_player: Some(&value.platform_id) == local_player_id,
+            player_id: value.platform_id,
+            team: value.team,
+            stats: value.stats,
             left: false,
             uncensored_name: None,
             epic_name: None,
             skill: None,
-            data: value,
             avatar_url: None,
         }
+    }
+
+    fn update_data(&mut self, value: PlayerData) {
+        self.name = value.name;
+        self.platform = value.platform;
+        self.player_id = value.platform_id;
+        self.team = value.team;
+        self.stats = value.stats;
     }
 
     pub fn display_name_is_censored(&self) -> bool {
@@ -38,23 +54,23 @@ impl MatchPlayer {
     }
 
     pub fn uncensor_with(&mut self, api: &NameAPI) {
-        self.uncensored_name = api.get(&self.data.platform_id);
+        self.uncensored_name = api.get(&self.player_id);
     }
 
     pub fn display_name(&self) -> &str {
         // unwrap or else gives a error idk why
         match &self.uncensored_name {
             Some(name) => name,
-            None => self.data.name.as_str(),
+            None => self.name.as_str(),
         }
     }
 
     pub fn open_player_info_command(&self) -> Option<PlayerInfoServiceCommand> {
         open_player_info_command(
             self.epic_name.as_ref().map(AsRef::as_ref),
-            self.data.platform,
+            self.platform,
             self.display_name(),
-            &self.data.platform_id,
+            &self.player_id,
         )
     }
 }
@@ -116,10 +132,10 @@ impl MatchInfo {
             let updated_pos = updated
                 .players
                 .iter()
-                .position(|p| p.platform_id == player.data.platform_id);
+                .position(|p| p.platform_id == player.player_id);
             if let Some(updated_pos) = updated_pos {
-                let updated = updated.players.swap_remove(updated_pos);
-                player.data = updated;
+                let updated_player = updated.players.swap_remove(updated_pos);
+                player.update_data(updated_player);
                 player.left = false;
             } else {
                 player.left = true;
@@ -140,8 +156,8 @@ impl MatchInfo {
             .players
             .iter()
             .find(|p| p.is_local_player)
-            .map_or(Team::Blue, |p| p.data.team);
-        self.players.sort_by_key(|p| p.data.team != self.our_team);
+            .map_or(Team::Blue, |p| p.team);
+        self.players.sort_by_key(|p| p.team != self.our_team);
     }
 
     fn on_each_player<F: Fn(&mut MatchPlayer), C: Fn(&MatchPlayer) -> bool>(
@@ -158,15 +174,15 @@ impl MatchInfo {
 
     pub fn update_ranks(&mut self, api: &RankAPI) {
         self.on_each_player(
-            |p| p.skill = api.get(&p.data.platform_id),
-            |c| c.data.platform != Platform::Bot,
+            |p| p.skill = api.get(&p.player_id),
+            |c| c.platform != Platform::Bot,
         );
     }
 
     pub fn update_epic_ids(&mut self, api: &EpicIdAPI) {
         self.on_each_player(
-            |p| p.epic_name = api.get(&p.data.platform_id),
-            |c| matches!(c.data.platform, Platform::Switch),
+            |p| p.epic_name = api.get(&p.player_id),
+            |c| matches!(c.platform, Platform::Switch),
         );
     }
 
@@ -229,9 +245,9 @@ impl StrippedPlayer {
     fn from_player(value: MatchPlayer, playlist: Playlist) -> Self {
         Self {
             name: value.display_name().to_owned(),
-            player_id: value.data.platform_id,
+            player_id: value.player_id,
             player_type: if value.is_local_player {
-                StrippedPlayerType::LocalPlayer(value.data.stats)
+                StrippedPlayerType::LocalPlayer(value.stats)
             } else {
                 StrippedPlayerType::RemotePlayer
             },
@@ -239,8 +255,8 @@ impl StrippedPlayer {
                 s.get_playlist(playlist.in_ranked().unwrap_or(playlist))
                     .cloned()
             }),
-            team: value.data.team,
-            platform: value.data.platform,
+            team: value.team,
+            platform: value.platform,
             epic_id: value.epic_name.as_ref().map(|s| s.as_ref().clone()),
             avatar_url: value.avatar_url.as_ref().map(|s| s.as_ref().clone()),
         }

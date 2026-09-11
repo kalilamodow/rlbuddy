@@ -10,11 +10,11 @@ fn bb_sprout(other_player: &MatchPlayer, matches: &Vec<MatchType<'_>>) -> Option
         MatchType::Old(o) => o
             .players
             .iter()
-            .all(|p| p.player_id != other_player.data.platform_id),
+            .all(|p| p.player_id != other_player.player_id),
         MatchType::Session(s) => s
             .players
             .iter()
-            .all(|p| p.data.platform_id != other_player.data.platform_id),
+            .all(|p| p.player_id != other_player.player_id),
     });
 
     not_played_together.then(|| BuddyBadge {
@@ -29,18 +29,17 @@ fn bb_bffs(other_player: &MatchPlayer, matches: &Vec<MatchType<'_>>) -> Option<B
         .filter(|m| match m {
             MatchType::Old(o) => {
                 o.winner == m.our_team()
-                    && o.players.iter().any(|p| {
-                        p.player_id == other_player.data.platform_id && p.team == m.our_team()
-                    })
+                    && o.players
+                        .iter()
+                        .any(|p| p.player_id == other_player.player_id && p.team == m.our_team())
             }
             MatchType::Session(s) => {
                 s.finish
                     .as_ref()
                     .is_some_and(|f| f.winner == Some(m.our_team()))
-                    && s.players.iter().any(|p| {
-                        p.data.platform_id == other_player.data.platform_id
-                            && p.data.team == m.our_team()
-                    })
+                    && s.players
+                        .iter()
+                        .any(|p| p.player_id == other_player.player_id && p.team == m.our_team())
             }
         })
         .count();
@@ -66,7 +65,7 @@ fn bb_rivals(other_player: &MatchPlayer, matches: &Vec<MatchType<'_>>) -> Option
             MatchType::Old(o) => {
                 if o.players
                     .iter()
-                    .any(|p| p.player_id == other_player.data.platform_id && p.team != m.our_team())
+                    .any(|p| p.player_id == other_player.player_id && p.team != m.our_team())
                 {
                     Some(if o.winner == o.our_team() {
                         (1, 0)
@@ -78,10 +77,10 @@ fn bb_rivals(other_player: &MatchPlayer, matches: &Vec<MatchType<'_>>) -> Option
                 }
             }
             MatchType::Session(s) => {
-                if s.players.iter().any(|p| {
-                    p.data.platform_id == other_player.data.platform_id
-                        && p.data.team != m.our_team()
-                }) && let Some(winner) = s.finish.as_ref().map(|f| f.winner)
+                if s.players
+                    .iter()
+                    .any(|p| p.player_id == other_player.player_id && p.team != m.our_team())
+                    && let Some(winner) = s.finish.as_ref().map(|f| f.winner)
                 {
                     Some(if winner == Some(m.our_team()) {
                         (1, 0)

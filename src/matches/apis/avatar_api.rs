@@ -62,7 +62,7 @@ pub struct AvatarKey {
 impl TryFrom<&MatchPlayer> for AvatarKey {
     type Error = ();
     fn try_from(value: &MatchPlayer) -> Result<Self, Self::Error> {
-        let Ok(platform) = value.data.platform.try_into() else {
+        let Ok(platform) = value.platform.try_into() else {
             return Err(());
         };
 
@@ -74,7 +74,7 @@ impl TryFrom<&MatchPlayer> for AvatarKey {
                     }
                     value.display_name().to_owned()
                 }
-                _ => get_platform_id(&value.data.platform_id).to_owned(),
+                _ => get_platform_id(&value.player_id).to_owned(),
             },
             platform,
         })
