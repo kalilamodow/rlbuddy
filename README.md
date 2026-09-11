@@ -4,9 +4,9 @@
 - rlbuddy is 100% sleep-deprived-humanslop. Little to no AI was used in its making!
 - [See it in use](https://www.youtube.com/watch?v=gAwO3Ls4_lo) (meh video but it's just to show it working. Read the whole readme for an overview of all the features!)
 
-rlbuddy is a Rocket League companion app for Windows that lets you preview your lobby's ranks without tabbing out,
-offers various statistics based on your match history, and has a bunch of widgets allowing for Discord rich presence,
-automatic music control, player stats, custom map loading, and more!
+rlbuddy is a Rocket League companion app for Windows and Linux (incomplete) that lets you preview your lobby's ranks without
+tabbing out, offers various statistics based on your match history, and has a bunch of widgets allowing for Discord rich
+presence, automatic music control, player stats, custom map loading, and more!
 
 Each feature has its own widget, so you can customize it to your heart's desire :)
 
@@ -158,7 +158,8 @@ rlbuddy can be partially transparent. You can adjust the opacity through the set
 ## Development/project architecture
 
 rlbuddy is written in Rust and uses the `eframe` gui framework. The build script automatically downloads assets from the
-Fandom images server. It does use a couple of Windows-only features, but Linux support is totally possible if enough
+Fandom images server. It does use a couple of Windows-only features, but I'm in the process of trying to feature-gate the
+Windows-only features to get it running on Linux!
 people want it (I'm on Windows so I'm not totally sure what works on other platforms).
 
 There are services and panels. Services are the code-behind, they're state managers with `update` methods called every
