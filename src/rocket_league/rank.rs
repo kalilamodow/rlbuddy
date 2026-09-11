@@ -84,9 +84,9 @@ impl Rank {
             Rank::Champ1 => egui::include_image!("../../assets/Champion1_rank_icon.webp"),
             Rank::Champ2 => egui::include_image!("../../assets/Champion2_rank_icon.webp"),
             Rank::Champ3 => egui::include_image!("../../assets/Champion3_rank_icon.webp"),
-            Rank::GC1 => egui::include_image!("../../assets/Grand_Champion1_rank_icon.webp"),
-            Rank::GC2 => egui::include_image!("../../assets/Grand_Champion2_rank_icon.webp"),
-            Rank::GC3 => egui::include_image!("../../assets/Grand_Champion3_rank_icon.webp"),
+            Rank::GC1 => egui::include_image!("../../assets/Grand_champion1_rank_icon.webp"),
+            Rank::GC2 => egui::include_image!("../../assets/Grand_champion2_rank_icon.webp"),
+            Rank::GC3 => egui::include_image!("../../assets/Grand_champion3_rank_icon.webp"),
             Rank::Ssl => egui::include_image!("../../assets/Supersonic_Legend_rank_icon.webp"),
         }
     }
