@@ -1,4 +1,4 @@
-use crate::common::savedata::{load_service_data, save_service_data};
+use crate::common::savedata::{load_service_config, save_service_config};
 use crate::core::app::{Panel, Service, ServiceWithUi};
 use crate::map_loader::widget::MapLoaderWidget;
 use crate::{
@@ -93,7 +93,7 @@ const DATA_ID: &str = "map_loader_savedata";
 
 impl MapLoaderService {
     pub fn new() -> Self {
-        let savedata: MapLoaderServiceSavedata = load_service_data(DATA_ID);
+        let savedata: MapLoaderServiceSavedata = load_service_config(DATA_ID);
         let underpass_path = {
             savedata
                 .underpass_path
@@ -242,7 +242,7 @@ impl Service for MapLoaderService {
 
     fn save(&self) {
         let state = self.state.read();
-        save_service_data(
+        save_service_config(
             DATA_ID,
             &MapLoaderServiceSavedata {
                 maps: state.maps.clone(),

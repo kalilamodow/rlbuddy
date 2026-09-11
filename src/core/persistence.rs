@@ -1,4 +1,4 @@
-use crate::common::savedata::{load_service_data, save_service_data};
+use crate::common::savedata::{load_service_config, save_service_config};
 use crate::core::app::SavedOpenPanelList;
 use eframe::egui;
 use serde::{Deserialize, Serialize};
@@ -12,10 +12,10 @@ pub struct AppData {
 
 impl AppData {
     pub fn load() -> Self {
-        load_service_data("global_data")
+        load_service_config("global_data")
     }
 
     pub fn save(&self) {
-        save_service_data("global_data", self);
+        save_service_config("global_data", self);
     }
 }

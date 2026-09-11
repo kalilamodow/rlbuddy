@@ -1,5 +1,5 @@
 use super::rpc::{PresenceData, RichPresenceController};
-use crate::common::savedata::{load_service_data, save_service_data};
+use crate::common::savedata::{load_service_config, save_service_config};
 use crate::core::app::{Panel, Service, ServiceWithUi};
 use crate::discord::widget::DiscordWidget;
 use crate::matches::MatchesService;
@@ -81,7 +81,7 @@ impl DiscordService {
     pub fn new(matches: &MatchesService, stats_api: &mut StatsApi) -> Self {
         DiscordService {
             state: ReadWriteStateHandle::new(DiscordServiceState::default()),
-            settings: ReadWriteStateHandle::new(load_service_data(DATA_ID)),
+            settings: ReadWriteStateHandle::new(load_service_config(DATA_ID)),
             controller: RichPresenceController::new(),
             current: GameState::Lobby,
             matches_handle: matches.state_handle(),
@@ -154,7 +154,7 @@ impl Service for DiscordService {
     }
 
     fn save(&self) {
-        save_service_data(DATA_ID, &*self.settings.read());
+        save_service_config(DATA_ID, &*self.settings.read());
     }
 }
 

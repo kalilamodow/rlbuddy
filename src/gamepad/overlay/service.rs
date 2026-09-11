@@ -1,5 +1,5 @@
 use crate::common::ReadWriteStateHandle;
-use crate::common::savedata::{load_service_data, save_service_data};
+use crate::common::savedata::{load_service_config, save_service_config};
 use crate::core::app::{Panel, Service, ServiceWithUi};
 use crate::gamepad::GamepadService;
 use crate::gamepad::overlay::widget::GamepadOverlayWidget;
@@ -32,7 +32,7 @@ impl GamepadOverlayService {
     #[must_use]
     pub fn new(ctx: egui::Context, gamepad_service: &GamepadService) -> Self {
         Self {
-            settings: ReadWriteStateHandle::new(load_service_data(DATA_ID)),
+            settings: ReadWriteStateHandle::new(load_service_config(DATA_ID)),
             gamepad: gamepad_service.gamepad_state_handle(),
             ctx,
             was_enabled_before: false,
@@ -196,7 +196,7 @@ impl Service for GamepadOverlayService {
     }
 
     fn save(&self) {
-        save_service_data(DATA_ID, &*self.settings.read());
+        save_service_config(DATA_ID, &*self.settings.read());
     }
 }
 

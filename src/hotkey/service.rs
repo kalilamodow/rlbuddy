@@ -1,5 +1,5 @@
 use crate::common::eventsource::EventReceiver;
-use crate::common::savedata::{load_service_data, save_service_data};
+use crate::common::savedata::{load_service_config, save_service_config};
 use crate::common::{ThreadedReadWriteStateHandle, ThreadedReadonlyStateHandle};
 use crate::core::app::{Panel, Service, ServiceWithUi};
 use crate::gamepad::{GamepadEvent, GamepadService};
@@ -102,7 +102,7 @@ pub struct HotkeyService {
 
 impl HotkeyService {
     pub fn new(gamepad_service: &mut GamepadService, overlay_tx: &mpsc::Sender<bool>) -> Self {
-        let settings = ThreadedReadWriteStateHandle::new(load_service_data(DATA_ID));
+        let settings = ThreadedReadWriteStateHandle::new(load_service_config(DATA_ID));
 
         let settings_for_kb_manager = settings.clone();
         let overlay_tx_for_kb_manager = overlay_tx.clone();
@@ -153,7 +153,7 @@ impl Service for HotkeyService {
     }
 
     fn save(&self) {
-        save_service_data(DATA_ID, &*self.settings.read());
+        save_service_config(DATA_ID, &*self.settings.read());
     }
 }
 

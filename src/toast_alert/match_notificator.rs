@@ -1,4 +1,4 @@
-use crate::common::savedata::{load_service_data, save_service_data};
+use crate::common::savedata::{load_service_config, save_service_config};
 use crate::core::app::{Panel, Service, ServiceWithUi};
 use crate::matches::MatchesService;
 use crate::stats_api::StatsApi;
@@ -39,7 +39,7 @@ impl MatchNotificatorService {
         toasts: &ToastAlertService,
     ) -> Self {
         Self {
-            settings_handle: ReadWriteStateHandle::new(load_service_data(DATA_ID)),
+            settings_handle: ReadWriteStateHandle::new(load_service_config(DATA_ID)),
             matches_handle: matches.state_handle(),
             stats_api: stats_api.subscribe(),
             toasts: toasts.sender(),
@@ -90,7 +90,7 @@ impl Service for MatchNotificatorService {
     }
 
     fn save(&self) {
-        save_service_data(DATA_ID, &*self.settings_handle.read());
+        save_service_config(DATA_ID, &*self.settings_handle.read());
     }
 }
 
