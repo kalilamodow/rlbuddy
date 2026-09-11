@@ -1,9 +1,23 @@
 use std::fs;
 use std::path::PathBuf;
 
+#[cfg(windows)]
 pub fn rlbuddy_data_dir() -> Option<PathBuf> {
     std::env::var("APPDATA")
         .map(|roaming| PathBuf::from(roaming).join("rlbuddy/"))
+        .ok()
+}
+
+#[cfg(not(windows))]
+pub fn rlbuddy_data_dir() -> Option<PathBuf> {
+    std::env::var("XDG_CONFIG_HOME")
+        .map(PathBuf::from)
+        .or_else(|_| {
+            std::env::var("HOME")
+                .map(PathBuf::from)
+                .map(|h| h.join(".config"))
+        })
+        .map(|p| p.join("rlbuddy/"))
         .ok()
 }
 
