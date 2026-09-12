@@ -2,28 +2,44 @@ use eframe::egui;
 use egui::{FontData, FontDefinitions};
 use std::fs;
 
-fn insert_font_data(ctx: &egui::Context, font_data: FontData) {
+fn insert_font_data(ctx: &egui::Context, font_data: FontData, emoji_font_data: Option<FontData>) {
     let mut fonts = FontDefinitions::default();
-    fonts
-        .font_data
-        .insert("Segoe UI".to_string(), font_data.into());
 
+    if let Some(emoji_font_data) = emoji_font_data {
+        fonts
+            .font_data
+            .insert("emoji".to_string(), emoji_font_data.into());
+
+        fonts
+            .families
+            .get_mut(&egui::FontFamily::Proportional)
+            .unwrap()
+            .insert(0, "emoji".to_string());
+    }
+
+    fonts.font_data.insert("text".to_string(), font_data.into());
     fonts
         .families
         .get_mut(&egui::FontFamily::Proportional)
         .unwrap()
-        .insert(0, "Segoe UI".to_owned());
+        .insert(0, "text".to_string());
 
     ctx.set_fonts(fonts);
 }
 
 #[cfg(windows)]
 pub fn load_fonts(ctx: &egui::Context) -> Result<(), Box<dyn std::error::Error>> {
-    const FONT_PATH: &str = "C:\\Windows\\Fonts\\segoeui.ttf";
+    const TEXT_FONT_PATH: &str = "C:\\Windows\\Fonts\\segoeui.ttf";
+    const EMOJI_FONT_PATH: &str = "C:\\Windows\\Fonts\\seguisym.ttf";
 
-    let file_content = fs::read(FONT_PATH)?;
+    let file_content = fs::read(TEXT_FONT_PATH)?;
     let font_data = FontData::from_owned(file_content);
-    insert_font_data(ctx, font_data);
+    let emoji_font_data = fs::read(EMOJI_FONT_PATH).map(FontData::from_owned);
+    if let Err(error) = &emoji_font_data {
+        eprintln!("error while loading emoji font: {error:?}");
+    }
+
+    insert_font_data(ctx, font_data, emoji_font_data.ok());
 
     Ok(())
 }
@@ -52,7 +68,7 @@ pub fn load_fonts(ctx: &egui::Context) -> Result<(), Box<dyn std::error::Error>>
 
     let file_content = fs::read(path)?;
     let font_data = FontData::from_owned(file_content);
-    insert_font_data(ctx, font_data);
+    insert_font_data(ctx, font_data, None);
 
     Ok(())
 }
