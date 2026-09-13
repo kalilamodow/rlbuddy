@@ -1,45 +1,46 @@
 use eframe::egui;
 use egui::{FontData, FontDefinitions};
 use std::fs;
+use std::io;
 
-fn insert_font_data(ctx: &egui::Context, font_data: FontData, emoji_font_data: Option<FontData>) {
+fn insert_font_data(ctx: &egui::Context, font_datas: Vec<(String, FontData)>) {
     let mut fonts = FontDefinitions::default();
 
-    if let Some(emoji_font_data) = emoji_font_data {
-        fonts
-            .font_data
-            .insert("emoji".to_string(), emoji_font_data.into());
-
+    for (name, data) in font_datas.into_iter() {
+        fonts.font_data.insert(name.clone(), data.into());
         fonts
             .families
             .get_mut(&egui::FontFamily::Proportional)
             .unwrap()
-            .insert(0, "emoji".to_string());
+            .insert(0, name);
     }
-
-    fonts.font_data.insert("text".to_string(), font_data.into());
-    fonts
-        .families
-        .get_mut(&egui::FontFamily::Proportional)
-        .unwrap()
-        .insert(0, "text".to_string());
 
     ctx.set_fonts(fonts);
 }
 
+fn by_path((name, path): (&str, &str)) -> io::Result<(String, FontData)> {
+    let file_content = fs::read(path)?;
+    let font_data = FontData::from_owned(file_content);
+    Ok((name.to_owned(), font_data))
+}
+
 #[cfg(windows)]
 pub fn load_fonts(ctx: &egui::Context) -> Result<(), Box<dyn std::error::Error>> {
-    const TEXT_FONT_PATH: &str = "C:\\Windows\\Fonts\\segoeui.ttf";
-    const EMOJI_FONT_PATH: &str = "C:\\Windows\\Fonts\\seguisym.ttf";
-
-    let file_content = fs::read(TEXT_FONT_PATH)?;
-    let font_data = FontData::from_owned(file_content);
-    let emoji_font_data = fs::read(EMOJI_FONT_PATH).map(FontData::from_owned);
-    if let Err(error) = &emoji_font_data {
-        eprintln!("error while loading emoji font: {error:?}");
+    macro_rules! windows_font_name_and_path {
+        ($font_name: literal) => {
+            ($font_name, concat!("C:\\Windows\\Fonts\\", $font_name))
+        };
     }
 
-    insert_font_data(ctx, font_data, emoji_font_data.ok());
+    let fonts: Vec<_> = vec![
+        by_path(windows_font_name_and_path!("segoeui.ttf")),
+        by_path(windows_font_name_and_path!("seguisym.ttf")),
+    ]
+    .into_iter()
+    .flatten()
+    .collect();
+
+    insert_font_data(ctx, fonts);
 
     Ok(())
 }
@@ -66,9 +67,10 @@ pub fn load_fonts(ctx: &egui::Context) -> Result<(), Box<dyn std::error::Error>>
         _ => return Err("theres no file for the font help".into()),
     };
 
-    let file_content = fs::read(path)?;
-    let font_data = FontData::from_owned(file_content);
-    insert_font_data(ctx, font_data, None);
+    insert_font_data(
+        ctx,
+        vec![by_path((&face.post_script_name, path.to_str().unwrap())).unwrap()],
+    );
 
     Ok(())
 }
