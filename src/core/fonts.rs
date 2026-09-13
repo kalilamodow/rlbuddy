@@ -32,9 +32,11 @@ pub fn load_fonts(ctx: &egui::Context) -> Result<(), Box<dyn std::error::Error>>
         };
     }
 
+    // lower->higher priority
     let fonts: Vec<_> = vec![
-        by_path(windows_font_name_and_path!("segoeui.ttf")),
+        by_path(windows_font_name_and_path!("YuGothM.ttc")),
         by_path(windows_font_name_and_path!("seguisym.ttf")),
+        by_path(windows_font_name_and_path!("segoeui.ttf")),
     ]
     .into_iter()
     .flatten()
