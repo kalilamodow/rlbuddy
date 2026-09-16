@@ -12,6 +12,7 @@ pub enum GamepadEvent {
 }
 
 #[derive(Debug, Default, Clone)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct GamepadState {
     pub trigger_left: bool,
     pub trigger_right: bool,
