@@ -1,7 +1,9 @@
 use super::rpc::{PresenceData, RichPresenceController};
+use crate::common::ThreadedReadonlyStateHandle;
 use crate::common::savedata::{load_service_config, save_service_config};
 use crate::core::app::{Panel, Service, ServiceWithUi};
 use crate::discord::widget::DiscordWidget;
+use crate::map_loader::{MapLoaderService, MapLoaderServiceState};
 use crate::matches::MatchesService;
 use crate::stats_api::StatsApi;
 use crate::{
@@ -11,13 +13,14 @@ use crate::{
     stats_api::{MatchState, RLEvent},
 };
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MatchData {
     pub team_score: u8,
     pub opp_score: u8,
     pub playlist: Playlist,
-    pub arena: &'static str,
+    pub arena: Cow<'static, str>,
     pub state: MatchState,
 }
 
@@ -69,6 +72,7 @@ const DATA_ID: &str = "drpc_settings";
 
 pub struct DiscordService {
     state: ReadWriteStateHandle<DiscordServiceState>,
+    custom_map_state: ThreadedReadonlyStateHandle<MapLoaderServiceState>,
     settings: ReadWriteStateHandle<DiscordSettings>,
     controller: RichPresenceController,
     current: GameState,
@@ -78,9 +82,14 @@ pub struct DiscordService {
 }
 
 impl DiscordService {
-    pub fn new(matches: &MatchesService, stats_api: &mut StatsApi) -> Self {
+    pub fn new(
+        matches: &MatchesService,
+        custom_maps: &MapLoaderService,
+        stats_api: &mut StatsApi,
+    ) -> Self {
         DiscordService {
             state: ReadWriteStateHandle::new(DiscordServiceState::default()),
+            custom_map_state: custom_maps.state_handle(),
             settings: ReadWriteStateHandle::new(load_service_config(DATA_ID)),
             controller: RichPresenceController::new(),
             current: GameState::Lobby,
@@ -105,11 +114,20 @@ impl DiscordService {
                 Team::Orange => (current_match.score.orange, current_match.score.blue),
             };
 
+            // if in custom map, use that as the name instead of unerpass
+            let arena = if current_match.arena == "Underpass"
+                && let Some(custom_map) = &self.custom_map_state.read().loaded_map
+            {
+                Cow::Owned(custom_map.to_string())
+            } else {
+                Cow::Borrowed(current_match.arena)
+            };
+
             GameState::InGame(MatchData {
                 team_score: our_score,
                 opp_score: their_score,
                 playlist: current_match.playlist,
-                arena: current_match.arena,
+                arena,
                 state: current_match.state.clone(),
             })
         } else {

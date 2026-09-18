@@ -182,10 +182,14 @@ impl RlBuddyApp {
         let matches_service = MatchesService::new(&ctx, &mut stats_api_service);
         let match_notificator_service =
             MatchNotificatorService::new(&matches_service, &mut stats_api_service, &toast_service);
-        let discord_service = DiscordService::new(&matches_service, &mut stats_api_service);
         let mut gamepad_service = GamepadService::default();
         let gamepad_overlay_service = GamepadOverlayService::new(ctx.clone(), &gamepad_service);
         let map_loader_service = MapLoaderService::new();
+        let discord_service = DiscordService::new(
+            &matches_service,
+            &map_loader_service,
+            &mut stats_api_service,
+        );
         let player_info_service = PlayerInfoService::default();
         let hotkey_service = HotkeyService::new(&mut gamepad_service, &overlay_tx);
         let music_service = MusicControlService::new(&mut stats_api_service);
