@@ -1,4 +1,4 @@
-use crate::common::savedata::load_service_data;
+use crate::common::savedata::{load_service_config, save_service_config};
 use crate::core::app::{Panel, Service, ServiceWithUi};
 use crate::music_control::widget::MusicControlWidget;
 use crate::stats_api::StatsApi;
@@ -49,7 +49,7 @@ impl MusicControlService {
 
         Self {
             controller: MediaController::new(playback_info_tx),
-            settings: ReadWriteStateHandle::new(load_service_data(DATA_ID)),
+            settings: ReadWriteStateHandle::new(load_service_config(DATA_ID)),
             state: ThreadedReadWriteStateHandle::default(),
             command_receiver: Receiver::new(),
             stats_api: stats_api.subscribe(),
@@ -108,6 +108,10 @@ impl MusicControlService {
 impl Service for MusicControlService {
     fn update(&mut self) {
         self.update();
+    }
+
+    fn save(&self) {
+        save_service_config(DATA_ID, &*self.settings.read());
     }
 }
 
