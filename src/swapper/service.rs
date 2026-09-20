@@ -1,4 +1,7 @@
-use std::path::PathBuf;
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 
 use crate::{
     common::{
@@ -7,7 +10,7 @@ use crate::{
         savedata::{load_service_data, save_service_data},
     },
     core::app::{Service, ServiceWithUi},
-    swapper::widget::SwapperWidget,
+    swapper::{encryption::load_all_keys, upk::Upk, widget::SwapperWidget},
 };
 use serde::{Deserialize, Serialize};
 
@@ -15,14 +18,25 @@ use serde::{Deserialize, Serialize};
 pub struct ItemId(String);
 
 impl ItemId {
+    pub fn new(item_id: String) -> Self {
+        Self(item_id)
+    }
+
     pub fn id(&self) -> &str {
         &self.0
     }
     pub fn sf_name(&self) -> String {
-        format!("{}_SF", self.0)
+        format!("{}_SF", self.id())
     }
     pub fn filename(&self) -> String {
         format!("{}.upk", self.sf_name())
+    }
+    pub fn path(&self, exe_path: &Path) -> PathBuf {
+        exe_path
+            .parent()
+            .unwrap()
+            .join("../../TAGame/CookedPCConsole/")
+            .join(self.filename())
     }
 }
 
@@ -81,7 +95,29 @@ impl SwapperService {
             SwapperCommand::Swap {
                 replaced,
                 appearance,
-            } => println!("swapping {replaced:?} for {appearance:?}"),
+            } => {
+                let Some(exe_path) = &self.state.read().exe_path else {
+                    return;
+                };
+
+                let Some(keys) = load_all_keys(&exe_path) else {
+                    eprintln!("failed to load keys");
+                    return;
+                };
+
+                let Ok(mut file) = fs::File::open(&replaced.path(&exe_path)) else {
+                    eprintln!("failed to read upk file");
+                    return;
+                };
+
+                let upk = match Upk::new(&mut file, &keys) {
+                    Ok(u) => u,
+                    Err(error) => {
+                        eprintln!("{error:?}");
+                        return;
+                    }
+                };
+            }
         }
     }
 }

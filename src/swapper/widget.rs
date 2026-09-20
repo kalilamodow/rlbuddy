@@ -4,12 +4,13 @@ use rfd::FileDialog;
 use crate::{
     common::{ReadonlyStateHandle, channel::Sender},
     core::app::Panel,
-    swapper::service::{SwapperCommand, SwapperService, SwapperServiceState},
+    swapper::service::{ItemId, SwapperCommand, SwapperService, SwapperServiceState},
 };
 
 pub struct SwapperWidget {
     state: ReadonlyStateHandle<SwapperServiceState>,
     sender: Sender<SwapperCommand>,
+    to_swap_input: (String, String),
 }
 
 impl SwapperWidget {
@@ -17,6 +18,7 @@ impl SwapperWidget {
         Self {
             state: service.state_handle(),
             sender: service.sender(),
+            to_swap_input: ("".into(), "".into()),
         }
     }
 
@@ -34,6 +36,22 @@ impl SwapperWidget {
 
         self.sender
             .send(SwapperCommand::SetExecutablePath(selected_file));
+    }
+
+    fn render_swap_inputs(&mut self, ui: &mut egui::Ui) {
+        ui.label("Appearance:");
+        ui.text_edit_singleline(&mut self.to_swap_input.0);
+        ui.label("Replace:");
+        ui.text_edit_singleline(&mut self.to_swap_input.1);
+
+        if !ui.button("Swap").clicked() {
+            return;
+        }
+
+        self.sender.send(SwapperCommand::Swap {
+            appearance: ItemId::new(std::mem::take(&mut self.to_swap_input.0)),
+            replaced: ItemId::new(std::mem::take(&mut self.to_swap_input.1)),
+        });
     }
 }
 
@@ -53,6 +71,8 @@ impl Panel for SwapperWidget {
                 self.render_exe_path_picker(ui);
             } else {
                 ui.label("Active swaps:");
+                ui.separator();
+                self.render_swap_inputs(ui);
             }
         })
         .response

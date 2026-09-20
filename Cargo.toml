@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 aes = "0.9.3"
+anyhow = "1.0.104"
 base64 = "0.23.1"
 byteorder = "1.5.0"
 cipher = "0.5.2"
