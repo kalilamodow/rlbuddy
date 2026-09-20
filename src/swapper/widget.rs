@@ -41,11 +41,22 @@ impl SwapperWidget {
     fn render_swap_list(&mut self, ui: &mut egui::Ui) {
         let state = self.state.read();
         for swap in &state.active_swaps {
-            ui.label(format!(
-                "{} looks like {}",
-                swap.replaced.id(),
-                swap.appearance.id()
-            ));
+            ui.group(|ui| {
+                ui.horizontal(|ui| {
+                    ui.label(format!(
+                        "{} looks like {}",
+                        swap.replaced.id(),
+                        swap.appearance.id()
+                    ));
+
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
+                        if ui.button("Remove").clicked() {
+                            self.sender
+                                .send(SwapperCommand::DeleteSwap(swap.replaced.clone()));
+                        }
+                    });
+                });
+            });
         }
     }
 
@@ -81,7 +92,16 @@ impl Panel for SwapperWidget {
             if !has_exe_path {
                 self.render_exe_path_picker(ui);
             } else {
-                ui.label("Active swaps:");
+                let has_any_swaps = {
+                    let state = self.state.read();
+                    !state.active_swaps.is_empty()
+                };
+                ui.label(if has_any_swaps {
+                    "Active swaps:"
+                } else {
+                    "No active swaps"
+                });
+
                 self.render_swap_list(ui);
 
                 ui.separator();

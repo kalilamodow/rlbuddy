@@ -14,7 +14,7 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ItemId(String);
 
 impl ItemId {
@@ -97,7 +97,22 @@ impl SwapperService {
 
     fn handle_command(&mut self, command: SwapperCommand) {
         match command {
-            SwapperCommand::DeleteSwap(id) => println!("deleting {id:?}"),
+            SwapperCommand::DeleteSwap(item) => {
+                let mut state = self.state.write();
+                let Some(exe_path) = &state.exe_path else {
+                    return;
+                };
+
+                if let Err(error) = fs::remove_file(item.path(&exe_path)) {
+                    eprintln!("error when removing masquerading file: {error:?}");
+                };
+
+                if let Err(error) = fs::copy(item.backup_path(&exe_path), item.path(&exe_path)) {
+                    eprintln!("error when copying backup file: {error:?}");
+                }
+
+                state.active_swaps.retain(|s| s.replaced != item);
+            }
             SwapperCommand::SetExecutablePath(path) => {
                 let mut state = self.state.write();
                 state.exe_path = Some(path);
