@@ -385,10 +385,6 @@ struct NameSwap {
 }
 
 impl NameSwap {
-    fn new(from: String, to: String) -> Self {
-        Self { from, to }
-    }
-
     /// returns the padded version if paddable, otherwise None
     fn padded(&self) -> Option<String> {
         let amount_to_pad = self.from.len().checked_sub(self.to.len());
@@ -411,7 +407,7 @@ struct FHeaderEncryptedRegion {
 }
 
 impl FHeaderEncryptedRegion {
-    fn extract<'a>(
+    fn decrypt<'a>(
         summary: &FPackageFileSummary,
         global_reader: &mut (impl Read + Seek),
         keys: &'a [RlAesKey],
@@ -468,6 +464,92 @@ impl FHeaderEncryptedRegion {
         ))
     }
 
+    fn encrypt(
+        &self,
+        summary_size: i32,
+        summary_padding_size: i32,
+        new_summary: &mut FPackageFileSummary,
+        key: &RlAesKey,
+    ) -> Result<Vec<u8>> {
+        let v33 = new_summary.v33();
+        let current_global_offset = |header: &mut Cursor<Vec<u8>>| {
+            header.stream_position().unwrap() as i32 + summary_size + summary_padding_size
+        };
+
+        let mut header = Cursor::new(Vec::new());
+
+        new_summary.name_offset = current_global_offset(&mut header);
+        let mut new_names = self.names.clone();
+        for name in &mut new_names {
+            for swap in &self.swaps {
+                if name.name.inner == swap.from {
+                    name.name.inner = swap.padded().unwrap_or_else(|| swap.to.clone());
+                }
+            }
+
+            name.serialize(&mut header, v33).unwrap();
+        }
+
+        new_summary.import_offset = current_global_offset(&mut header);
+        for import in &self.imports {
+            import.serialize(&mut header, v33).unwrap();
+        }
+
+        new_summary.export_offset = current_global_offset(&mut header);
+        for export in &self.exports {
+            export.serialize(&mut header, v33).unwrap();
+        }
+
+        new_summary.depends_offset = current_global_offset(&mut header);
+        new_summary.compressed_chunk_info_offset = header.position() as i32;
+        self.compressed_chunk_info
+            .serialize(&mut header, v33)
+            .context("FHeaderEncryptedRegion: serializing compressed chunk info")?;
+
+        // aes padding
+        let new_header_size = header.position();
+        let new_header_size_full = (new_header_size + 15) & !15;
+        for i in 0..new_header_size_full - new_header_size {
+            let pos = new_header_size + i;
+            let byte = (pos % 0xFF) as u8;
+            header.write_u8(byte).unwrap();
+        }
+
+        let header_size_change = new_header_size_full as i32 - new_summary.encrypted_region_size();
+        eprintln!("header size changed by {header_size_change}");
+        new_summary.total_header_size =
+            new_header_size as i32 + new_summary.name_offset + new_summary.garbage_size;
+
+        let global_to_local_offset = |offset: i32| offset - summary_padding_size - summary_size;
+
+        let mut new_exports = self.exports.clone();
+        for export in &mut new_exports {
+            export.serial_offset += header_size_change as i64;
+        }
+        header.set_position(global_to_local_offset(new_summary.export_offset) as u64);
+        for export in new_exports {
+            export.serialize(&mut header, v33).unwrap();
+        }
+
+        header.set_position(new_summary.compressed_chunk_info_offset as u64);
+        let mut new_compressed_chunk_info = self.compressed_chunk_info.clone();
+        for chunk in &mut new_compressed_chunk_info.inner {
+            chunk.compressed_offset += header_size_change as i64;
+
+            // idk why but if you do the one with 0 size it freezes the game
+            if chunk.uncompressed_size != 0 {
+                chunk.uncompressed_offset += header_size_change as i64;
+            }
+        }
+        new_compressed_chunk_info
+            .serialize(&mut header, v33)
+            .unwrap();
+
+        let mut encrypted = header.into_inner();
+        key.encrypt(&mut encrypted);
+        Ok(encrypted)
+    }
+
     fn add_swap(&mut self, swap: NameSwap) {
         self.swaps.push(swap);
     }
@@ -490,7 +572,7 @@ impl<'a> Upk<'a> {
         let summary = FPackageFileSummary::deserialize(reader, false)?;
         ensure!(summary.is_valid(), "package file tag isnt valid");
 
-        let (header, key) = FHeaderEncryptedRegion::extract(&summary, reader, keys)
+        let (header, key) = FHeaderEncryptedRegion::decrypt(&summary, reader, keys)
             .context("extracting encrypted region")?;
 
         reader.seek(SeekFrom::Start(
@@ -507,6 +589,37 @@ impl<'a> Upk<'a> {
             key,
             id,
         })
+    }
+
+    pub fn serialize(&self) -> Result<Vec<u8>> {
+        let summary_size = {
+            let mut serialized = Vec::new();
+            self.summary
+                .serialize(&mut serialized, false)
+                .context("summary serialize first pass")?;
+            serialized.len()
+        };
+        let mut modified_summary = self.summary.clone(); // will perform surgery after
+        let summary_padding_size = self.summary.name_offset - summary_size as i32;
+        let encrypted_header = self
+            .header
+            .encrypt(
+                summary_size as i32,
+                summary_padding_size,
+                &mut modified_summary,
+                self.key,
+            )
+            .context("reserializing encrypted header")?;
+
+        let mut serialized = Vec::new();
+        modified_summary
+            .serialize(&mut serialized, false)
+            .context("Upk: serializing modified summary")?;
+        serialized.extend(vec![0u8; summary_padding_size as usize]);
+        serialized.extend(&encrypted_header);
+        serialized.extend(&self.payload);
+
+        Ok(serialized)
     }
 
     pub fn open<P: AsRef<Path>>(path: P, id: &'a ItemId, keys: &'a [RlAesKey]) -> Result<Self> {

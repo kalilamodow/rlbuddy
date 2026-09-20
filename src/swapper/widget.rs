@@ -38,6 +38,17 @@ impl SwapperWidget {
             .send(SwapperCommand::SetExecutablePath(selected_file));
     }
 
+    fn render_swap_list(&mut self, ui: &mut egui::Ui) {
+        let state = self.state.read();
+        for swap in &state.active_swaps {
+            ui.label(format!(
+                "{} looks like {}",
+                swap.replaced.id(),
+                swap.appearance.id()
+            ));
+        }
+    }
+
     fn render_swap_inputs(&mut self, ui: &mut egui::Ui) {
         ui.label("Appearance:");
         ui.text_edit_singleline(&mut self.to_swap_input.0);
@@ -71,6 +82,8 @@ impl Panel for SwapperWidget {
                 self.render_exe_path_picker(ui);
             } else {
                 ui.label("Active swaps:");
+                self.render_swap_list(ui);
+
                 ui.separator();
                 self.render_swap_inputs(ui);
             }

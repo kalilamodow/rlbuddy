@@ -52,8 +52,8 @@ impl ItemId {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ActiveSwap {
-    appearance: ItemId,
-    replaced: ItemId,
+    pub appearance: ItemId,
+    pub replaced: ItemId,
 }
 
 #[derive(Debug)]
@@ -106,7 +106,8 @@ impl SwapperService {
                 replaced,
                 appearance,
             } => {
-                let Some(exe_path) = &self.state.read().exe_path else {
+                let mut state = self.state.write();
+                let Some(exe_path) = &state.exe_path else {
                     return;
                 };
 
@@ -116,7 +117,7 @@ impl SwapperService {
                 };
 
                 if !replaced.backup_path(&exe_path).is_file() {
-                    fs::rename(replaced.path(&exe_path), replaced.backup_path(&exe_path)).unwrap();
+                    fs::copy(replaced.path(&exe_path), replaced.backup_path(&exe_path)).unwrap();
                 }
 
                 let mut appearance_upk =
@@ -136,6 +137,23 @@ impl SwapperService {
                 };
 
                 appearance_upk.pretend_to_be(&replaced_upk);
+                let serialized = match appearance_upk.serialize() {
+                    Ok(s) => s,
+                    Err(e) => {
+                        eprint!("serializing failure: {e:?}");
+                        return;
+                    }
+                };
+                if let Err(error) = fs::write(replaced.path(&exe_path), serialized) {
+                    eprint!("swap failure when writing new file: {error:?}");
+                    return;
+                };
+
+                let swap = ActiveSwap {
+                    appearance,
+                    replaced,
+                };
+                state.active_swaps.push(swap);
             }
         }
     }
