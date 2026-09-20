@@ -4,7 +4,7 @@ mod auto_setup;
 mod common;
 mod core;
 mod discord;
-pub mod gamepad;
+mod gamepad;
 mod hotkey;
 mod map_loader;
 mod matches;
@@ -13,6 +13,7 @@ mod my_stats;
 mod player_info;
 mod rocket_league;
 mod stats_api;
+mod swapper;
 mod toast_alert;
 
 use eframe::egui;

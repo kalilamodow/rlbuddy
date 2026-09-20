@@ -6,6 +6,7 @@ use crate::gamepad::overlay::GamepadOverlayService;
 use crate::hotkey::HotkeyService;
 use crate::music_control::MusicControlService;
 use crate::my_stats::MyStatsWidget;
+use crate::swapper::SwapperService;
 use crate::{
     auto_setup::AutoSetupWidget,
     common::eventsource::EventReceiver,
@@ -193,6 +194,7 @@ impl RlBuddyApp {
         let player_info_service = PlayerInfoService::default();
         let hotkey_service = HotkeyService::new(&mut gamepad_service, &overlay_tx);
         let music_service = MusicControlService::new(&mut stats_api_service);
+        let swapper_service = SwapperService::new();
 
         let panels = vec![
             AppPanel::new(CurrentMatchWidget::new(
@@ -208,6 +210,7 @@ impl RlBuddyApp {
             AppPanel::new(player_info_service.panel()),
             AppPanel::new(AutoSetupWidget::new()),
             AppPanel::new(map_loader_service.panel()),
+            AppPanel::new(swapper_service.panel()),
             AppPanel::new(gamepad_overlay_service.panel()),
             AppPanel::new(match_notificator_service.panel()),
             AppPanel::new(hotkey_service.panel()),
@@ -242,6 +245,7 @@ impl RlBuddyApp {
                 Box::new(gamepad_service),
                 Box::new(gamepad_overlay_service),
                 Box::new(map_loader_service),
+                Box::new(swapper_service),
             ],
 
             app_settings,
