@@ -6,7 +6,7 @@
 
 rlbuddy is a Rocket League companion app for Windows and Linux (incomplete) that lets you preview your lobby's ranks without
 tabbing out, offers various statistics based on your match history, and has a bunch of widgets allowing for Discord rich
-presence, automatic music control, player stats, custom map loading, and more!
+presence, automatic music control, player stats, custom map loading, item swapping, and more!
 
 Each feature has its own widget, so you can customize it to your heart's desire :)
 
@@ -18,6 +18,7 @@ Each feature has its own widget, so you can customize it to your heart's desire 
     - [Match history](#match-history)
     - [Session Stats](#session-stats)
     - [Music](#music)
+    - [Item swapper](#item-swapper)
     - [Custom map loader](#custom-map-loader)
     - [Gamepad overlay](#gamepad-overlay)
     - [Discord rich presence](#discord-rich-presence)
@@ -90,6 +91,13 @@ that shows up in the Action center should also show up in rlbuddy.
 
 rlbuddy used to integrate with Spotify, but it was pretty annoying, so it now interfaces directly with Windows. It's a
 lot faster this way as well.
+
+### Item swapper
+
+<img src="readme-images/asset-swapper.jpg" alt="Custom map loader demo" />
+
+rlbuddy can replace the "identity" of one asset with another, while leaving its actual data the same. This lets you any
+item you want, similar to Alphaconsole!
 
 ### Custom map loader
 
