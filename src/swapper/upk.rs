@@ -1,8 +1,12 @@
 use anyhow::{Context as _, Result, ensure};
 use byteorder::{LittleEndian, ReadBytesExt as _, WriteBytesExt as _};
-use std::io::{self, Cursor, Read, Seek, SeekFrom, Write};
+use std::{
+    fs,
+    io::{self, Cursor, Read, Seek, SeekFrom, Write},
+    path::Path,
+};
 
-use crate::swapper::encryption::RlAesKey;
+use crate::swapper::{encryption::RlAesKey, service::ItemId};
 
 trait ReadBytes: Read {
     fn read_bytes(&mut self, n_bytes: usize) -> io::Result<Vec<u8>> {
@@ -375,11 +379,35 @@ fn find_valid_aes_key<'a>(
 }
 
 #[derive(Debug, Clone)]
+struct NameSwap {
+    from: String,
+    to: String,
+}
+
+impl NameSwap {
+    fn new(from: String, to: String) -> Self {
+        Self { from, to }
+    }
+
+    /// returns the padded version if paddable, otherwise None
+    fn padded(&self) -> Option<String> {
+        let amount_to_pad = self.from.len().checked_sub(self.to.len());
+        let Some(amount_to_pad) = amount_to_pad else {
+            return None;
+        };
+
+        let padding = "\0".repeat(amount_to_pad);
+        Some(format!("{}{padding}", self.to))
+    }
+}
+
+#[derive(Debug, Clone)]
 struct FHeaderEncryptedRegion {
     names: Vec<FNameEntry>,
     imports: Vec<FImportEntry>,
     exports: Vec<FExportEntry>,
     compressed_chunk_info: TArray<FCompressedChunkInfo>,
+    swaps: Vec<NameSwap>,
 }
 
 impl FHeaderEncryptedRegion {
@@ -434,21 +462,31 @@ impl FHeaderEncryptedRegion {
                 imports,
                 exports,
                 compressed_chunk_info,
+                swaps: Vec::new(),
             },
             key,
         ))
     }
+
+    fn add_swap(&mut self, swap: NameSwap) {
+        self.swaps.push(swap);
+    }
 }
 
-pub struct Upk {
+pub struct Upk<'a> {
     summary: FPackageFileSummary,
     header: FHeaderEncryptedRegion,
     payload: Vec<u8>, // the compressed info
-    key: RlAesKey,
+    key: &'a RlAesKey,
+    id: &'a ItemId,
 }
 
-impl Upk {
-    pub fn new(reader: &mut (impl Read + Seek), keys: &[RlAesKey]) -> Result<Self> {
+impl<'a> Upk<'a> {
+    pub fn new(
+        reader: &mut (impl Read + Seek),
+        id: &'a ItemId,
+        keys: &'a [RlAesKey],
+    ) -> Result<Self> {
         let summary = FPackageFileSummary::deserialize(reader, false)?;
         ensure!(summary.is_valid(), "package file tag isnt valid");
 
@@ -466,7 +504,27 @@ impl Upk {
             summary,
             header,
             payload,
-            key: key.clone(),
+            key,
+            id,
         })
+    }
+
+    pub fn open<P: AsRef<Path>>(path: P, id: &'a ItemId, keys: &'a [RlAesKey]) -> Result<Self> {
+        let mut file = fs::File::open(path)?;
+        Self::new(&mut file, id, keys)
+    }
+
+    pub fn pretend_to_be(&mut self, other: &'a Upk) {
+        self.header.add_swap(NameSwap {
+            from: self.id.id().to_owned(),
+            to: other.id.id().to_owned(),
+        });
+        self.header.add_swap(NameSwap {
+            from: self.id.sf_name(),
+            to: other.id.sf_name(),
+        });
+        self.summary.guid = other.summary.guid.clone();
+        self.key = other.key;
+        self.id = other.id;
     }
 }

@@ -31,12 +31,22 @@ impl ItemId {
     pub fn filename(&self) -> String {
         format!("{}.upk", self.sf_name())
     }
+    pub fn backup_filename(&self) -> String {
+        format!("{}.upk.bak", self.sf_name())
+    }
     pub fn path(&self, exe_path: &Path) -> PathBuf {
         exe_path
             .parent()
             .unwrap()
             .join("../../TAGame/CookedPCConsole/")
             .join(self.filename())
+    }
+    pub fn backup_path(&self, exe_path: &Path) -> PathBuf {
+        exe_path
+            .parent()
+            .unwrap()
+            .join("../../TAGame/CookedPCConsole/")
+            .join(self.backup_filename())
     }
 }
 
@@ -105,18 +115,27 @@ impl SwapperService {
                     return;
                 };
 
-                let Ok(mut file) = fs::File::open(&replaced.path(&exe_path)) else {
-                    eprintln!("failed to read upk file");
-                    return;
-                };
+                if !replaced.backup_path(&exe_path).is_file() {
+                    fs::rename(replaced.path(&exe_path), replaced.backup_path(&exe_path)).unwrap();
+                }
 
-                let upk = match Upk::new(&mut file, &keys) {
+                let mut appearance_upk =
+                    match Upk::open(appearance.path(&exe_path), &appearance, &keys) {
+                        Ok(u) => u,
+                        Err(error) => {
+                            eprintln!("Loading appearance file: {error:?}");
+                            return;
+                        }
+                    };
+                let replaced_upk = match Upk::open(replaced.path(&exe_path), &replaced, &keys) {
                     Ok(u) => u,
                     Err(error) => {
-                        eprintln!("{error:?}");
+                        eprintln!("Loading replaced file: {error:?}");
                         return;
                     }
                 };
+
+                appearance_upk.pretend_to_be(&replaced_upk);
             }
         }
     }
