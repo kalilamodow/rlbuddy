@@ -1,3 +1,4 @@
+mod encryption;
 mod service;
 mod widget;
 
