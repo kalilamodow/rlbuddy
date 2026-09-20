@@ -516,7 +516,6 @@ impl FHeaderEncryptedRegion {
         }
 
         let header_size_change = new_header_size_full as i32 - new_summary.encrypted_region_size();
-        eprintln!("header size changed by {header_size_change}");
         new_summary.total_header_size =
             new_header_size as i32 + new_summary.name_offset + new_summary.garbage_size;
 
