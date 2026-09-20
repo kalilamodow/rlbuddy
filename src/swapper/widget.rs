@@ -103,10 +103,12 @@ impl Panel for SwapperWidget {
                 });
 
                 self.render_swap_list(ui);
-
                 ui.separator();
                 self.render_swap_inputs(ui);
+                ui.separator();
             }
+
+            ui.small("Thanks to ShinyEmii/Toga-Files for aes keys!");
         })
         .response
     }

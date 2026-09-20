@@ -126,9 +126,12 @@ impl SwapperService {
                     return;
                 };
 
-                let Some(keys) = load_all_keys(&exe_path) else {
-                    eprintln!("failed to load keys");
-                    return;
+                let keys = match load_all_keys() {
+                    Ok(k) => k,
+                    Err(error) => {
+                        eprintln!("failed to load keys: {error:?}");
+                        return;
+                    }
                 };
 
                 if !replaced.backup_path(&exe_path).is_file() {

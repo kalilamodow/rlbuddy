@@ -1,37 +1,9 @@
+use crate::common::savedata::{load_service_data, save_service_data};
 use aes::Aes256;
 use base64::{Engine, engine::general_purpose};
 use cipher::{BlockCipherDecrypt, BlockCipherEncrypt, KeyInit};
-use serde::Deserialize;
-use serde_json::Deserializer;
-use std::{
-    fs::File,
-    io::{BufRead, BufReader},
-    path::Path,
-    sync::LazyLock,
-};
-
-const NORMAL_POLY: u32 = 0x04C11DB7;
-const CRC32_INIT: u32 = !0x87636B;
-
-static CRC_TABLE: LazyLock<[u32; 256]> = LazyLock::new(|| {
-    std::array::from_fn(|i| {
-        (0..8).fold((i as u32) << 24, |crc, _| {
-            if crc & 0x80000000 != 0 {
-                (crc << 1) ^ NORMAL_POLY
-            } else {
-                crc << 1
-            }
-        })
-    })
-});
-
-fn crc32_chunk(chunk: &[u8]) -> u32 {
-    let crc32 = chunk.iter().fold(CRC32_INIT, |crc32, &byte| {
-        let index = byte ^ ((crc32 >> 24) as u8 & 0xFF);
-        (crc32 << 8) ^ CRC_TABLE[index as usize]
-    });
-    !crc32
-}
+use serde::{Deserialize, Serialize};
+use std::time::{Duration, Instant};
 
 #[derive(Debug, Clone)]
 pub struct RlAesKey(Aes256);
@@ -57,82 +29,73 @@ impl RlAesKey {
         }
     }
 
-    fn from_content_key(content_key: &str) -> Self {
-        let content_key_bytes: [u8; 32] = general_purpose::STANDARD
-            .decode(content_key)
+    fn from_base64(b64: &str) -> Self {
+        let aes_key: [u8; 32] = general_purpose::STANDARD
+            .decode(b64)
             .unwrap()
             .try_into()
             .unwrap();
-
-        let aes_key: Vec<u8> = content_key_bytes
-            .chunks_exact(4)
-            .map(crc32_chunk)
-            .flat_map(|c| c.to_le_bytes())
-            .collect();
-        let aes_key: [u8; 32] = aes_key.try_into().unwrap();
         let cipher = Aes256::new((&aes_key).into());
-
         Self(cipher)
     }
+}
 
-    fn from_array(array: &[u8; 32]) -> Self {
-        Self(Aes256::new(array.into()))
+const URL: &str =
+    "https://raw.githubusercontent.com/ShinyEmii/Toga-Files/refs/heads/master/aes.txt";
+const DATA_ID: &str = "swapper-encryption";
+
+#[derive(Debug, Serialize, Deserialize)]
+struct AESKeyListCache {
+    etag: String,
+    b64s: String,
+}
+
+#[derive(Debug, Default, Serialize, Deserialize)]
+struct EncryptionSavedata {
+    cache: Option<AESKeyListCache>,
+}
+
+#[derive(Debug)]
+pub enum KeyLoadingError {
+    NoInternet,
+}
+
+pub fn load_all_keys() -> Result<Vec<RlAesKey>, KeyLoadingError> {
+    let mut savedata: EncryptionSavedata = load_service_data(DATA_ID);
+
+    let start = Instant::now();
+    let mut request = ureq::get(URL)
+        .config()
+        .timeout_global(Some(Duration::from_secs(2)))
+        .build();
+    if let Some(cache) = &savedata.cache {
+        request = request.header("if-none-match", &cache.etag);
     }
-}
 
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "PascalCase")]
-struct PsynetContentMapEntry {
-    content: String,
-}
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "PascalCase")]
-struct PsynetContentConfig {
-    content_map: Vec<PsynetContentMapEntry>,
-}
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "PascalCase")]
-struct PsynetResponse {
-    content_config: PsynetContentConfig,
-}
+    // 304 means the cache matched
+    if let Ok(response) = request.call()
+        && response.status() != 304
+    {
+        println!("keys.txt loading took {:#?}", start.elapsed());
+        let etag = String::from_utf8_lossy(response.headers().get("ETag").unwrap().as_bytes())
+            .into_owned();
+        let response_text = response.into_body().read_to_string().unwrap();
+        let new_cache = AESKeyListCache {
+            etag,
+            b64s: response_text,
+        };
+        savedata.cache = Some(new_cache);
+        save_service_data(DATA_ID, &savedata);
+    }
 
-static DEFAULT_AES_KEY: LazyLock<RlAesKey> = LazyLock::new(|| {
-    RlAesKey::from_array(&[
-        0xC7, 0xDF, 0x6B, 0x13, 0x25, 0x2A, 0xCC, 0x71, 0x47, 0xBB, 0x51, 0xC9, 0x8A, 0xD7, 0xE3,
-        0x4B, 0x7F, 0xE5, 0x00, 0xB7, 0x7F, 0xA5, 0xFA, 0xB2, 0x93, 0xE2, 0xF2, 0x4E, 0x6B, 0x17,
-        0xE7, 0x79,
-    ])
-});
-
-pub fn load_all_keys(rocket_league_exe_path: &Path) -> Option<Vec<RlAesKey>> {
-    let cache_file = rocket_league_exe_path
-        .parent()?
-        .join("..")
-        .join("..")
-        .join("TAGame")
-        .join("Cache")
-        .join("WebCache")
-        // cached psynet config
-        .join("L3YyL0NvbmZpZy9CYXR0bGVDYXJzLy0xODg3Njk0MDgzL1Byb2QvRXBpYy9JTlQv");
-    let file = File::open(cache_file).ok()?;
-    let mut reader = BufReader::new(file);
-    reader.skip_until('{' as u8).unwrap();
-    reader.seek_relative(-1).unwrap();
-
-    let mut de = Deserializer::from_reader(reader);
-    let content_keys: Vec<String> = PsynetResponse::deserialize(&mut de)
-        .unwrap()
-        .content_config
-        .content_map
-        .into_iter()
-        .map(|e| e.content)
-        .collect();
-
-    Some(
-        content_keys
-            .iter()
-            .map(|k| RlAesKey::from_content_key(&k))
-            .chain(std::iter::once(DEFAULT_AES_KEY.clone()))
-            .collect(),
-    )
+    savedata
+        .cache
+        .map(|cache| {
+            cache
+                .b64s
+                .lines()
+                .map(|line| RlAesKey::from_base64(line))
+                .collect()
+        })
+        .ok_or(KeyLoadingError::NoInternet)
 }
