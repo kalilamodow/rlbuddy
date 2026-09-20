@@ -60,6 +60,18 @@ impl SwapperWidget {
         }
     }
 
+    fn render_current_error(&mut self, ui: &mut egui::Ui) {
+        let state = self.state.read();
+        if let Some(error) = &state.current_error {
+            ui.horizontal(|ui| {
+                ui.colored_label(ui.style().visuals.error_fg_color, error);
+                if ui.button("OK").clicked() {
+                    self.sender.send(SwapperCommand::ClearError);
+                }
+            });
+        }
+    }
+
     fn render_swap_inputs(&mut self, ui: &mut egui::Ui) {
         ui.label("Appearance:");
         ui.text_edit_singleline(&mut self.to_swap_input.0);
@@ -103,6 +115,7 @@ impl Panel for SwapperWidget {
                 });
 
                 self.render_swap_list(ui);
+                self.render_current_error(ui);
                 ui.separator();
                 self.render_swap_inputs(ui);
                 ui.separator();

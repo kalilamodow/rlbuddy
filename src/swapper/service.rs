@@ -64,6 +64,7 @@ pub enum SwapperCommand {
     },
     DeleteSwap(ItemId), // replaced
     SetExecutablePath(PathBuf),
+    ClearError,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -112,16 +113,18 @@ impl SwapperService {
         match command {
             SwapperCommand::DeleteSwap(item) => {
                 let mut state = self.state.write();
-                let Some(exe_path) = &state.exe_path else {
+                let Some(exe_path) = state.exe_path.clone() else {
                     return;
                 };
 
                 if let Err(error) = fs::remove_file(item.path(&exe_path)) {
-                    eprintln!("error when removing masquerading file: {error:?}");
+                    state.current_error =
+                        Some(format!("error when removing masquerading file: {error:?}"));
                 };
 
                 if let Err(error) = fs::copy(item.backup_path(&exe_path), item.path(&exe_path)) {
-                    eprintln!("error when copying backup file: {error:?}");
+                    state.current_error =
+                        Some(format!("error when copying backup file: {error:?}"));
                 }
 
                 state.active_swaps.retain(|s| s.replaced != item);
@@ -135,17 +138,26 @@ impl SwapperService {
                 appearance,
             } => {
                 let mut state = self.state.write();
-                let Some(exe_path) = &state.exe_path else {
+                let Some(exe_path) = state.exe_path.clone() else {
                     return;
                 };
 
                 let keys = match load_all_keys() {
                     Ok(k) => k,
                     Err(error) => {
-                        eprintln!("failed to load keys: {error:?}");
+                        state.current_error = Some(format!("failed to load keys: {error:?}"));
                         return;
                     }
                 };
+
+                if !appearance.path(&exe_path).is_file() {
+                    state.current_error = Some("invalid appearance item".into());
+                    return;
+                }
+                if !replaced.path(&exe_path).is_file() {
+                    state.current_error = Some("invalid replaced item".into());
+                    return;
+                }
 
                 if !replaced.backup_path(&exe_path).is_file() {
                     fs::copy(replaced.path(&exe_path), replaced.backup_path(&exe_path)).unwrap();
@@ -155,14 +167,15 @@ impl SwapperService {
                     match Upk::open(appearance.path(&exe_path), &appearance, &keys) {
                         Ok(u) => u,
                         Err(error) => {
-                            eprintln!("Loading appearance file: {error:?}");
+                            state.current_error =
+                                Some(format!("Loading appearance file: {error:?}"));
                             return;
                         }
                     };
                 let replaced_upk = match Upk::open(replaced.path(&exe_path), &replaced, &keys) {
                     Ok(u) => u,
                     Err(error) => {
-                        eprintln!("Loading replaced file: {error:?}");
+                        state.current_error = Some(format!("Loading replaced file: {error:?}"));
                         return;
                     }
                 };
@@ -171,12 +184,13 @@ impl SwapperService {
                 let serialized = match appearance_upk.serialize() {
                     Ok(s) => s,
                     Err(e) => {
-                        eprint!("serializing failure: {e:?}");
+                        state.current_error = Some(format!("serializing failure: {e:?}"));
                         return;
                     }
                 };
                 if let Err(error) = fs::write(replaced.path(&exe_path), serialized) {
-                    eprint!("swap failure when writing new file: {error:?}");
+                    state.current_error =
+                        Some(format!("swap failure when writing new file: {error:?}"));
                     return;
                 };
 
@@ -185,6 +199,10 @@ impl SwapperService {
                     replaced,
                 };
                 state.active_swaps.push(swap);
+            }
+            SwapperCommand::ClearError => {
+                let mut state = self.state.write();
+                state.current_error = None;
             }
         }
     }
