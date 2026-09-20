@@ -50,7 +50,7 @@ impl ItemId {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ActiveSwap {
     pub appearance: ItemId,
     pub replaced: ItemId,
@@ -67,9 +67,16 @@ pub enum SwapperCommand {
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
+pub struct SwapperServiceSavedata {
+    pub active_swaps: Vec<ActiveSwap>,
+    pub exe_path: Option<PathBuf>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct SwapperServiceState {
     pub active_swaps: Vec<ActiveSwap>,
     pub exe_path: Option<PathBuf>,
+    pub current_error: Option<String>,
 }
 
 pub struct SwapperService {
@@ -81,8 +88,14 @@ const DATA_ID: &str = "item_swapper";
 
 impl SwapperService {
     pub fn new() -> Self {
+        let savedata: SwapperServiceSavedata = load_service_data(DATA_ID);
+
         Self {
-            state: ReadWriteStateHandle::new(load_service_data(DATA_ID)),
+            state: ReadWriteStateHandle::new(SwapperServiceState {
+                active_swaps: savedata.active_swaps,
+                exe_path: savedata.exe_path,
+                current_error: None,
+            }),
             command_receiver: Receiver::new(),
         }
     }
@@ -185,7 +198,14 @@ impl Service for SwapperService {
     }
 
     fn save(&self) {
-        save_service_data(DATA_ID, &*self.state_handle().read());
+        let state = self.state.read().clone();
+        save_service_data(
+            DATA_ID,
+            &SwapperServiceSavedata {
+                active_swaps: state.active_swaps,
+                exe_path: state.exe_path,
+            },
+        );
     }
 }
 
