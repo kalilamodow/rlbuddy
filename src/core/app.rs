@@ -99,8 +99,27 @@ impl egui::Widget for &mut AppPanel {
 // Option implements Default, then RlBuddyApp can do its own wtv logic with unwrap_or_default
 pub struct SavedOpenPanelList(Option<Vec<PanelId>>);
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum AutoPopupMode {
+    #[default]
+    FirstCountdown,
+    MatchCreated,
+    Disabled,
+}
+
+impl AutoPopupMode {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::FirstCountdown => "Countdown",
+            Self::MatchCreated => "On join",
+            Self::Disabled => "Disable",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct AppSettings {
+    pub popup_mode: AutoPopupMode,
     pub transparency: u8,
     pub loop_time: u16,
     pub ui_fps_limit: bool,
@@ -109,6 +128,7 @@ pub struct AppSettings {
 impl Default for AppSettings {
     fn default() -> Self {
         Self {
+            popup_mode: AutoPopupMode::default(),
             transparency: 20,
             loop_time: 65,
             ui_fps_limit: true,
@@ -336,7 +356,21 @@ impl eframe::App for RlBuddyApp {
                 RLEvent::Disconnected => ctx.send_viewport_cmd(ViewportCommand::Title(
                     "rlbuddy (not connected)".to_string(),
                 )),
-                RLEvent::MatchStart => self.pop_up(),
+                RLEvent::MatchCreated => {
+                    let settings = self.app_settings.read();
+                    if matches!(settings.popup_mode, AutoPopupMode::MatchCreated) {
+                        drop(settings);
+                        self.show(ctx);
+                    }
+                }
+                RLEvent::MatchStart => {
+                    let settings = self.app_settings.read();
+                    match settings.popup_mode {
+                        AutoPopupMode::FirstCountdown => self.pop_up(),
+                        AutoPopupMode::MatchCreated => self.hide(ctx),
+                        AutoPopupMode::Disabled => {}
+                    }
+                }
                 _ => {}
             }
         }
@@ -437,6 +471,20 @@ impl Panel for AppSettingsWidget {
     fn ui(&mut self, ui: &mut Ui) -> Response {
         ui.vertical(|ui| {
             let mut settings = self.handle.write();
+            egui::ComboBox::from_label("Popup mode")
+                .selected_text(settings.popup_mode.as_str())
+                .show_ui(ui, |ui| {
+                    for choice in &[
+                        AutoPopupMode::FirstCountdown,
+                        AutoPopupMode::MatchCreated,
+                        AutoPopupMode::Disabled,
+                    ] {
+                        ui.selectable_value(&mut settings.popup_mode, *choice, choice.as_str());
+                    }
+                });
+            ui.small("Choose how the overlay should automatically pop up.");
+
+            ui.add_space(8.0);
             ui.add(
                 egui::Slider::new(&mut settings.transparency, u8::MIN..=u8::MAX)
                     .text("App transparency"),
@@ -446,7 +494,7 @@ impl Panel for AppSettingsWidget {
                 but it'll be harder to see the game behind it!",
             );
 
-            ui.add_space(6.0);
+            ui.add_space(8.0);
             ui.horizontal(|ui| {
                 ui.checkbox(&mut settings.ui_fps_limit, "Limit UI framerate");
 
@@ -462,7 +510,7 @@ impl Panel for AppSettingsWidget {
                 will use a lot more resources while open.",
             );
 
-            ui.add_space(6.0);
+            ui.add_space(8.0);
             ui.horizontal(|ui| {
                 ui.add(egui::Slider::new(&mut settings.loop_time, 5..=1000).text("Loop time (ms)"));
 

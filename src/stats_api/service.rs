@@ -197,6 +197,7 @@ pub struct MatchUpdate {
 
 pub enum RLEvent {
     Update(MatchUpdate),
+    MatchCreated,
     MatchStart,
     MatchOver(Team), // winner
     MatchLeft,
@@ -384,7 +385,7 @@ impl StatsApi {
             }
             StatsApiEvent::MatchCreated => {
                 self.match_created_event_happened = true;
-                return None;
+                RLEvent::MatchCreated
             }
             StatsApiEvent::CountdownBegin if self.match_created_event_happened => {
                 self.match_created_event_happened = false;
