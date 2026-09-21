@@ -87,6 +87,20 @@ impl SwapperWidget {
             replaced: ItemId::new(std::mem::take(&mut self.to_swap_input.1)),
         });
     }
+
+    fn render_footer(&self, ui: &mut egui::Ui) {
+        ui.horizontal(|ui| {
+            ui.small("Thanks to ShinyEmii/Toga-Files for aes keys!");
+
+            let is_updating = !self.state.read().keys_loaded;
+            if is_updating {
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
+                    ui.spinner();
+                    ui.small("Updating keys...");
+                });
+            }
+        });
+    }
 }
 
 impl Panel for SwapperWidget {
@@ -118,10 +132,10 @@ impl Panel for SwapperWidget {
                 self.render_current_error(ui);
                 ui.separator();
                 self.render_swap_inputs(ui);
-                ui.separator();
             }
 
-            ui.small("Thanks to ShinyEmii/Toga-Files for aes keys!");
+            ui.separator();
+            self.render_footer(ui);
         })
         .response
     }
