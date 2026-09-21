@@ -139,10 +139,44 @@ impl PlaybackInfo {
     }
 }
 
+type SessionTask = Box<
+    dyn FnOnce(&GlobalSystemMediaTransportControlsSession) -> windows::core::Result<()>
+        + Send
+        + Sync
+        + 'static,
+>;
+
+fn start_task_executor(
+    session_handle: Arc<Mutex<Option<GlobalSystemMediaTransportControlsSession>>>,
+) -> mpsc::Sender<SessionTask> {
+    let (tx, rx) = mpsc::channel::<SessionTask>();
+
+    thread::spawn(move || {
+        loop {
+            // only one per loop! forces congestion (which is good here) so that commands in
+            // rapid succession dont break the player
+            if let Ok(func) = rx.try_recv() {
+                let session_guard = session_handle.lock().unwrap();
+                let Some(session) = session_guard.as_ref() else {
+                    return;
+                };
+
+                if let Err(error) = func(session) {
+                    eprintln!("[music control] winrt failure: {error:?}");
+                }
+            }
+
+            thread::sleep(Duration::from_micros(50));
+        }
+    });
+
+    tx
+}
+
 pub struct MediaController {
     #[allow(unused)] // needs to stay alive or the CurrentSessionChanged listener will drop
     manager: GlobalSystemMediaTransportControlsSessionManager,
-    current_session: Arc<Mutex<Option<GlobalSystemMediaTransportControlsSession>>>,
+    executor: mpsc::Sender<SessionTask>,
 }
 
 impl MediaController {
@@ -179,10 +213,9 @@ impl MediaController {
             }))
             .unwrap();
 
-        Self {
-            manager,
-            current_session,
-        }
+        let executor = start_task_executor(current_session.clone());
+
+        Self { manager, executor }
     }
 
     pub fn next(&self) {
@@ -217,16 +250,7 @@ impl MediaController {
             + Sync
             + 'static,
     {
-        let session = Arc::clone(&self.current_session);
-        thread::spawn(move || {
-            let session_guard = session.lock().unwrap();
-            let Some(session) = session_guard.as_ref() else {
-                return;
-            };
-
-            if let Err(error) = func(session) {
-                eprintln!("winrt failure: {error:?}");
-            }
-        });
+        let task: SessionTask = Box::new(func);
+        self.executor.send(task).unwrap();
     }
 }
