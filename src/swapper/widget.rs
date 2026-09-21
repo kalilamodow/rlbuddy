@@ -1,11 +1,11 @@
-use eframe::egui;
-use rfd::FileDialog;
-
 use crate::{
     common::{ReadonlyStateHandle, channel::Sender},
     core::app::Panel,
-    swapper::service::{ItemId, SwapperCommand, SwapperService, SwapperServiceState},
+    rocket_league::{ItemPackageName, ItemsLoadStatus, get_items},
+    swapper::service::{SwapperCommand, SwapperService, SwapperServiceState},
 };
+use eframe::egui;
+use rfd::FileDialog;
 
 pub struct SwapperWidget {
     state: ReadonlyStateHandle<SwapperServiceState>,
@@ -83,22 +83,27 @@ impl SwapperWidget {
         }
 
         self.sender.send(SwapperCommand::Swap {
-            appearance: ItemId::new(std::mem::take(&mut self.to_swap_input.0)),
-            replaced: ItemId::new(std::mem::take(&mut self.to_swap_input.1)),
+            appearance: ItemPackageName::new(std::mem::take(&mut self.to_swap_input.0)),
+            replaced: ItemPackageName::new(std::mem::take(&mut self.to_swap_input.1)),
         });
     }
 
     fn render_footer(&self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
-            ui.small("Thanks to ShinyEmii/Toga-Files for aes keys!");
+            ui.small("Thanks to ShinyEmii/Toga-Files for item definitions!");
 
-            let is_updating = !self.state.read().keys_loaded;
-            if is_updating {
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
-                    ui.spinner();
-                    ui.small("Updating keys...");
-                });
-            }
+            ui.with_layout(
+                egui::Layout::right_to_left(egui::Align::Min),
+                |ui| match &*get_items() {
+                    ItemsLoadStatus::Error(err) => {
+                        ui.colored_label(ui.visuals().error_fg_color, err.to_string());
+                    }
+                    ItemsLoadStatus::Loading | ItemsLoadStatus::NotLoaded => {
+                        ui.label("Loading items...");
+                    }
+                    ItemsLoadStatus::Loaded(_) => {}
+                },
+            );
         });
     }
 }

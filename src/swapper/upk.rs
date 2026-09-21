@@ -1,3 +1,4 @@
+use crate::rocket_league::{ItemPackageName, RlAesKey};
 use anyhow::{Context as _, Result, ensure};
 use byteorder::{LittleEndian, ReadBytesExt as _, WriteBytesExt as _};
 use std::{
@@ -5,8 +6,6 @@ use std::{
     io::{self, Cursor, Read, Seek, SeekFrom, Write},
     path::Path,
 };
-
-use crate::swapper::{encryption::RlAesKey, service::ItemId};
 
 trait ReadBytes: Read {
     fn read_bytes(&mut self, n_bytes: usize) -> io::Result<Vec<u8>> {
@@ -357,27 +356,6 @@ impl FPackageFileSummary {
     }
 }
 
-fn find_valid_aes_key<'a>(
-    summary: &FPackageFileSummary,
-    encrypted_tables_data: &[u8],
-    keys: &'a [RlAesKey],
-) -> Option<&'a RlAesKey> {
-    const CHECK_SIZE: usize = 64;
-    let first_few_blocks: [u8; CHECK_SIZE] =
-        encrypted_tables_data[..CHECK_SIZE].try_into().unwrap();
-
-    for key in keys {
-        let mut check = first_few_blocks.clone();
-        key.decrypt(&mut check);
-        let mut cursor = Cursor::new(&check);
-        if FString::deserialize(&mut cursor, summary.v33()).is_ok() {
-            return Some(key);
-        }
-    }
-
-    None
-}
-
 #[derive(Debug, Clone)]
 struct NameSwap {
     from: String,
@@ -410,8 +388,8 @@ impl FHeaderEncryptedRegion {
     fn decrypt<'a>(
         summary: &FPackageFileSummary,
         global_reader: &mut (impl Read + Seek),
-        keys: &'a [RlAesKey],
-    ) -> Result<(Self, &'a RlAesKey)> {
+        key: &'a RlAesKey,
+    ) -> Result<Self> {
         global_reader
             .seek(SeekFrom::Start(summary.name_offset as u64))
             .unwrap();
@@ -420,9 +398,6 @@ impl FHeaderEncryptedRegion {
         global_reader
             .read_exact(&mut tables_data)
             .context("reading encrypted region data")?;
-
-        let key =
-            find_valid_aes_key(summary, &tables_data, keys).context("finding valid aes key")?;
 
         key.decrypt(&mut tables_data);
         let mut tables_reader = Cursor::new(tables_data);
@@ -452,16 +427,13 @@ impl FHeaderEncryptedRegion {
         let compressed_chunk_info = TArray::deserialize(&mut tables_reader, v33)
             .context("reading compressed chunk info")?;
 
-        Ok((
-            Self {
-                names,
-                imports,
-                exports,
-                compressed_chunk_info,
-                swaps: Vec::new(),
-            },
-            key,
-        ))
+        Ok(Self {
+            names,
+            imports,
+            exports,
+            compressed_chunk_info,
+            swaps: Vec::new(),
+        })
     }
 
     fn encrypt(
@@ -559,19 +531,19 @@ pub struct Upk<'a> {
     header: FHeaderEncryptedRegion,
     payload: Vec<u8>, // the compressed info
     key: &'a RlAesKey,
-    id: &'a ItemId,
+    id: &'a ItemPackageName,
 }
 
 impl<'a> Upk<'a> {
     pub fn new(
         reader: &mut (impl Read + Seek),
-        id: &'a ItemId,
-        keys: &'a [RlAesKey],
+        id: &'a ItemPackageName,
+        key: &'a RlAesKey,
     ) -> Result<Self> {
         let summary = FPackageFileSummary::deserialize(reader, false)?;
         ensure!(summary.is_valid(), "package file tag isnt valid");
 
-        let (header, key) = FHeaderEncryptedRegion::decrypt(&summary, reader, keys)
+        let header = FHeaderEncryptedRegion::decrypt(&summary, reader, key)
             .context("extracting encrypted region")?;
 
         reader.seek(SeekFrom::Start(
@@ -621,9 +593,13 @@ impl<'a> Upk<'a> {
         Ok(serialized)
     }
 
-    pub fn open<P: AsRef<Path>>(path: P, id: &'a ItemId, keys: &'a [RlAesKey]) -> Result<Self> {
+    pub fn open<P: AsRef<Path>>(
+        path: P,
+        id: &'a ItemPackageName,
+        key: &'a RlAesKey,
+    ) -> Result<Self> {
         let mut file = fs::File::open(path)?;
-        Self::new(&mut file, id, keys)
+        Self::new(&mut file, id, key)
     }
 
     pub fn pretend_to_be(&mut self, other: &'a Upk) {

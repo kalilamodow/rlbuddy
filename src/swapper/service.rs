@@ -5,69 +5,25 @@ use crate::{
         savedata::{load_service_data, save_service_data},
     },
     core::app::{Service, ServiceWithUi},
-    swapper::{
-        encryption::{KeyLoadingError, RlAesKey, load_all_keys},
-        upk::Upk,
-        widget::SwapperWidget,
-    },
+    rocket_league::{ItemPackageName, ItemsLoadStatus, get_items},
+    swapper::{upk::Upk, widget::SwapperWidget},
 };
 use serde::{Deserialize, Serialize};
-use std::{
-    fs,
-    path::{Path, PathBuf},
-    sync::{Arc, Mutex},
-    thread,
-};
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct ItemId(String);
-
-impl ItemId {
-    pub fn new(item_id: String) -> Self {
-        Self(item_id)
-    }
-
-    pub fn id(&self) -> &str {
-        &self.0
-    }
-    pub fn sf_name(&self) -> String {
-        format!("{}_SF", self.id())
-    }
-    pub fn filename(&self) -> String {
-        format!("{}.upk", self.sf_name())
-    }
-    pub fn backup_filename(&self) -> String {
-        format!("{}.upk.bak", self.sf_name())
-    }
-    pub fn path(&self, exe_path: &Path) -> PathBuf {
-        exe_path
-            .parent()
-            .unwrap()
-            .join("../../TAGame/CookedPCConsole/")
-            .join(self.filename())
-    }
-    pub fn backup_path(&self, exe_path: &Path) -> PathBuf {
-        exe_path
-            .parent()
-            .unwrap()
-            .join("../../TAGame/CookedPCConsole/")
-            .join(self.backup_filename())
-    }
-}
+use std::{fs, path::PathBuf};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ActiveSwap {
-    pub appearance: ItemId,
-    pub replaced: ItemId,
+    pub appearance: ItemPackageName,
+    pub replaced: ItemPackageName,
 }
 
 #[derive(Debug)]
 pub enum SwapperCommand {
     Swap {
-        replaced: ItemId,
-        appearance: ItemId,
+        replaced: ItemPackageName,
+        appearance: ItemPackageName,
     },
-    DeleteSwap(ItemId), // replaced
+    DeleteSwap(ItemPackageName), // replaced
     SetExecutablePath(PathBuf),
     ClearError,
 }
@@ -83,28 +39,11 @@ pub struct SwapperServiceState {
     pub active_swaps: Vec<ActiveSwap>,
     pub exe_path: Option<PathBuf>,
     pub current_error: Option<String>,
-    pub keys_loaded: bool,
 }
-
-type KeysArtex = Arc<Mutex<Option<Result<Vec<RlAesKey>, KeyLoadingError>>>>;
 
 pub struct SwapperService {
     state: ReadWriteStateHandle<SwapperServiceState>,
-    keys: KeysArtex,
     command_receiver: Receiver<SwapperCommand>,
-}
-
-fn fetch_aes_keys() -> KeysArtex {
-    let rc = KeysArtex::default();
-
-    let handle = Arc::clone(&rc);
-    thread::spawn(move || {
-        let keys = load_all_keys();
-        let mut guard = handle.lock().unwrap();
-        *guard = Some(keys);
-    });
-
-    rc
 }
 
 const DATA_ID: &str = "item_swapper";
@@ -112,16 +51,13 @@ const DATA_ID: &str = "item_swapper";
 impl SwapperService {
     pub fn new() -> Self {
         let savedata: SwapperServiceSavedata = load_service_data(DATA_ID);
-        let keys = fetch_aes_keys();
 
         Self {
             state: ReadWriteStateHandle::new(SwapperServiceState {
                 active_swaps: savedata.active_swaps,
                 exe_path: savedata.exe_path,
                 current_error: None,
-                keys_loaded: false,
             }),
-            keys,
             command_receiver: Receiver::new(),
         }
     }
@@ -180,33 +116,39 @@ impl SwapperService {
                     fs::copy(replaced.path(&exe_path), replaced.backup_path(&exe_path)).unwrap();
                 }
 
-                let keys_guard = self.keys.lock().unwrap();
-                let Some(keys) = keys_guard.as_ref() else {
-                    state.current_error = Some("Updating keys...".into());
+                let ItemsLoadStatus::Loaded(items) = &*get_items() else {
+                    state.current_error = Some("items aren't loaded yet".into());
+                    return;
+                };
+                let Some(appearance_item_def) = items.iter().find(|i| i.package == appearance)
+                else {
+                    state.current_error = Some("invalid appearance item".into());
+                    return;
+                };
+                let Some(replaced_item_def) = items.iter().find(|i| i.package == replaced) else {
+                    state.current_error = Some("invalid replaced item".into());
                     return;
                 };
 
-                let Ok(keys) = keys else {
-                    state.current_error = Some("Unable to load keys".into());
-                    return;
-                };
-
-                let mut appearance_upk =
-                    match Upk::open(appearance.path(&exe_path), &appearance, keys) {
-                        Ok(u) => u,
-                        Err(error) => {
-                            state.current_error =
-                                Some(format!("Loading appearance file: {error:?}"));
-                            return;
-                        }
-                    };
-                let replaced_upk = match Upk::open(replaced.path(&exe_path), &replaced, keys) {
+                let mut appearance_upk = match Upk::open(
+                    appearance.path(&exe_path),
+                    &appearance,
+                    &appearance_item_def.key,
+                ) {
                     Ok(u) => u,
                     Err(error) => {
-                        state.current_error = Some(format!("Loading replaced file: {error:?}"));
+                        state.current_error = Some(format!("Loading appearance file: {error:?}"));
                         return;
                     }
                 };
+                let replaced_upk =
+                    match Upk::open(replaced.path(&exe_path), &replaced, &replaced_item_def.key) {
+                        Ok(u) => u,
+                        Err(error) => {
+                            state.current_error = Some(format!("Loading replaced file: {error:?}"));
+                            return;
+                        }
+                    };
 
                 appearance_upk.pretend_to_be(&replaced_upk);
                 let serialized = match appearance_upk.serialize() {
@@ -238,11 +180,6 @@ impl SwapperService {
 
 impl Service for SwapperService {
     fn update(&mut self) {
-        {
-            let mut state = self.state.write();
-            state.keys_loaded = self.keys.lock().unwrap().is_some();
-        }
-
         while let Some(cmd) = self.command_receiver.try_recv() {
             self.handle_command(cmd);
         }
