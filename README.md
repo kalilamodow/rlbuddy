@@ -168,7 +168,6 @@ rlbuddy can be partially transparent. You can adjust the opacity through the set
 rlbuddy is written in Rust and uses the `eframe` gui framework. The build script automatically downloads assets from the
 Fandom images server. It does use a couple of Windows-only features, but I'm in the process of trying to feature-gate the
 Windows-only features to get it running on Linux!
-people want it (I'm on Windows so I'm not totally sure what works on other platforms).
 
 There are services and panels. Services are the code-behind, they're state managers with `update` methods called every
 tick. They usually connect to external programs (discord, rocket league, etc.) to give rlbuddy information. They're
