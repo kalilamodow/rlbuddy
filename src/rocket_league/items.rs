@@ -11,14 +11,13 @@ use std::{
     time::Duration,
 };
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ItemId(u16);
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ItemPackageName(String);
 
 impl ItemPackageName {
-    pub fn new(item_id: String) -> Self {
-        Self(item_id)
-    }
-
     pub fn id(&self) -> &str {
         &self.0
     }
@@ -48,7 +47,7 @@ impl ItemPackageName {
 }
 
 // there are more but this is just items
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ItemSlot {
     Antenna,
     Body,
@@ -74,6 +73,19 @@ impl ItemSlot {
             _ => return None,
         })
     }
+
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Antenna => "Antenna",
+            Self::Body => "Body",
+            Self::Boost => "Boost",
+            Self::Explosion => "Goal explosion",
+            Self::PaintFinish => "Paint finish",
+            Self::Topper => "Topper",
+            Self::Trail => "Trail",
+            Self::Wheel => "Wheels",
+        }
+    }
 }
 
 const URL: &str =
@@ -88,7 +100,7 @@ pub struct ItemsCache {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Item {
-    pub id: u16,
+    pub id: ItemId,
     pub name: String,
     pub slot: ItemSlot,
     pub package: ItemPackageName,
@@ -115,7 +127,7 @@ fn parse_csv_response(csv: String) -> Result<Vec<Item>> {
     // skip table header
     for line in csv.lines().skip(1) {
         let mut values = line.split(',');
-        let id: u16 = values.next().context("loading next id")?.parse()?; // id
+        let id = ItemId(values.next().context("loading next id")?.parse()?);
         values.next(); // skip name
         let name = trim_quotes(values.next().context("loading next label")?).to_owned(); // Label
 

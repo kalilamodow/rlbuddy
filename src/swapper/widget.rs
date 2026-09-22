@@ -1,7 +1,7 @@
 use crate::{
     common::{ReadonlyStateHandle, channel::Sender},
     core::app::Panel,
-    rocket_league::{ItemPackageName, ItemsLoadStatus, get_items},
+    rocket_league::{Item, ItemSlot, ItemsLoadStatus, get_items},
     swapper::service::{SwapperCommand, SwapperService, SwapperServiceState},
 };
 use eframe::egui;
@@ -10,7 +10,8 @@ use rfd::FileDialog;
 pub struct SwapperWidget {
     state: ReadonlyStateHandle<SwapperServiceState>,
     sender: Sender<SwapperCommand>,
-    to_swap_input: (String, String),
+    to_swap_input: (Option<Item>, Option<Item>),
+    to_swap_filter: ItemSlot,
 }
 
 impl SwapperWidget {
@@ -18,7 +19,8 @@ impl SwapperWidget {
         Self {
             state: service.state_handle(),
             sender: service.sender(),
-            to_swap_input: ("".into(), "".into()),
+            to_swap_input: (None, None),
+            to_swap_filter: ItemSlot::Boost,
         }
     }
 
@@ -40,19 +42,30 @@ impl SwapperWidget {
 
     fn render_swap_list(&mut self, ui: &mut egui::Ui) {
         let state = self.state.read();
+        let ItemsLoadStatus::Loaded(items) = &*get_items() else {
+            ui.spinner();
+            return;
+        };
+
         for swap in &state.active_swaps {
+            let replaced = items.iter().find(|i| i.id == swap.replaced);
+            let appearance = items.iter().find(|i| i.id == swap.appearance);
+
             ui.group(|ui| {
                 ui.horizontal(|ui| {
                     ui.label(format!(
                         "{} looks like {}",
-                        swap.replaced.id(),
-                        swap.appearance.id()
+                        replaced.map(|r| r.name.as_str()).unwrap_or_default(),
+                        appearance.map(|r| r.name.as_str()).unwrap_or_default()
                     ));
 
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
-                        if ui.button("Remove").clicked() {
+                        if ui
+                            .add_enabled(replaced.is_some(), egui::Button::new("Remove"))
+                            .clicked()
+                        {
                             self.sender
-                                .send(SwapperCommand::DeleteSwap(swap.replaced.clone()));
+                                .send(SwapperCommand::DeleteSwap(replaced.unwrap().clone()));
                         }
                     });
                 });
@@ -73,19 +86,88 @@ impl SwapperWidget {
     }
 
     fn render_swap_inputs(&mut self, ui: &mut egui::Ui) {
-        ui.label("Appearance:");
-        ui.text_edit_singleline(&mut self.to_swap_input.0);
-        ui.label("Replace:");
-        ui.text_edit_singleline(&mut self.to_swap_input.1);
+        let ItemsLoadStatus::Loaded(items) = &*get_items() else {
+            ui.spinner();
+            return;
+        };
 
-        if !ui.button("Swap").clicked() {
+        egui::ComboBox::from_label("Appearance")
+            .selected_text(
+                self.to_swap_input
+                    .0
+                    .as_ref()
+                    .map(|i| i.name.as_str())
+                    .unwrap_or("Select..."),
+            )
+            .show_ui(ui, |ui| {
+                for item in items.iter().filter(|i| i.slot == self.to_swap_filter) {
+                    if ui
+                        .selectable_label(
+                            self.to_swap_input.0.as_ref().map(|i| i.id) == Some(item.id),
+                            &item.name,
+                        )
+                        .clicked()
+                    {
+                        self.to_swap_input.0 = Some(item.clone());
+                    }
+                }
+            });
+        egui::ComboBox::from_label("Replaced item")
+            .selected_text(
+                self.to_swap_input
+                    .1
+                    .as_ref()
+                    .map(|i| i.name.as_str())
+                    .unwrap_or("Select..."),
+            )
+            .show_ui(ui, |ui| {
+                for item in items.iter().filter(|i| i.slot == self.to_swap_filter) {
+                    if ui
+                        .selectable_label(
+                            self.to_swap_input.1.as_ref().map(|i| i.id) == Some(item.id),
+                            &item.name,
+                        )
+                        .clicked()
+                    {
+                        self.to_swap_input.1 = Some(item.clone());
+                    }
+                }
+            });
+
+        let mut swap_clicked = false;
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
+            swap_clicked = ui.button("Swap").clicked();
+
+            egui::ComboBox::from_label("Slot")
+                .selected_text(self.to_swap_filter.as_str())
+                .show_ui(ui, |ui| {
+                    for slot in &[
+                        ItemSlot::Antenna,
+                        ItemSlot::Body,
+                        ItemSlot::Boost,
+                        ItemSlot::Explosion,
+                        ItemSlot::PaintFinish,
+                        ItemSlot::Topper,
+                        ItemSlot::Trail,
+                        ItemSlot::Wheel,
+                    ] {
+                        ui.selectable_value(&mut self.to_swap_filter, slot.clone(), slot.as_str());
+                    }
+                });
+        });
+
+        if !swap_clicked {
             return;
         }
 
-        self.sender.send(SwapperCommand::Swap {
-            appearance: ItemPackageName::new(std::mem::take(&mut self.to_swap_input.0)),
-            replaced: ItemPackageName::new(std::mem::take(&mut self.to_swap_input.1)),
-        });
+        if let Some(appearance) = self.to_swap_input.0.take()
+            && let Some(replaced) = self.to_swap_input.1.take()
+        {
+            self.sender.send(SwapperCommand::Swap {
+                replaced,
+                appearance,
+            });
+        }
     }
 
     fn render_footer(&self, ui: &mut egui::Ui) {

@@ -5,25 +5,23 @@ use crate::{
         savedata::{load_service_data, save_service_data},
     },
     core::app::{Service, ServiceWithUi},
-    rocket_league::{ItemPackageName, ItemsLoadStatus, get_items},
+    rocket_league::{Item, ItemId},
     swapper::{upk::Upk, widget::SwapperWidget},
 };
+use anyhow::{Context, bail};
 use serde::{Deserialize, Serialize};
 use std::{fs, path::PathBuf};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ActiveSwap {
-    pub appearance: ItemPackageName,
-    pub replaced: ItemPackageName,
+    pub appearance: ItemId,
+    pub replaced: ItemId,
 }
 
 #[derive(Debug)]
 pub enum SwapperCommand {
-    Swap {
-        replaced: ItemPackageName,
-        appearance: ItemPackageName,
-    },
-    DeleteSwap(ItemPackageName), // replaced
+    Swap { replaced: Item, appearance: Item },
+    DeleteSwap(Item), // replaced
     SetExecutablePath(PathBuf),
     ClearError,
 }
@@ -70,25 +68,23 @@ impl SwapperService {
         self.command_receiver.send()
     }
 
-    fn handle_command(&mut self, command: SwapperCommand) {
+    fn handle_command(&mut self, command: SwapperCommand) -> anyhow::Result<()> {
         match command {
             SwapperCommand::DeleteSwap(item) => {
                 let mut state = self.state.write();
                 let Some(exe_path) = state.exe_path.clone() else {
-                    return;
+                    bail!("no exe path");
                 };
 
-                if let Err(error) = fs::remove_file(item.path(&exe_path)) {
-                    state.current_error =
-                        Some(format!("error when removing masquerading file: {error:?}"));
-                };
+                fs::remove_file(item.package.path(&exe_path))
+                    .context("removing masquerading file")?;
+                fs::copy(
+                    item.package.backup_path(&exe_path),
+                    item.package.path(&exe_path),
+                )
+                .context("restoring backup")?;
 
-                if let Err(error) = fs::copy(item.backup_path(&exe_path), item.path(&exe_path)) {
-                    state.current_error =
-                        Some(format!("error when copying backup file: {error:?}"));
-                }
-
-                state.active_swaps.retain(|s| s.replaced != item);
+                state.active_swaps.retain(|s| s.replaced != item.id);
             }
             SwapperCommand::SetExecutablePath(path) => {
                 let mut state = self.state.write();
@@ -100,73 +96,59 @@ impl SwapperService {
             } => {
                 let mut state = self.state.write();
                 let Some(exe_path) = state.exe_path.clone() else {
-                    return;
+                    bail!("no exe path");
                 };
 
-                if !appearance.path(&exe_path).is_file() {
-                    state.current_error = Some("invalid appearance item".into());
-                    return;
+                if !appearance.package.path(&exe_path).is_file() {
+                    bail!("invalid appearance item");
                 }
-                if !replaced.path(&exe_path).is_file() {
-                    state.current_error = Some("invalid replaced item".into());
-                    return;
+                if !replaced.package.path(&exe_path).is_file() {
+                    bail!("invalid replaced item");
                 }
 
-                if !replaced.backup_path(&exe_path).is_file() {
-                    fs::copy(replaced.path(&exe_path), replaced.backup_path(&exe_path)).unwrap();
+                if !replaced.package.backup_path(&exe_path).is_file() {
+                    fs::copy(
+                        replaced.package.path(&exe_path),
+                        replaced.package.backup_path(&exe_path),
+                    )
+                    .context("backing up file")?;
                 }
-
-                let ItemsLoadStatus::Loaded(items) = &*get_items() else {
-                    state.current_error = Some("items aren't loaded yet".into());
-                    return;
-                };
-                let Some(appearance_item_def) = items.iter().find(|i| i.package == appearance)
-                else {
-                    state.current_error = Some("invalid appearance item".into());
-                    return;
-                };
-                let Some(replaced_item_def) = items.iter().find(|i| i.package == replaced) else {
-                    state.current_error = Some("invalid replaced item".into());
-                    return;
-                };
 
                 let mut appearance_upk = match Upk::open(
-                    appearance.path(&exe_path),
-                    &appearance,
-                    &appearance_item_def.key,
+                    appearance.package.path(&exe_path),
+                    &appearance.package,
+                    &appearance.key,
                 ) {
                     Ok(u) => u,
                     Err(error) => {
-                        state.current_error = Some(format!("Loading appearance file: {error:?}"));
-                        return;
+                        bail!("Loading appearance file: {error:?}");
                     }
                 };
-                let replaced_upk =
-                    match Upk::open(replaced.path(&exe_path), &replaced, &replaced_item_def.key) {
-                        Ok(u) => u,
-                        Err(error) => {
-                            state.current_error = Some(format!("Loading replaced file: {error:?}"));
-                            return;
-                        }
-                    };
+                let replaced_upk = match Upk::open(
+                    replaced.package.path(&exe_path),
+                    &replaced.package,
+                    &replaced.key,
+                ) {
+                    Ok(u) => u,
+                    Err(error) => {
+                        bail!("Loading replaced file: {error:?}");
+                    }
+                };
 
                 appearance_upk.pretend_to_be(&replaced_upk);
                 let serialized = match appearance_upk.serialize() {
                     Ok(s) => s,
                     Err(e) => {
-                        state.current_error = Some(format!("serializing failure: {e:?}"));
-                        return;
+                        bail!("serializing failure: {e:?}");
                     }
                 };
-                if let Err(error) = fs::write(replaced.path(&exe_path), serialized) {
-                    state.current_error =
-                        Some(format!("swap failure when writing new file: {error:?}"));
-                    return;
+                if let Err(error) = fs::write(replaced.package.path(&exe_path), serialized) {
+                    bail!("swap failure when writing new file: {error:?}");
                 };
 
                 let swap = ActiveSwap {
-                    appearance,
-                    replaced,
+                    appearance: appearance.id,
+                    replaced: replaced.id,
                 };
                 state.active_swaps.push(swap);
             }
@@ -175,13 +157,18 @@ impl SwapperService {
                 state.current_error = None;
             }
         }
+
+        Ok(())
     }
 }
 
 impl Service for SwapperService {
     fn update(&mut self) {
         while let Some(cmd) = self.command_receiver.try_recv() {
-            self.handle_command(cmd);
+            if let Err(error) = self.handle_command(cmd) {
+                let mut state = self.state.write();
+                state.current_error = Some(error.to_string());
+            }
         }
     }
 
