@@ -5,12 +5,12 @@ use crate::{
         savedata::{load_service_data, save_service_data},
     },
     core::app::{Service, ServiceWithUi},
-    rocket_league::{Item, ItemId},
+    rocket_league::{Item, ItemId, get_rl_exe_path},
     swapper::{upk::Upk, widget::SwapperWidget},
 };
 use anyhow::{Context, bail};
 use serde::{Deserialize, Serialize};
-use std::{fs, path::PathBuf};
+use std::fs;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ActiveSwap {
@@ -22,20 +22,17 @@ pub struct ActiveSwap {
 pub enum SwapperCommand {
     Swap { replaced: Item, appearance: Item },
     DeleteSwap(Item), // replaced
-    SetExecutablePath(PathBuf),
     ClearError,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct SwapperServiceSavedata {
     pub active_swaps: Vec<ActiveSwap>,
-    pub exe_path: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct SwapperServiceState {
     pub active_swaps: Vec<ActiveSwap>,
-    pub exe_path: Option<PathBuf>,
     pub current_error: Option<String>,
 }
 
@@ -53,7 +50,6 @@ impl SwapperService {
         Self {
             state: ReadWriteStateHandle::new(SwapperServiceState {
                 active_swaps: savedata.active_swaps,
-                exe_path: savedata.exe_path,
                 current_error: None,
             }),
             command_receiver: Receiver::new(),
@@ -72,7 +68,7 @@ impl SwapperService {
         match command {
             SwapperCommand::DeleteSwap(item) => {
                 let mut state = self.state.write();
-                let Some(exe_path) = state.exe_path.clone() else {
+                let Some(exe_path) = get_rl_exe_path() else {
                     bail!("no exe path");
                 };
 
@@ -86,16 +82,12 @@ impl SwapperService {
 
                 state.active_swaps.retain(|s| s.replaced != item.id);
             }
-            SwapperCommand::SetExecutablePath(path) => {
-                let mut state = self.state.write();
-                state.exe_path = Some(path);
-            }
             SwapperCommand::Swap {
                 replaced,
                 appearance,
             } => {
                 let mut state = self.state.write();
-                let Some(exe_path) = state.exe_path.clone() else {
+                let Some(exe_path) = get_rl_exe_path() else {
                     bail!("no exe path");
                 };
 
@@ -178,7 +170,6 @@ impl Service for SwapperService {
             DATA_ID,
             &SwapperServiceSavedata {
                 active_swaps: state.active_swaps,
-                exe_path: state.exe_path,
             },
         );
     }

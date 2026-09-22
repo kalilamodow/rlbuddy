@@ -1,7 +1,7 @@
 use crate::{
     common::{ReadonlyStateHandle, channel::Sender},
     core::app::Panel,
-    rocket_league::{Item, ItemSlot, ItemsLoadStatus, get_items},
+    rocket_league::{Item, ItemSlot, ItemsLoadStatus, get_items, get_rl_exe_path, set_rl_exe_path},
     swapper::service::{SwapperCommand, SwapperService, SwapperServiceState},
 };
 use eframe::egui;
@@ -36,8 +36,7 @@ impl SwapperWidget {
             return;
         };
 
-        self.sender
-            .send(SwapperCommand::SetExecutablePath(selected_file));
+        set_rl_exe_path(selected_file);
     }
 
     fn render_swap_list(&mut self, ui: &mut egui::Ui) {
@@ -198,8 +197,8 @@ impl Panel for SwapperWidget {
     fn ui(&mut self, ui: &mut eframe::egui::Ui) -> eframe::egui::Response {
         ui.vertical(|ui| {
             let has_exe_path = {
-                let state = self.state.read();
-                state.exe_path.is_some()
+                let exe_path = get_rl_exe_path();
+                exe_path.is_some()
             };
 
             if !has_exe_path {
