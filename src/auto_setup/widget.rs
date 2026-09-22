@@ -1,4 +1,7 @@
-use crate::core::app::Panel;
+use crate::{
+    core::app::Panel,
+    rocket_league::{get_rl_exe_path, set_rl_exe_path},
+};
 use eframe::egui;
 use rfd::FileDialog;
 use std::{fs, io, path::PathBuf};
@@ -29,13 +32,17 @@ impl AutoSetupWidget {
         AutoSetupWidget { success: None }
     }
 
-    fn do_setup(&mut self) {
-        let Some(selected_file) = FileDialog::new()
-            .add_filter("Executable", &["exe"])
-            .pick_file()
-        else {
+    fn do_setup(&mut self, exe_path: Option<PathBuf>) {
+        let Some(selected_file) = exe_path.or_else(|| {
+            let f = FileDialog::new()
+                .add_filter("Executable", &["exe"])
+                .pick_file();
+            f
+        }) else {
             return;
         };
+
+        set_rl_exe_path(selected_file.clone());
 
         let Some(binary_dir) = selected_file.parent() else {
             self.success = Some(Err("invalid path".to_string()));
@@ -87,9 +94,22 @@ impl Panel for AutoSetupWidget {
                     }
                 }
             } else {
-                ui.label("Select RocketLeague.exe path");
-                if ui.button("Select file").clicked() {
-                    self.do_setup();
+                // do_setup handles None ex_path
+                let exe_path = get_rl_exe_path();
+
+                if exe_path.is_none() {
+                    ui.label("Select RocketLeague.exe path");
+                }
+
+                if ui
+                    .button(if exe_path.is_some() {
+                        "Set up automatically"
+                    } else {
+                        "Select file"
+                    })
+                    .clicked()
+                {
+                    self.do_setup(exe_path);
                 }
             }
         })
