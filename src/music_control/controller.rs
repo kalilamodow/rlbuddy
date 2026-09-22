@@ -158,7 +158,7 @@ fn start_task_executor(
             if let Ok(func) = rx.try_recv() {
                 let session_guard = session_handle.lock().unwrap();
                 let Some(session) = session_guard.as_ref() else {
-                    return;
+                    continue;
                 };
 
                 if let Err(error) = func(session) {
