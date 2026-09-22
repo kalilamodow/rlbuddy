@@ -2,6 +2,8 @@ mod aes;
 pub use aes::*;
 mod arena;
 pub use arena::*;
+mod exe_path;
+pub use exe_path::*;
 mod items;
 pub use items::*;
 mod platform;
