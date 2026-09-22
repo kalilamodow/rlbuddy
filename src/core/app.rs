@@ -6,6 +6,7 @@ use crate::gamepad::overlay::GamepadOverlayService;
 use crate::hotkey::HotkeyService;
 use crate::music_control::MusicControlService;
 use crate::my_stats::MyStatsWidget;
+use crate::rocket_league::set_rl_exe_path;
 use crate::swapper::SwapperService;
 use crate::{
     auto_setup::AutoSetupWidget,
@@ -19,6 +20,7 @@ use crate::{
 };
 use discord::DiscordService;
 use eframe::egui::{self, Response, Ui, ViewportCommand};
+use rfd::FileDialog;
 use serde::{Deserialize, Serialize};
 use std::hash::{DefaultHasher, Hasher};
 use std::thread;
@@ -484,7 +486,7 @@ impl Panel for AppSettingsWidget {
                 });
             ui.small("Choose how the overlay should automatically pop up.");
 
-            ui.add_space(8.0);
+            ui.add_space(4.0);
             ui.add(
                 egui::Slider::new(&mut settings.transparency, u8::MIN..=u8::MAX)
                     .text("App transparency"),
@@ -494,7 +496,10 @@ impl Panel for AppSettingsWidget {
                 but it'll be harder to see the game behind it!",
             );
 
-            ui.add_space(8.0);
+            ui.add_space(4.0);
+            ui.separator();
+            ui.add_space(4.0);
+
             ui.horizontal(|ui| {
                 ui.checkbox(&mut settings.ui_fps_limit, "Limit UI framerate");
 
@@ -526,6 +531,19 @@ impl Panel for AppSettingsWidget {
                 You'll get diminishing returns before around 20ms and after about 100ms. \
                 This won't affect UI performance.",
             );
+
+            ui.add_space(4.0);
+            ui.separator();
+            ui.add_space(4.0);
+
+            if ui.button("Reset Rocket League executable path").clicked() {
+                if let Some(file) = FileDialog::new()
+                    .add_filter("Executable", &["exe"])
+                    .pick_file()
+                {
+                    set_rl_exe_path(file);
+                }
+            }
         })
         .response
     }
