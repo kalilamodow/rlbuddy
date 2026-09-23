@@ -3,7 +3,7 @@ use crate::{
     common::eventsource::{EventReceiver, EventSource},
     rocket_league::{Platform, Playlist, Team, asset_to_arena},
 };
-use num_enum::TryFromPrimitive;
+use num_enum::FromPrimitive as _;
 use serde::{Deserialize, Serialize};
 use std::{
     cmp::Ordering,
@@ -380,7 +380,7 @@ impl StatsApi {
                         .into_iter()
                         .filter_map(parse_stats_api_player)
                         .collect(),
-                    playlist: Playlist::try_from_primitive(data.game.playlist_id).unwrap(),
+                    playlist: Playlist::from_primitive(data.game.playlist_id),
                 })
             }
             StatsApiEvent::MatchCreated => {

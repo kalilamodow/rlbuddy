@@ -1,8 +1,7 @@
-use std::sync::Arc;
-
 use eframe::egui;
-use num_enum::{TryFromPrimitive as _, TryFromPrimitiveError};
+use num_enum::{FromPrimitive, TryFromPrimitive as _};
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 use crate::{
     common::CachedHttpApi,
@@ -33,16 +32,14 @@ pub struct PlaylistSkillInformation {
     pub rank_is_estimate: bool,
 }
 
-impl PlaylistSkillInformation {
-    fn try_from_data(
-        value: &GetPlayerSkillsPlaylistData,
-    ) -> Result<Self, TryFromPrimitiveError<Playlist>> {
+impl From<GetPlayerSkillsPlaylistData> for PlaylistSkillInformation {
+    fn from(value: GetPlayerSkillsPlaylistData) -> Self {
         let actual_rank = Rank::try_from_primitive(value.tier).expect("Failed to convert rank");
         let use_estimate = actual_rank == Rank::Unranked;
 
-        let playlist = Playlist::try_from_primitive(value.id)?;
+        let playlist = Playlist::from_primitive(value.id);
 
-        Ok(Self {
+        Self {
             playlist,
             rank: if use_estimate {
                 Rank::estimate_from_mmr(value.mmr)
@@ -52,7 +49,7 @@ impl PlaylistSkillInformation {
             div: Division::from(value.division),
             mmr: value.mmr,
             rank_is_estimate: use_estimate,
-        })
+        }
     }
 }
 
@@ -70,11 +67,7 @@ impl PlayerSkillInformation {
 impl From<GetPlayerSkillsResponse> for PlayerSkillInformation {
     fn from(value: GetPlayerSkillsResponse) -> Self {
         Self {
-            playlists: value
-                .playlists
-                .into_iter()
-                .filter_map(|v| PlaylistSkillInformation::try_from_data(&v).ok())
-                .collect(),
+            playlists: value.playlists.into_iter().map(Into::into).collect(),
         }
     }
 }

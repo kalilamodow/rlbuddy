@@ -1,20 +1,45 @@
-use num_enum::TryFromPrimitive;
+use crate::rocket_league::get_rl_exe_path;
+use num_enum::FromPrimitive;
 use serde::{Deserialize, Serialize};
-use std::fmt;
+use std::{
+    fmt, fs,
+    io::{self, Seek},
+    sync::LazyLock,
+};
 
-// combination of data scraped from PsyNet and https://bakkesplugins.com/wiki/bakkesmod-sdk/code-snippets/playlist-id
+#[derive(Debug, Deserialize)]
+struct PsynetPlaylist {
+    #[serde(rename = "PlaylistID")]
+    id: u8,
+    #[serde(rename = "Title")]
+    name: String,
+}
+
+// to load up-to-date info!
+static PLAYLISTS_FROM_GAME: LazyLock<Option<Vec<PsynetPlaylist>>> = LazyLock::new(|| {
+    let rl_exe_path = get_rl_exe_path()?;
+    let cache_file = rl_exe_path
+        .parent()?
+        .join("../../TAGame/Cache/WebCache/")
+        .join("L3YyL0NvbmZpZy9CYXR0bGVDYXJzLy0xODg3Njk0MDgzL1Byb2QvRXBpYy9JTlQv"); // cache file
+
+    let mut cache_file = fs::File::open(cache_file).ok()?;
+    cache_file.seek(io::SeekFrom::Start(55)).unwrap();
+    let mut de = serde_json::Deserializer::from_reader(cache_file);
+    let items: Vec<PsynetPlaylist> = serde_json::Map::deserialize(&mut de)
+        .unwrap()
+        .into_values()
+        .filter(|obj| obj["Class"] == "PlaylistSettings_TA")
+        .map(serde_json::from_value)
+        .filter_map(Result::ok)
+        .collect();
+
+    Some(items)
+});
+
+// stuff that's worth hardcoding (comp playlists, stuff that the online config doesnt say)
 #[derive(
-    Debug,
-    Copy,
-    Clone,
-    PartialOrd,
-    Ord,
-    TryFromPrimitive,
-    PartialEq,
-    Eq,
-    Serialize,
-    Deserialize,
-    Hash,
+    Debug, Copy, Clone, PartialOrd, Ord, FromPrimitive, PartialEq, Eq, Serialize, Deserialize, Hash,
 )]
 #[repr(u8)]
 pub enum Playlist {
@@ -31,48 +56,31 @@ pub enum Playlist {
     RankedTeamDoubles = 11,
     RankedStandard = 13,
     SnowDayPromotion = 15,
-    Experimental = 16,
     BasketballDoubles = 17,
     Rumble = 18,
     Workshop = 19,
     CustomTrainingEditor = 20,
     CustomTraining = 21,
-    Tournament = 22,
     Breakout = 23,
     LocalMatch = 24,
-    FaceIt = 26,
     RankedBasketballDoubles = 27,
     RankedRumble = 28,
     RankedBreakout = 29,
     RankedSnowDay = 30,
     HauntedBall = 31,
-    BeachBall = 32,
-    Rugby = 33,
-    AutoTournament = 34,
-    RocketLabs = 35,
     RumShot = 37,
     GodBall = 38,
     BoomerBall = 41,
     GodBallDoubles = 43,
     SpecialSnowDay = 44,
-    Football = 46,
-    Cubic = 47,
     TacticalRumble = 48,
-    SpringLoaded = 49,
-    SpeedDemon = 50,
     RumbleBM = 52,
-    Knockout = 54,
-    ThirdWheel = 55,
     RankedQuads = 61,
-    MagnusFutball = 62,
     RankedHeatseekerDoubles = 63,
     GodBallSpooky = 64,
     GodBallHaunted = 65,
     GodBallRicochet = 66,
-    CubicSpooky = 67,
-    GForceFrenzy = 68,
     RumShotDoubles = 70,
-    Territory = 72,
     OnlineFreeplay = 73,
     TerritoryDoubles = 74,
     GodballTerritory = 75,
@@ -80,17 +88,8 @@ pub enum Playlist {
     NonStandardSoccar = 77,
     NonStandardSoccarDoubles = 78,
     SnowdayTerritory = 79,
-    RunItBack = 80,
-    CarWars = 81,
-    PizzaParty = 82,
-    PushThePuck = 83,
-    Possession = 84,
-    FCShowdown = 86,
-    Sacrifice = 87,
-    JumpJam = 88,
-    SonicRush = 89,
-    UpToNoGood = 90,
-    ProjectAIM = 91,
+    #[num_enum(catch_all)]
+    Other(u8),
 }
 
 impl Playlist {
@@ -105,30 +104,15 @@ impl Playlist {
             Self::Rumble | Self::RankedRumble => "Rumble",
             Self::RankedSnowDay | Self::SnowDayPromotion => "Snow Day",
             Self::BasketballDoubles | Self::RankedBasketballDoubles => "Hoops",
-            Self::Experimental | Self::RocketLabs => "Rocket Labs",
-            Self::Tournament | Self::AutoTournament => "Tournament Match",
-            Self::FaceIt => "External Match",
             Self::RankedHeatseekerDoubles | Self::GodBall | Self::GodBallDoubles => "Heatseeker",
             Self::HauntedBall => "Ghost Hunt",
-            Self::BeachBall => "Beach Ball",
-            Self::Rugby => "Spike Rush",
             Self::GodBallSpooky | Self::GodBallHaunted => "Haunted Heatseeker",
             Self::GodBallRicochet => "Heatseeker Ricochet",
             Self::RumShot | Self::RumShotDoubles => "Dropshot Rumble",
             Self::BoomerBall => "Boomer Ball",
             Self::SpecialSnowDay => "Winter Breakaway",
-            Self::Football => "Gridiron",
-            Self::Cubic => "Super Cube",
-            Self::CubicSpooky => "Spooky Cube",
             Self::TacticalRumble => "Tactical Rumble",
-            Self::SpringLoaded => "Spring Loaded",
-            Self::SpeedDemon => "Speed Demon",
             Self::RumbleBM => "Gotham City Rumble",
-            Self::Knockout => "Knockout",
-            Self::ThirdWheel => "confidential_thirdwheel_test",
-            Self::MagnusFutball => "Nike FC Showdown",
-            Self::GForceFrenzy => "G-Force Frenzy",
-            Self::Territory => "Split Shot",
             Self::TerritoryDoubles => "Split Shot Doubles",
             Self::GodballTerritory => "Split Shot Heatseeker",
             Self::GodballTerritoryDoubles => "Split Shot Heatseeker Doubles",
@@ -136,17 +120,6 @@ impl Playlist {
             Self::NonStandardSoccar => "Non-Standard Soccar",
             Self::NonStandardSoccarDoubles => "Non-Standard Soccar Doubles",
             Self::SnowdayTerritory => "Split Shot Snow Day",
-            Self::RunItBack => "Run It Back",
-            Self::CarWars => "Spike Drop",
-            Self::PizzaParty => "Pizza Party",
-            Self::PushThePuck => "Push The Puck",
-            Self::Possession => "Possession Rumble",
-            Self::FCShowdown => "FIFA Soccar Strike",
-            Self::Sacrifice => "Demolition Duel",
-            Self::JumpJam => "Jump Jam",
-            Self::SonicRush => "Sonic Spin",
-            Self::UpToNoGood => "Up To No Good",
-            Self::ProjectAIM => "FREE AERIALS *not clickbait*",
             Self::PrivateMatch => "Private Match",
             Self::Season => "Season Match",
             Self::Exhibition => "Exhibition Match",
@@ -155,6 +128,10 @@ impl Playlist {
             Self::CustomTraining => "Custom Training",
             Self::CustomTrainingEditor => "Editing Custom Training",
             Self::LocalMatch => "Local Match",
+            Self::Other(id) => PLAYLISTS_FROM_GAME
+                .as_ref()
+                .and_then(|ps| ps.iter().find(|p| p.id == id).map(|p| p.name.as_str()))
+                .unwrap_or("Unknown"),
         }
     }
 
