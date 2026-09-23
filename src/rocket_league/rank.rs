@@ -1,8 +1,7 @@
-use std::{fmt, str::FromStr};
-
 use eframe::egui::{self, Color32};
 use num_enum::{FromPrimitive, TryFromPrimitive};
 use serde::{Deserialize, Serialize};
+use std::{fmt, str::FromStr};
 
 const RANK_NAMES: [&str; 23] = [
     "Unranked",
@@ -92,14 +91,16 @@ impl Rank {
     }
 
     pub fn to_color(self) -> Color32 {
+        const COLOR_DIAMOND: Color32 = Color32::from_rgba_unmultiplied_const(185, 252, 255, 255);
+
         match self {
             Rank::Unranked => Color32::DARK_GRAY,
             Rank::Bronze1 | Rank::Bronze2 | Rank::Bronze3 => Color32::BROWN,
             Rank::Silver1 | Rank::Silver2 | Rank::Silver3 => Color32::GRAY,
             Rank::Gold1 | Rank::Gold2 | Rank::Gold3 => Color32::YELLOW,
             Rank::Plat1 | Rank::Plat2 | Rank::Plat3 => Color32::LIGHT_BLUE,
-            Rank::Diamond1 | Rank::Diamond2 | Rank::Diamond3 => Color32::BLUE,
-            Rank::Champ1 | Rank::Champ2 | Rank::Champ3 => Color32::PURPLE,
+            Rank::Diamond1 | Rank::Diamond2 | Rank::Diamond3 => COLOR_DIAMOND,
+            Rank::Champ1 | Rank::Champ2 | Rank::Champ3 => Color32::MAGENTA,
             Rank::GC1 | Rank::GC2 | Rank::GC3 => Color32::RED,
             Rank::Ssl => Color32::WHITE,
         }
