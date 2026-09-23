@@ -166,16 +166,12 @@ fn load_items() {
     thread::spawn(|| {
         let etag = {
             let cached: Option<ItemsCache> = load_service_data(DATA_ID); // so default is None
-            let mut guard = ITEMS.lock().unwrap();
-            match cached {
-                Some(c) => {
-                    *guard = ItemsLoadStatus::Loaded(c.items);
-                    Some(c.etag)
-                }
-                None => {
-                    *guard = ItemsLoadStatus::Loading;
-                    None
-                }
+            if let Some(cached) = cached {
+                let mut guard = ITEMS.lock().unwrap();
+                *guard = ItemsLoadStatus::Loaded(cached.items);
+                Some(cached.etag)
+            } else {
+                None
             }
         };
 
@@ -214,8 +210,9 @@ fn load_items() {
 }
 
 pub fn get_items() -> MutexGuard<'static, ItemsLoadStatus> {
-    let items = ITEMS.lock().unwrap();
+    let mut items = ITEMS.lock().unwrap();
     if matches!(&*items, ItemsLoadStatus::NotLoaded) {
+        *items = ItemsLoadStatus::Loading;
         load_items();
     }
 
