@@ -159,6 +159,7 @@ fn parse_csv_response(csv: String) -> Result<Vec<Item>> {
         });
     }
 
+    items.sort_by_key(|i| i.name.to_lowercase());
     Ok(items)
 }
 
