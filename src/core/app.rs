@@ -545,6 +545,10 @@ impl Panel for AppSettingsWidget {
                     set_rl_exe_path(file);
                 }
             }
+            ui.small(
+                "rlbuddy caches the path you put in to calculate game filepaths. If you \
+                moved your game to another folder, you might need to reset it here.",
+            );
 
             ui.add_space(4.0);
             ui.separator();
