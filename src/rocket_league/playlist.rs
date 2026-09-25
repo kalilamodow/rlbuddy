@@ -1,9 +1,13 @@
 use crate::rocket_league::get_rl_exe_path;
+use anyhow::Context as _;
+use base64::{Engine, engine::general_purpose::URL_SAFE};
 use num_enum::FromPrimitive;
 use serde::{Deserialize, Serialize};
 use std::{
+    ffi::OsString,
     fmt, fs,
     io::{self, Seek},
+    path::Path,
     sync::LazyLock,
 };
 
@@ -15,15 +19,43 @@ struct PsynetPlaylist {
     name: String,
 }
 
+fn find_latest_cache_file<P: AsRef<Path>>(webcache_folder: P) -> anyhow::Result<OsString> {
+    let files = fs::read_dir(webcache_folder).context("reading webcache directory")?;
+    for file in files.flatten() {
+        if file.file_name().len() != 64 {
+            continue;
+        }
+
+        let decoded = URL_SAFE
+            .decode(file.file_name().as_encoded_bytes())
+            .with_context(|| format!("decoding filename {:?}", file.file_name()))?;
+        let decoded = String::from_utf8_lossy(&decoded);
+
+        if !decoded.contains("buildSecret") {
+            continue;
+        }
+        return Ok(file.file_name());
+    }
+
+    anyhow::bail!("couldn't find a cache file!")
+}
+
 // to load up-to-date info!
 static PLAYLISTS_FROM_GAME: LazyLock<Option<Vec<PsynetPlaylist>>> = LazyLock::new(|| {
-    let rl_exe_path = get_rl_exe_path()?;
-    let cache_file = rl_exe_path
-        .parent()?
-        .join("../../TAGame/Cache/WebCache/")
-        .join("L3YyL0NvbmZpZy9CYXR0bGVDYXJzLy0xODg3Njk0MDgzL1Byb2QvRXBpYy9JTlQv"); // cache file
+    let cache_filepath = {
+        let rl_exe_path = get_rl_exe_path()?;
+        let cache_folder = rl_exe_path.parent()?.join("../../TAGame/Cache/WebCache/");
+        let cache_filename = match find_latest_cache_file(&cache_folder) {
+            Ok(n) => n,
+            Err(e) => {
+                eprintln!("{e:?}");
+                return None;
+            }
+        };
+        cache_folder.join(cache_filename)
+    };
 
-    let mut cache_file = fs::File::open(cache_file).ok()?;
+    let mut cache_file = fs::File::open(cache_filepath).ok()?;
     cache_file.seek(io::SeekFrom::Start(55)).unwrap();
     let mut de = serde_json::Deserializer::from_reader(cache_file);
     let items: Vec<PsynetPlaylist> = serde_json::Map::deserialize(&mut de)
