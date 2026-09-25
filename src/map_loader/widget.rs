@@ -1,4 +1,5 @@
 use crate::core::app::Panel;
+use crate::rocket_league::{get_rl_exe_path, set_rl_exe_path};
 use crate::{
     common::{ThreadedReadonlyStateHandle, savedata::rlbuddy_data_dir},
     map_loader::{
@@ -31,30 +32,14 @@ impl MapLoaderWidget {
             return;
         }
 
-        let Some(binary_path) = FileDialog::new()
+        let Some(selected_file) = FileDialog::new()
             .add_filter("Executable", &["exe"])
             .pick_file()
         else {
             return;
         };
 
-        let underpass_path =
-            binary_path.join("../../../TAGame/CookedPCConsole/Labs_Underpass_P.upk");
-        let Ok(underpass_path) = fs::canonicalize(underpass_path) else {
-            return;
-        };
-
-        let underpass_path = match fs::canonicalize(underpass_path) {
-            Ok(wtv) => wtv,
-            Err(error) => {
-                eprintln!("{error}");
-                return;
-            }
-        };
-
-        let _ = self
-            .command_sender
-            .send(MapLoaderCommand::UpdateUnderpassPath(underpass_path));
+        set_rl_exe_path(selected_file);
     }
 
     fn import_map(&self) {
@@ -169,8 +154,8 @@ impl Panel for MapLoaderWidget {
     fn ui(&mut self, ui: &mut egui::Ui) -> egui::Response {
         ui.vertical(|ui| {
             {
-                let set_up = self.state.read().underpass_path.is_some();
-                if !set_up {
+                let already_set_up = get_rl_exe_path().is_some();
+                if !already_set_up {
                     self.render_setup(ui);
                     return;
                 }

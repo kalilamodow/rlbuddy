@@ -1,6 +1,7 @@
 use crate::common::savedata::{load_service_config, save_service_config};
 use crate::core::app::{Panel, Service, ServiceWithUi};
 use crate::map_loader::widget::MapLoaderWidget;
+use crate::rocket_league::get_rl_exe_path;
 use crate::{
     common::{
         ThreadedReadWriteStateHandle, ThreadedReadonlyStateHandle, savedata::rlbuddy_data_dir,
@@ -55,14 +56,12 @@ struct CustomMapInfoJson {
 pub struct MapLoaderServiceSavedata {
     pub maps: Vec<CustomMapInfo>,
     pub loaded_map: Option<CustomMapId>,
-    pub underpass_path: Option<String>,
 }
 
 #[derive(Debug, Clone)]
 pub struct MapLoaderServiceState {
     pub maps: Vec<CustomMapInfo>,
     pub loaded_map: Option<CustomMapId>,
-    pub underpass_path: Option<PathBuf>,
     pub current_error: Option<String>,
     pub import_progress: Option<f32>, // 0-1
 }
@@ -79,7 +78,6 @@ pub enum MapLoaderCommand {
     Load(CustomMapId),
     Delete(CustomMapId),
     Unload,
-    UpdateUnderpassPath(PathBuf),
     ClearError,
 }
 
@@ -94,20 +92,12 @@ const DATA_ID: &str = "map_loader_savedata";
 impl MapLoaderService {
     pub fn new() -> Self {
         let savedata: MapLoaderServiceSavedata = load_service_config(DATA_ID);
-        let underpass_path = {
-            savedata
-                .underpass_path
-                .map(PathBuf::from)
-                .take_if(|p| p.exists())
-        };
-
         let (command_sender, command_receiver) = mpsc::channel();
 
         Self {
             state: ThreadedReadWriteStateHandle::new(MapLoaderServiceState {
                 maps: savedata.maps,
                 loaded_map: savedata.loaded_map,
-                underpass_path,
                 current_error: None,
                 import_progress: None,
             }),
@@ -132,10 +122,6 @@ impl MapLoaderService {
 
     fn handle_command(&self, command: MapLoaderCommand) {
         match command {
-            MapLoaderCommand::UpdateUnderpassPath(path) => {
-                let mut state = self.state.write();
-                state.underpass_path = Some(path);
-            }
             MapLoaderCommand::Import(path) => {
                 if path.extension().is_none_or(|ext| ext != "zip") || !path.is_file() {
                     return;
@@ -198,11 +184,11 @@ impl MapLoaderService {
 
     fn load(&self, id: &CustomMapId) -> Result<(), Box<dyn std::error::Error>> {
         let mut state = self.state.write();
-        let Some(underpass_path) = &state.underpass_path else {
+        let Some(underpass_path) = underpass_path() else {
             return Err(string_to_error("no valid underpass path"));
         };
 
-        back_up_old_underpass(underpass_path)?;
+        back_up_old_underpass(&underpass_path)?;
 
         let map_directory = get_custom_map_directory(id)?;
         fs::copy(map_directory.join("map.upk"), underpass_path)?;
@@ -213,11 +199,11 @@ impl MapLoaderService {
 
     fn unload(&self) -> io::Result<()> {
         let mut state = self.state.write();
-        let Some(underpass_path) = &state.underpass_path else {
+        let Some(underpass_path) = underpass_path() else {
             return Err(io::Error::other("no underpass path"));
         };
 
-        fs::remove_file(underpass_path)?;
+        fs::remove_file(&underpass_path)?;
         let backup_path = underpass_path.join("..\\Labs_Underpass_P.upk.bak");
         fs::rename(backup_path, underpass_path)?;
 
@@ -247,10 +233,6 @@ impl Service for MapLoaderService {
             &MapLoaderServiceSavedata {
                 maps: state.maps.clone(),
                 loaded_map: state.loaded_map.clone(),
-                underpass_path: state
-                    .underpass_path
-                    .clone()
-                    .and_then(|p| p.to_str().map(str::to_owned)),
             },
         );
     }
@@ -381,6 +363,11 @@ fn get_custom_map_directory(id: &CustomMapId) -> Result<PathBuf, String> {
     };
 
     Ok(data_dir.join("custom maps\\").join(id.as_str()))
+}
+
+fn underpass_path() -> Option<PathBuf> {
+    let exe_path = get_rl_exe_path()?;
+    Some(exe_path.join("../../../TAGame/CookedPCConsole/Labs_Underpass_P.upk"))
 }
 
 fn back_up_old_underpass(underpass_path: &Path) -> io::Result<u64> {
