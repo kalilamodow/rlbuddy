@@ -1,5 +1,5 @@
 use crate::rocket_league::{ItemPackageName, RlAesKey};
-use anyhow::{Context as _, Result, ensure};
+use anyhow::{Context as _, Result, anyhow, ensure};
 use byteorder::{LittleEndian, ReadBytesExt as _, WriteBytesExt as _};
 use std::{
     fs,
@@ -342,6 +342,7 @@ fstruct!(FPackageFileSummary {
 const PACKAGE_FILE_MAGIC: u32 = 0x9E2A83C1;
 
 impl FPackageFileSummary {
+    // nonces n stuff
     pub fn v33(&self) -> bool {
         self.licensee_version >= 33
     }
@@ -353,6 +354,18 @@ impl FPackageFileSummary {
     pub fn encrypted_region_size(&self) -> i32 {
         let actual_size = self.total_header_size - self.garbage_size - self.name_offset;
         (actual_size + 15) & !15
+    }
+
+    pub fn extra_encryption(&self) -> bool {
+        (self.package_flags & 0x0800) != 0
+    }
+
+    pub fn set_extra_encryption(&mut self, on: bool) {
+        if on {
+            self.package_flags |= 0x0800;
+        } else {
+            self.package_flags &= !0x0800;
+        }
     }
 }
 
@@ -375,8 +388,11 @@ impl NameSwap {
     }
 }
 
+const NONCE_SIZE: i32 = 12;
+
 #[derive(Debug, Clone)]
 struct FHeaderEncryptedRegion {
+    nonce: Option<[u8; NONCE_SIZE as usize]>,
     names: Vec<FNameEntry>,
     imports: Vec<FImportEntry>,
     exports: Vec<FExportEntry>,
@@ -390,16 +406,32 @@ impl FHeaderEncryptedRegion {
         global_reader: &mut (impl Read + Seek),
         key: &'a RlAesKey,
     ) -> Result<Self> {
-        global_reader
-            .seek(SeekFrom::Start(summary.name_offset as u64))
-            .unwrap();
+        let nonce = summary.v33().then(|| {
+            let mut buffer = [0u8; 12];
+            global_reader
+                .seek(SeekFrom::Start(
+                    summary.name_offset as u64 - NONCE_SIZE as u64,
+                ))
+                .unwrap();
+            global_reader.read_exact(&mut buffer).unwrap();
+            buffer
+        });
 
         let mut tables_data = vec![0u8; summary.encrypted_region_size() as usize];
         global_reader
             .read_exact(&mut tables_data)
             .context("reading encrypted region data")?;
 
-        key.decrypt(&mut tables_data);
+        if summary.extra_encryption()
+            && let nonce = nonce.as_ref().ok_or(anyhow!(
+                "extra encryption is enabled but licensee version is <33"
+            ))?
+        {
+            key.ctr(&mut tables_data, &nonce);
+        } else {
+            key.decrypt(&mut tables_data);
+        }
+
         let mut tables_reader = Cursor::new(tables_data);
         let v33 = summary.v33();
 
@@ -428,6 +460,7 @@ impl FHeaderEncryptedRegion {
             .context("reading compressed chunk info")?;
 
         Ok(Self {
+            nonce,
             names,
             imports,
             exports,
@@ -439,13 +472,12 @@ impl FHeaderEncryptedRegion {
     fn encrypt(
         &self,
         summary_size: i32,
-        summary_padding_size: i32,
         new_summary: &mut FPackageFileSummary,
         key: &RlAesKey,
     ) -> Result<Vec<u8>> {
         let v33 = new_summary.v33();
         let current_global_offset = |header: &mut Cursor<Vec<u8>>| {
-            header.stream_position().unwrap() as i32 + summary_size + summary_padding_size
+            header.stream_position().unwrap() as i32 + summary_size + NONCE_SIZE
         };
 
         let mut header = Cursor::new(Vec::new());
@@ -478,20 +510,28 @@ impl FHeaderEncryptedRegion {
             .serialize(&mut header, v33)
             .context("FHeaderEncryptedRegion: serializing compressed chunk info")?;
 
-        // aes padding
         let new_header_size = header.position();
         let new_header_size_full = (new_header_size + 15) & !15;
-        for i in 0..new_header_size_full - new_header_size {
-            let pos = new_header_size + i;
-            let byte = (pos % 0xFF) as u8;
-            header.write_u8(byte).unwrap();
+        {
+            let aes_padding_size = new_header_size_full - new_header_size;
+            if new_summary.extra_encryption() {
+                // boring padding
+                header.write(&vec![0u8; aes_padding_size as usize]).unwrap();
+            } else {
+                // cool padding
+                for i in 0..new_header_size_full - new_header_size {
+                    let pos = new_header_size + i;
+                    let byte = (pos % 0xFF) as u8;
+                    header.write_u8(byte).unwrap();
+                }
+            }
         }
 
         let header_size_change = new_header_size_full as i32 - new_summary.encrypted_region_size();
         new_summary.total_header_size =
             new_header_size as i32 + new_summary.name_offset + new_summary.garbage_size;
 
-        let global_to_local_offset = |offset: i32| offset - summary_padding_size - summary_size;
+        let global_to_local_offset = |offset: i32| offset - NONCE_SIZE - summary_size;
 
         let mut new_exports = self.exports.clone();
         for export in &mut new_exports {
@@ -517,8 +557,24 @@ impl FHeaderEncryptedRegion {
             .unwrap();
 
         let mut encrypted = header.into_inner();
-        key.encrypt(&mut encrypted);
-        Ok(encrypted)
+        if new_summary.extra_encryption()
+            && let nonce = self.nonce.as_ref().ok_or(anyhow!(
+                "extra encryption is enabled but licensee version is <33"
+            ))?
+        {
+            key.ctr(&mut encrypted, nonce);
+        } else {
+            key.encrypt(&mut encrypted);
+        }
+
+        let mut serialized = Vec::with_capacity(encrypted.len() + NONCE_SIZE as usize);
+        if new_summary.v33()
+            && let Some(nonce) = &self.nonce
+        {
+            serialized.extend_from_slice(nonce);
+        }
+        serialized.extend_from_slice(&encrypted);
+        Ok(serialized)
     }
 
     fn add_swap(&mut self, swap: NameSwap) {
@@ -571,22 +627,15 @@ impl<'a> Upk<'a> {
             serialized.len()
         };
         let mut modified_summary = self.summary.clone(); // will perform surgery after
-        let summary_padding_size = self.summary.name_offset - summary_size as i32;
         let encrypted_header = self
             .header
-            .encrypt(
-                summary_size as i32,
-                summary_padding_size,
-                &mut modified_summary,
-                self.key,
-            )
+            .encrypt(summary_size as i32, &mut modified_summary, self.key)
             .context("reserializing encrypted header")?;
 
         let mut serialized = Vec::new();
         modified_summary
             .serialize(&mut serialized, false)
             .context("Upk: serializing modified summary")?;
-        serialized.extend(vec![0u8; summary_padding_size as usize]);
         serialized.extend(&encrypted_header);
         serialized.extend(&self.payload);
 
@@ -612,7 +661,46 @@ impl<'a> Upk<'a> {
             to: other.id.sf_name(),
         });
         self.summary.guid = other.summary.guid.clone();
-        self.key = other.key;
         self.id = other.id;
+
+        // note: do this BEFORE setting self.key/self.nonce
+        if self.summary.extra_encryption() {
+            // decrypts
+            self.run_ctr_on_payload();
+        }
+
+        if self.summary.extra_encryption() && !other.summary.extra_encryption() {
+            for chunk in &mut self.header.compressed_chunk_info.inner {
+                chunk.nonce = Some([0u8; 12]);
+            }
+        }
+
+        self.key = other.key;
+        if self.header.nonce.is_some()
+            && let Some(new_nonce) = &other.header.nonce
+        {
+            self.header.nonce.replace(new_nonce.clone());
+        }
+
+        if other.summary.extra_encryption() {
+            // re-encrypts
+            self.run_ctr_on_payload();
+        }
+
+        self.summary
+            .set_extra_encryption(other.summary.extra_encryption());
+    }
+
+    fn run_ctr_on_payload(&mut self) {
+        let global_to_local_pos = |position: i32| {
+            position - (self.summary.name_offset + self.summary.encrypted_region_size())
+        };
+
+        for chunk in &self.header.compressed_chunk_info.inner {
+            let start = global_to_local_pos(chunk.compressed_offset as i32) as usize;
+            let end = start + chunk.compressed_size as usize;
+            self.key
+                .ctr(&mut self.payload[start..end], chunk.nonce.as_ref().unwrap());
+        }
     }
 }

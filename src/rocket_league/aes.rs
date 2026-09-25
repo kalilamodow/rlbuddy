@@ -1,10 +1,15 @@
-use aes::Aes256;
+use aes::{
+    Aes256,
+    cipher::{
+        BlockCipherDecrypt as _, BlockCipherEncrypt as _, KeyInit as _, KeyIvInit as _,
+        StreamCipher,
+    },
+};
 use base64::{Engine, engine::general_purpose};
-use cipher::{BlockCipherDecrypt, BlockCipherEncrypt, KeyInit};
 use serde::{Deserialize, Serialize, de::Visitor};
 
 #[derive(Debug, Clone)]
-pub struct RlAesKey(Aes256, [u8; 32]);
+pub struct RlAesKey([u8; 32]);
 
 impl RlAesKey {
     pub fn encrypt(&self, buffer: &mut [u8]) {
@@ -12,8 +17,9 @@ impl RlAesKey {
             panic!("encryption: buffer size isnt divisible by 16");
         }
 
+        let cipher = Aes256::new(&self.0.into());
         for chunk in buffer.chunks_exact_mut(16) {
-            self.0.encrypt_block(chunk.try_into().unwrap());
+            cipher.encrypt_block(chunk.try_into().unwrap());
         }
     }
 
@@ -22,13 +28,22 @@ impl RlAesKey {
             panic!("decryption: buffer size isnt divisible by 16");
         }
 
+        let cipher = Aes256::new(&self.0.into());
         for chunk in buffer.chunks_exact_mut(16) {
-            self.0.decrypt_block(chunk.try_into().unwrap());
+            cipher.decrypt_block(chunk.try_into().unwrap());
         }
     }
 
+    pub fn ctr(&self, buffer: &mut [u8], nonce: &[u8; 12]) {
+        let mut iv = [0u8; 16];
+        iv[..12].copy_from_slice(nonce);
+
+        let mut cipher = ctr::Ctr32BE::<Aes256>::new(&self.0.into(), &iv.into());
+        cipher.apply_keystream(buffer);
+    }
+
     pub fn to_base64(&self) -> String {
-        general_purpose::STANDARD.encode(self.1)
+        general_purpose::STANDARD.encode(self.0)
     }
 
     pub fn from_base64(b64: &str) -> anyhow::Result<Self> {
@@ -36,8 +51,7 @@ impl RlAesKey {
             .decode(b64)?
             .try_into()
             .map_err(|_| anyhow::anyhow!("decoded vec is not 32 bytes"))?;
-        let cipher = Aes256::new((&aes_key).into());
-        Ok(Self(cipher, aes_key))
+        Ok(Self(aes_key))
     }
 }
 
