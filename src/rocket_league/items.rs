@@ -8,7 +8,7 @@ use std::{
     path::{Path, PathBuf},
     sync::{LazyLock, Mutex, MutexGuard},
     thread,
-    time::Duration,
+    time::{Duration, SystemTime},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -95,6 +95,7 @@ const DATA_ID: &str = "items";
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ItemsCache {
+    time: SystemTime,
     etag: String,
     items: Vec<Item>,
 }
@@ -109,7 +110,7 @@ pub struct Item {
 }
 
 pub enum ItemsLoadStatus {
-    Loaded(Vec<Item>),
+    Loaded(Vec<Item>, SystemTime),
     Loading,
     NotLoaded,
     Error(anyhow::Error),
@@ -170,7 +171,7 @@ fn load_items() {
             let cached: Option<ItemsCache> = load_service_data(DATA_ID); // so default is None
             if let Some(cached) = cached {
                 let mut guard = ITEMS.lock().unwrap();
-                *guard = ItemsLoadStatus::Loaded(cached.items);
+                *guard = ItemsLoadStatus::Loaded(cached.items, cached.time);
                 Some(cached.etag)
             } else {
                 None
@@ -197,9 +198,13 @@ fn load_items() {
             match response {
                 Ok(items) => {
                     let mut guard = ITEMS.lock().unwrap();
-                    *guard = ItemsLoadStatus::Loaded(items.clone());
+                    *guard = ItemsLoadStatus::Loaded(items.clone(), SystemTime::now());
 
-                    let new_cache = Some(ItemsCache { etag, items });
+                    let new_cache = Some(ItemsCache {
+                        time: SystemTime::now(),
+                        etag,
+                        items,
+                    });
                     save_service_data(DATA_ID, &new_cache);
                 }
                 Err(error) => {
@@ -219,4 +224,14 @@ pub fn get_items() -> MutexGuard<'static, ItemsLoadStatus> {
     }
 
     items
+}
+
+/// delete cache too
+pub fn reset_items() {
+    {
+        let mut items = ITEMS.lock().unwrap();
+        *items = ItemsLoadStatus::NotLoaded;
+    }
+
+    save_service_data::<Option<ItemsCache>>(DATA_ID, &None);
 }

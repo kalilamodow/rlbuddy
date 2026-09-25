@@ -1,4 +1,5 @@
 use crate::common::ReadWriteStateHandle;
+use crate::common::timefmt::format_seconds;
 use crate::core::fonts::load_fonts;
 use crate::core::persistence::AppData;
 use crate::gamepad::GamepadService;
@@ -6,7 +7,7 @@ use crate::gamepad::overlay::GamepadOverlayService;
 use crate::hotkey::HotkeyService;
 use crate::music_control::MusicControlService;
 use crate::my_stats::MyStatsWidget;
-use crate::rocket_league::set_rl_exe_path;
+use crate::rocket_league::{ItemsLoadStatus, get_items, reset_items, set_rl_exe_path};
 use crate::swapper::SwapperService;
 use crate::{
     auto_setup::AutoSetupWidget,
@@ -543,6 +544,39 @@ impl Panel for AppSettingsWidget {
                 {
                     set_rl_exe_path(file);
                 }
+            }
+
+            ui.add_space(4.0);
+            ui.separator();
+            ui.add_space(4.0);
+
+            {
+                ui.horizontal(|ui| {
+                    let items = &*get_items();
+                    if ui
+                        .add_enabled(
+                            matches!(items, ItemsLoadStatus::Loaded(_, _)),
+                            egui::Button::new("Clear items cache"),
+                        )
+                        .clicked()
+                    {
+                        reset_items();
+                    }
+
+                    if let ItemsLoadStatus::Loaded(_, time) = items
+                        && let Ok(elapsed) = time.elapsed()
+                    {
+                        ui.small(format!(
+                            "Cache age: {}",
+                            format_seconds(elapsed.as_secs(), false)
+                        ));
+                    }
+                });
+                ui.small(
+                    "The cache updates automatically, so this shouldn't be necessary. If there's \
+                    been more than a few days since the last update and the cache's still old, try \
+                    clearing it, though.",
+                );
             }
         })
         .response

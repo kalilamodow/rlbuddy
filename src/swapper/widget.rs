@@ -48,7 +48,7 @@ impl SwapperWidget {
 
     fn render_swap_list(&mut self, ui: &mut egui::Ui) {
         let state = self.state.read();
-        let ItemsLoadStatus::Loaded(items) = &*get_items() else {
+        let ItemsLoadStatus::Loaded(items, _) = &*get_items() else {
             ui.spinner();
             return;
         };
@@ -136,7 +136,7 @@ impl SwapperWidget {
     }
 
     fn render_swap_inputs(&mut self, ui: &mut egui::Ui) {
-        let ItemsLoadStatus::Loaded(items) = &*get_items() else {
+        let ItemsLoadStatus::Loaded(items, _) = &*get_items() else {
             ui.spinner();
             return;
         };
@@ -214,7 +214,7 @@ impl SwapperWidget {
                     ItemsLoadStatus::Loading | ItemsLoadStatus::NotLoaded => {
                         ui.label("Loading items...");
                     }
-                    ItemsLoadStatus::Loaded(_) => {}
+                    ItemsLoadStatus::Loaded(_, _) => {}
                 },
             );
         });
