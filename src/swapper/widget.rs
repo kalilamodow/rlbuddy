@@ -7,11 +7,19 @@ use crate::{
 use eframe::egui;
 use rfd::FileDialog;
 
+#[derive(Debug, Default)]
+struct SwapInput {
+    appearance: Option<Item>,
+    replaced: Option<Item>,
+    filter_appearance: String,
+    filter_replaced: String,
+    slot_filter: ItemSlot,
+}
+
 pub struct SwapperWidget {
     state: ReadonlyStateHandle<SwapperServiceState>,
     sender: Sender<SwapperCommand>,
-    to_swap_input: (Option<Item>, Option<Item>),
-    to_swap_filter: ItemSlot,
+    input: SwapInput,
 }
 
 impl SwapperWidget {
@@ -19,8 +27,7 @@ impl SwapperWidget {
         Self {
             state: service.state_handle(),
             sender: service.sender(),
-            to_swap_input: (None, None),
-            to_swap_filter: ItemSlot::Boost,
+            input: SwapInput::default(),
         }
     }
 
@@ -84,87 +91,112 @@ impl SwapperWidget {
         }
     }
 
+    fn render_item_select(
+        ui: &mut egui::Ui,
+        label: &str,
+        selected: &mut Option<Item>,
+        text_filter: &mut String,
+        slot_filter: &ItemSlot,
+        items: &[Item],
+    ) {
+        ui.horizontal(|ui| {
+            egui::ComboBox::from_label(label)
+                .selected_text(
+                    selected
+                        .as_ref()
+                        .map(|i| i.name.as_str())
+                        .unwrap_or("Select..."),
+                )
+                .show_ui(ui, |ui| {
+                    for item in items.iter().filter(|i| &i.slot == slot_filter).filter(|i| {
+                        i.name
+                            .to_lowercase()
+                            .contains(text_filter.to_lowercase().as_str())
+                    }) {
+                        if ui
+                            .selectable_label(
+                                selected.as_ref().map(|i| i.id) == Some(item.id),
+                                &item.name,
+                            )
+                            .clicked()
+                        {
+                            selected.replace(item.clone());
+                        }
+                    }
+                });
+
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
+                ui.add(
+                    egui::TextEdit::singleline(text_filter)
+                        .hint_text("Filter")
+                        .desired_width(100.0),
+                );
+            });
+        });
+    }
+
     fn render_swap_inputs(&mut self, ui: &mut egui::Ui) {
         let ItemsLoadStatus::Loaded(items) = &*get_items() else {
             ui.spinner();
             return;
         };
 
-        egui::ComboBox::from_label("Appearance")
-            .selected_text(
-                self.to_swap_input
-                    .0
-                    .as_ref()
-                    .map(|i| i.name.as_str())
-                    .unwrap_or("Select..."),
-            )
-            .show_ui(ui, |ui| {
-                for item in items.iter().filter(|i| i.slot == self.to_swap_filter) {
-                    if ui
-                        .selectable_label(
-                            self.to_swap_input.0.as_ref().map(|i| i.id) == Some(item.id),
-                            &item.name,
-                        )
-                        .clicked()
-                    {
-                        self.to_swap_input.0 = Some(item.clone());
-                    }
-                }
-            });
-        egui::ComboBox::from_label("Replaced item")
-            .selected_text(
-                self.to_swap_input
-                    .1
-                    .as_ref()
-                    .map(|i| i.name.as_str())
-                    .unwrap_or("Select..."),
-            )
-            .show_ui(ui, |ui| {
-                for item in items.iter().filter(|i| i.slot == self.to_swap_filter) {
-                    if ui
-                        .selectable_label(
-                            self.to_swap_input.1.as_ref().map(|i| i.id) == Some(item.id),
-                            &item.name,
-                        )
-                        .clicked()
-                    {
-                        self.to_swap_input.1 = Some(item.clone());
-                    }
-                }
-            });
+        Self::render_item_select(
+            ui,
+            "Appearance",
+            &mut self.input.appearance,
+            &mut self.input.filter_appearance,
+            &self.input.slot_filter,
+            items,
+        );
+        Self::render_item_select(
+            ui,
+            "Replaced item",
+            &mut self.input.replaced,
+            &mut self.input.filter_replaced,
+            &self.input.slot_filter,
+            items,
+        );
+        ui.add_space(4.0);
 
         let mut swap_clicked = false;
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
+        ui.horizontal(|ui| {
             swap_clicked = ui.button("Swap").clicked();
 
-            egui::ComboBox::from_label("Slot")
-                .selected_text(self.to_swap_filter.as_str())
-                .show_ui(ui, |ui| {
-                    for slot in &[
-                        ItemSlot::Antenna,
-                        ItemSlot::Body,
-                        ItemSlot::Boost,
-                        ItemSlot::Explosion,
-                        ItemSlot::PaintFinish,
-                        ItemSlot::Topper,
-                        ItemSlot::Trail,
-                        ItemSlot::Wheel,
-                    ] {
-                        ui.selectable_value(&mut self.to_swap_filter, slot.clone(), slot.as_str());
-                    }
-                });
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
+                egui::ComboBox::from_label("Slot")
+                    .selected_text(self.input.slot_filter.as_str())
+                    .show_ui(ui, |ui| {
+                        for slot in &[
+                            ItemSlot::Antenna,
+                            ItemSlot::Body,
+                            ItemSlot::Boost,
+                            ItemSlot::Explosion,
+                            ItemSlot::PaintFinish,
+                            ItemSlot::Topper,
+                            ItemSlot::Trail,
+                            ItemSlot::Wheel,
+                        ] {
+                            ui.selectable_value(
+                                &mut self.input.slot_filter,
+                                slot.clone(),
+                                slot.as_str(),
+                            );
+                        }
+                    });
+            });
         });
 
         if !swap_clicked {
             return;
         }
 
-        if let Some(appearance) = self.to_swap_input.0.take()
-            && let Some(replaced) = self.to_swap_input.1.take()
+        if let Some(appearance) = &self.input.appearance
+            && let Some(replaced) = &self.input.replaced
         {
             self.sender.send(SwapperCommand::Swap {
-                replaced,
-                appearance,
+                replaced: replaced.clone(),
+                appearance: appearance.clone(),
             });
         }
     }

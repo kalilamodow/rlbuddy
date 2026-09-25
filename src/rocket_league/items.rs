@@ -47,10 +47,11 @@ impl ItemPackageName {
 }
 
 // there are more but this is just items
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ItemSlot {
     Antenna,
     Body,
+    #[default]
     Boost,
     Explosion,
     PaintFinish,
