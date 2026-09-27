@@ -1,9 +1,9 @@
-use crate::rocket_league::get_rl_exe_path;
 use anyhow::Context as _;
 use base64::{Engine, engine::general_purpose::URL_SAFE};
 use num_enum::FromPrimitive;
 use serde::{Deserialize, Serialize};
 use std::{
+    env::home_dir,
     ffi::OsString,
     fmt, fs,
     io::{self, Seek},
@@ -47,11 +47,13 @@ fn find_latest_cache_file<P: AsRef<Path>>(webcache_folder: P) -> anyhow::Result<
     found.map(|f| f.0).context("couldn't find a cache file")
 }
 
-// to load up-to-date info!
 static PLAYLISTS_FROM_GAME: LazyLock<Option<Vec<PsynetPlaylist>>> = LazyLock::new(|| {
     let cache_filepath = {
-        let rl_exe_path = get_rl_exe_path()?;
-        let cache_folder = rl_exe_path.parent()?.join("../../TAGame/Cache/WebCache/");
+        // rl always stores savedata in Documents, but sometimes the game/binaries
+        // are installed in a different place. so dont bother with rl_exe_path
+        let cache_folder =
+            home_dir()?.join("Documents/My Games/Rocket League/TAGame/Cache/WebCache/");
+
         let cache_filename = match find_latest_cache_file(&cache_folder) {
             Ok(n) => n,
             Err(e) => {
