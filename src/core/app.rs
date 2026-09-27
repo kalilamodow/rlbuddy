@@ -537,13 +537,12 @@ impl Panel for AppSettingsWidget {
             ui.separator();
             ui.add_space(4.0);
 
-            if ui.button("Reset Rocket League executable path").clicked() {
-                if let Some(file) = FileDialog::new()
+            if ui.button("Reset Rocket League executable path").clicked()
+                && let Some(file) = FileDialog::new()
                     .add_filter("Executable", &["exe"])
                     .pick_file()
-                {
-                    set_rl_exe_path(file);
-                }
+            {
+                set_rl_exe_path(file);
             }
             ui.small(
                 "rlbuddy caches the path you put in to calculate game filepaths. If you \

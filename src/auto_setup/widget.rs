@@ -34,10 +34,9 @@ impl AutoSetupWidget {
 
     fn do_setup(&mut self, exe_path: Option<PathBuf>) {
         let Some(selected_file) = exe_path.or_else(|| {
-            let f = FileDialog::new()
+            FileDialog::new()
                 .add_filter("Executable", &["exe"])
-                .pick_file();
-            f
+                .pick_file()
         }) else {
             return;
         };

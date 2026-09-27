@@ -91,9 +91,9 @@ macro_rules! fbuiltin {
             }
 
             fn deserialize(reader: &mut impl Read, _: bool) -> Result<Self> {
-                Ok(reader
+                reader
                     .$readfn::<LittleEndian>()
-                    .context(concat!("deserializing builtin type ", stringify!($type)))?)
+                    .context(concat!("deserializing builtin type ", stringify!($type)))
             }
         }
     };
@@ -212,7 +212,7 @@ impl UPKPart for FCompressedChunkInfo {
         self.compressed_offset.serialize(writer, v33)?;
         self.compressed_size.serialize(writer, v33)?;
         if let Some(nonce) = &self.nonce {
-            writer.write(nonce)?;
+            writer.write_all(nonce)?;
         }
 
         Ok(())
@@ -378,11 +378,7 @@ struct NameSwap {
 impl NameSwap {
     /// returns the padded version if paddable, otherwise None
     fn padded(&self) -> Option<String> {
-        let amount_to_pad = self.from.len().checked_sub(self.to.len());
-        let Some(amount_to_pad) = amount_to_pad else {
-            return None;
-        };
-
+        let amount_to_pad = self.from.len().checked_sub(self.to.len())?;
         let padding = "\0".repeat(amount_to_pad);
         Some(format!("{}{padding}", self.to))
     }
@@ -401,10 +397,10 @@ struct FHeaderEncryptedRegion {
 }
 
 impl FHeaderEncryptedRegion {
-    fn decrypt<'a>(
+    fn decrypt(
         summary: &FPackageFileSummary,
         global_reader: &mut (impl Read + Seek),
-        key: &'a RlAesKey,
+        key: &RlAesKey,
     ) -> Result<Self> {
         let nonce = summary.v33().then(|| {
             let mut buffer = [0u8; 12];
@@ -427,7 +423,7 @@ impl FHeaderEncryptedRegion {
                 "extra encryption is enabled but licensee version is <33"
             ))?
         {
-            key.ctr(&mut tables_data, &nonce);
+            key.ctr(&mut tables_data, nonce);
         } else {
             key.decrypt(&mut tables_data);
         }
@@ -516,7 +512,9 @@ impl FHeaderEncryptedRegion {
             let aes_padding_size = new_header_size_full - new_header_size;
             if new_summary.extra_encryption() {
                 // boring padding
-                header.write(&vec![0u8; aes_padding_size as usize]).unwrap();
+                header
+                    .write_all(&vec![0u8; aes_padding_size as usize])
+                    .unwrap();
             } else {
                 // cool padding
                 for i in 0..new_header_size_full - new_header_size {
@@ -679,7 +677,7 @@ impl<'a> Upk<'a> {
         if self.header.nonce.is_some()
             && let Some(new_nonce) = &other.header.nonce
         {
-            self.header.nonce.replace(new_nonce.clone());
+            self.header.nonce.replace(*new_nonce);
         }
 
         if other.summary.extra_encryption() {

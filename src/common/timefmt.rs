@@ -80,7 +80,7 @@ pub fn format_seconds(total_seconds: u64, short: bool) -> Cow<'static, str> {
     .collect();
 
     if parts.is_empty() {
-        return Cow::Borrowed(&"Just now");
+        return Cow::Borrowed("Just now");
     }
 
     let output_string = parts

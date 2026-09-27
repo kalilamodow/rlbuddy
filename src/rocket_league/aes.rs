@@ -13,7 +13,7 @@ pub struct RlAesKey([u8; 32]);
 
 impl RlAesKey {
     pub fn encrypt(&self, buffer: &mut [u8]) {
-        if buffer.len() % 16 != 0 {
+        if !buffer.len().is_multiple_of(16) {
             panic!("encryption: buffer size isnt divisible by 16");
         }
 
@@ -24,7 +24,7 @@ impl RlAesKey {
     }
 
     pub fn decrypt(&self, buffer: &mut [u8]) {
-        if buffer.len() % 16 != 0 {
+        if !buffer.len().is_multiple_of(16) {
             panic!("decryption: buffer size isnt divisible by 16");
         }
 
