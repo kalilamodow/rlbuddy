@@ -65,7 +65,10 @@ impl MapLoaderWidget {
         let state = self.state.read();
         if let Some(err) = state.current_error.as_ref() {
             ui.horizontal(|ui| {
-                ui.colored_label(ui.style().visuals.error_fg_color, err);
+                ui.colored_label(
+                    ui.style().visuals.error_fg_color,
+                    format!("Error while {err}"),
+                );
                 if ui.small_button("X").clicked() {
                     let _ = self.command_sender.send(MapLoaderCommand::ClearError);
                 }

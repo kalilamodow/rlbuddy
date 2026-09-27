@@ -8,6 +8,7 @@ use crate::{
     },
     map_loader::service::MapLoaderCommand::ClearError,
 };
+use anyhow::{Context as _, Result, bail};
 use serde::{Deserialize, Serialize};
 use std::{
     fs,
@@ -158,22 +159,13 @@ impl MapLoaderService {
                 });
             }
             MapLoaderCommand::Delete(id) => {
-                if let Err(error) = self.delete(&id) {
-                    let mut state = self.state.write();
-                    state.current_error = Some(error.to_string());
-                }
+                self.maybe_set_error(self.delete(&id));
             }
             MapLoaderCommand::Load(id) => {
-                if let Err(error) = self.load(&id) {
-                    let mut state = self.state.write();
-                    state.current_error = Some(error.to_string());
-                }
+                self.maybe_set_error(self.load(&id));
             }
             MapLoaderCommand::Unload => {
-                if let Err(error) = self.unload() {
-                    let mut state = self.state.write();
-                    state.current_error = Some(error.to_string());
-                }
+                self.maybe_set_error(self.unload());
             }
             ClearError => {
                 let mut state = self.state.write();
@@ -182,36 +174,45 @@ impl MapLoaderService {
         }
     }
 
-    fn load(&self, id: &CustomMapId) -> Result<(), Box<dyn std::error::Error>> {
+    fn maybe_set_error<R>(&self, result: Result<R>) {
+        if let Err(error) = result {
+            let mut state = self.state.write();
+            state.current_error = Some(format!("{:?}", error));
+        }
+    }
+
+    fn load(&self, id: &CustomMapId) -> Result<()> {
         let mut state = self.state.write();
         let Some(underpass_path) = underpass_path() else {
-            return Err(string_to_error("no valid underpass path"));
+            bail!("no valid underpass path");
         };
 
-        back_up_old_underpass(&underpass_path)?;
+        back_up_old_underpass(&underpass_path).context("loading new custom map")?;
 
-        let map_directory = get_custom_map_directory(id)?;
-        fs::copy(map_directory.join("map.upk"), underpass_path)?;
+        let map_directory = get_custom_map_directory(id).context("loading new custom map")?;
+        fs::copy(map_directory.join("map.upk"), underpass_path)
+            .context("copying over new custom map")?;
 
         state.loaded_map = Some(id.clone());
         Ok(())
     }
 
-    fn unload(&self) -> io::Result<()> {
+    fn unload(&self) -> Result<()> {
         let mut state = self.state.write();
         let Some(underpass_path) = underpass_path() else {
-            return Err(io::Error::other("no underpass path"));
+            bail!("no underpass path");
         };
 
-        fs::remove_file(&underpass_path)?;
+        let _ = fs::remove_file(&underpass_path); // ok to fail, probs doesnt exist
         let backup_path = underpass_path.join("..\\Labs_Underpass_P.upk.bak");
-        fs::rename(backup_path, underpass_path)?;
+        fs::rename(backup_path, underpass_path)
+            .context("moving backup underpass map back to normal")?;
 
         state.loaded_map = None;
         Ok(())
     }
 
-    fn delete(&self, id: &CustomMapId) -> Result<(), Box<dyn std::error::Error>> {
+    fn delete(&self, id: &CustomMapId) -> Result<()> {
         fs::remove_dir_all(get_custom_map_directory(id)?)?;
 
         let mut state = self.state.write();
@@ -247,15 +248,15 @@ impl ServiceWithUi for MapLoaderService {
 fn import_archive_from_file(
     zip_path: &Path,
     state_handle: &ThreadedReadWriteStateHandle<MapLoaderServiceState>,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<()> {
     let map_name = zip_path
         .file_prefix()
         .and_then(|f| f.to_str())
-        .ok_or_else(|| string_to_error("could not get map name"))?
+        .context("getting map name from zip path")?
         .to_owned();
 
-    let file = fs::File::open(zip_path)?;
-    let archive = ZipArchive::new(file)?;
+    let file = fs::File::open(zip_path).context("reading archive from file")?;
+    let archive = ZipArchive::new(file).context("parsing archive from file")?;
 
     import_archive(
         CustomMapInfo {
@@ -267,6 +268,7 @@ fn import_archive_from_file(
         state_handle,
         None,
     )
+    .context("importing archive from file")
 }
 
 fn import_archive_from_bytes(
@@ -274,9 +276,11 @@ fn import_archive_from_bytes(
     archive_bytes: Vec<u8>,
     state_handle: &ThreadedReadWriteStateHandle<MapLoaderServiceState>,
     image_jpeg_bytes: Vec<u8>,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let archive = ZipArchive::new(io::Cursor::new(archive_bytes))?;
+) -> Result<()> {
+    let archive =
+        ZipArchive::new(io::Cursor::new(archive_bytes)).context("parsing archive from bytes")?;
     import_archive(info, archive, state_handle, Some(image_jpeg_bytes))
+        .context("importing archive from bytes")
 }
 
 fn import_archive<R>(
@@ -284,7 +288,7 @@ fn import_archive<R>(
     mut archive: ZipArchive<R>,
     state_handle: &ThreadedReadWriteStateHandle<MapLoaderServiceState>,
     default_preview_image_jpeg_data: Option<Vec<u8>>,
-) -> Result<(), Box<dyn std::error::Error>>
+) -> Result<()>
 where
     R: io::Read + io::Seek, // required for ZipArchive
 {
@@ -299,7 +303,7 @@ where
     let mut preview_image_data = default_preview_image_jpeg_data.unwrap_or_default();
 
     for i in 0..archive.len() {
-        let mut file = archive.by_index(i)?;
+        let mut file = archive.by_index(i).unwrap();
         let Some(path) = file.enclosed_name() else {
             eprintln!("failed to get enclosed name of {}", file.name());
             continue;
@@ -320,12 +324,12 @@ where
                 .extension()
                 .is_some_and(|ext| ext.eq_ignore_ascii_case("upk"))
         {
-            let total_size = usize::try_from(file.size())?;
+            let total_size = file.size() as usize;
             rl_pkg_data = vec![0u8; total_size];
 
-            let chunk_size = total_size / 100;
+            let chunk_size = (total_size / 100).max(1);
             for (i, chunk) in rl_pkg_data.chunks_mut(chunk_size).enumerate() {
-                file.read_exact(chunk)?;
+                file.read_exact(chunk).unwrap();
                 // i as f32 / 100.0 = actual completion
                 // * 0.9 to only fill up to 90% + 0.05 because it starts at 5%
                 update_progress((i as f32 / 100.0) * 0.9 + 0.05);
@@ -336,16 +340,19 @@ where
     }
 
     if rl_pkg_data.is_empty() {
-        return Err(string_to_error("failed to load package data"));
+        bail!("no upk in archive");
     }
     // its ok if theres no preview
 
-    let custom_map_dir = get_custom_map_directory(&info.id)?;
-    fs::create_dir_all(&custom_map_dir)?;
+    let custom_map_dir =
+        get_custom_map_directory(&info.id).context("getting directory to put imported map in")?;
+    fs::create_dir_all(&custom_map_dir)
+        .context("ensuring directory to put imported map in exists")?;
 
-    fs::write(custom_map_dir.join("map.upk"), rl_pkg_data)?;
+    fs::write(custom_map_dir.join("map.upk"), rl_pkg_data).context("writing imported map upk")?;
     if !preview_image_data.is_empty() {
-        fs::write(custom_map_dir.join("preview.jpg"), preview_image_data)?;
+        fs::write(custom_map_dir.join("preview.jpg"), preview_image_data)
+            .context("writing imported map preview image")?;
     }
 
     {
@@ -357,9 +364,9 @@ where
     Ok(())
 }
 
-fn get_custom_map_directory(id: &CustomMapId) -> Result<PathBuf, String> {
+fn get_custom_map_directory(id: &CustomMapId) -> Result<PathBuf> {
     let Some(data_dir) = rlbuddy_data_dir() else {
-        return Err("no data directory".into());
+        bail!("no data directory");
     };
 
     Ok(data_dir.join("custom maps\\").join(id.as_str()))
@@ -377,8 +384,4 @@ fn back_up_old_underpass(underpass_path: &Path) -> io::Result<u64> {
     }
 
     fs::copy(underpass_path, backup_path)
-}
-
-fn string_to_error(s: &str) -> Box<dyn std::error::Error> {
-    Box::<dyn std::error::Error>::from(s)
 }
