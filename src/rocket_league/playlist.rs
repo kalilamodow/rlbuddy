@@ -9,6 +9,7 @@ use std::{
     io::{self, Seek},
     path::Path,
     sync::LazyLock,
+    time::SystemTime,
 };
 
 #[derive(Debug, Deserialize)]
@@ -21,6 +22,8 @@ struct PsynetPlaylist {
 
 fn find_latest_cache_file<P: AsRef<Path>>(webcache_folder: P) -> anyhow::Result<OsString> {
     let files = fs::read_dir(webcache_folder).context("reading webcache directory")?;
+
+    let mut found: Option<(OsString, SystemTime)> = None;
     for file in files.flatten() {
         if file.file_name().len() != 64 {
             continue;
@@ -34,10 +37,14 @@ fn find_latest_cache_file<P: AsRef<Path>>(webcache_folder: P) -> anyhow::Result<
         if !decoded.contains("buildSecret") {
             continue;
         }
-        return Ok(file.file_name());
+
+        let created = file.metadata().unwrap().modified().unwrap();
+        if found.as_ref().is_none_or(|current| created > current.1) {
+            found = Some((file.file_name(), created));
+        }
     }
 
-    anyhow::bail!("couldn't find a cache file!")
+    found.map(|f| f.0).context("couldn't find a cache file")
 }
 
 // to load up-to-date info!
