@@ -3,12 +3,14 @@ use base64::{Engine, engine::general_purpose::URL_SAFE};
 use num_enum::FromPrimitive;
 use serde::{Deserialize, Serialize};
 use std::{
+    borrow::Cow,
     env::home_dir,
     ffi::OsString,
     fmt, fs,
     io::{self, Seek},
     path::Path,
-    sync::LazyLock,
+    sync::{Arc, LazyLock, Mutex},
+    thread,
     time::SystemTime,
 };
 
@@ -47,7 +49,7 @@ fn find_latest_cache_file<P: AsRef<Path>>(webcache_folder: P) -> anyhow::Result<
     found.map(|f| f.0).context("couldn't find a cache file")
 }
 
-static PLAYLISTS_FROM_GAME: LazyLock<Option<Vec<PsynetPlaylist>>> = LazyLock::new(|| {
+fn load_playlists_from_game() -> Option<Vec<PsynetPlaylist>> {
     let cache_filepath = {
         // rl always stores savedata in Documents, but sometimes the game/binaries
         // are installed in a different place. so dont bother with rl_exe_path
@@ -76,7 +78,21 @@ static PLAYLISTS_FROM_GAME: LazyLock<Option<Vec<PsynetPlaylist>>> = LazyLock::ne
         .collect();
 
     Some(items)
-});
+}
+
+static PLAYLISTS_FROM_GAME: LazyLock<Arc<Mutex<Option<Vec<PsynetPlaylist>>>>> =
+    LazyLock::new(|| {
+        let handle = Arc::<Mutex<Option<Vec<PsynetPlaylist>>>>::default();
+
+        let thread_handle = Arc::clone(&handle);
+        thread::spawn(move || {
+            let playlists = load_playlists_from_game();
+            let mut guard = thread_handle.lock().unwrap();
+            *guard = playlists;
+        });
+
+        handle
+    });
 
 // stuff that's worth hardcoding (comp playlists, stuff that the online config doesnt say)
 #[derive(
@@ -134,8 +150,8 @@ pub enum Playlist {
 }
 
 impl Playlist {
-    pub fn as_str(self) -> &'static str {
-        match self {
+    pub fn as_str(self) -> Cow<'static, str> {
+        Cow::Borrowed(match self {
             Self::Casual => "Casual",
             Self::Standard | Self::RankedStandard => "Standard",
             Self::Doubles | Self::RankedTeamDoubles => "Doubles",
@@ -169,11 +185,19 @@ impl Playlist {
             Self::CustomTraining => "Custom Training",
             Self::CustomTrainingEditor => "Editing Custom Training",
             Self::LocalMatch => "Local Match",
-            Self::Other(id) => PLAYLISTS_FROM_GAME
-                .as_ref()
-                .and_then(|ps| ps.iter().find(|p| p.id == id).map(|p| p.name.as_str()))
-                .unwrap_or("Unknown"),
-        }
+            Self::Other(id) => {
+                return PLAYLISTS_FROM_GAME
+                    .lock()
+                    .unwrap()
+                    .as_ref()
+                    .and_then(|ps| {
+                        ps.iter()
+                            .find(|p| p.id == id)
+                            .map(|p| Cow::Owned(p.name.clone()))
+                    })
+                    .unwrap_or(Cow::Borrowed("Unknown"));
+            }
+        })
     }
 
     pub fn is_singleplayer(self) -> bool {

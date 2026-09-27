@@ -80,7 +80,7 @@ impl MyStatsWidget {
             egui::ComboBox::from_label("Choose playlist")
                 .selected_text(
                     self.selected_graph_playlist
-                        .map_or("None", Playlist::as_str),
+                        .map_or(Cow::Borrowed("None"), |p| p.as_str()),
                 )
                 .show_ui(ui, |ui| {
                     for playlist in choosable_playlists {
