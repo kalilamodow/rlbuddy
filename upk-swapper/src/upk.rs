@@ -1,4 +1,4 @@
-use crate::swapper::RlAesKey;
+use crate::RlAesKey;
 use anyhow::{Context as _, Result, anyhow, ensure};
 use byteorder::{LittleEndian, ReadBytesExt as _, WriteBytesExt as _};
 use std::io::{self, Cursor, Read, Seek, SeekFrom, Write};

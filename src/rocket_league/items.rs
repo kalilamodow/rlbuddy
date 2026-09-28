@@ -1,7 +1,4 @@
-use crate::{
-    common::savedata::{load_service_data, save_service_data},
-    swapper::RlAesKey,
-};
+use crate::common::savedata::{load_service_data, save_service_data};
 use anyhow::{Context as _, Result};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -106,7 +103,7 @@ pub struct Item {
     pub name: String,
     pub slot: ItemSlot,
     pub package: ItemPackageName,
-    pub key: RlAesKey,
+    pub key: String,
 }
 
 pub enum ItemsLoadStatus {
@@ -150,7 +147,7 @@ fn parse_csv_response(csv: String) -> Result<Vec<Item>> {
         if key.is_empty() {
             continue;
         }
-        let key = RlAesKey::from_base64(key)?;
+        let key = key.to_string();
 
         items.push(Item {
             id,

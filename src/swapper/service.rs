@@ -6,9 +6,10 @@ use crate::{
     },
     core::app::{Service, ServiceWithUi},
     rocket_league::{Item, ItemId, get_rl_exe_path},
-    swapper::{RlAesKey, upk::Upk, widget::SwapperWidget},
+    swapper::widget::SwapperWidget,
 };
 use anyhow::{Context, bail};
+use rlbuddy_upk_swapper::{RlAesKey, Upk};
 use serde::{Deserialize, Serialize};
 use std::{fs, path::Path};
 
@@ -106,20 +107,25 @@ impl SwapperService {
                     .context("backing up file")?;
                 }
 
+                let appearance_aes = RlAesKey::from_base64(&appearance.key)
+                    .context("parsing appearance upk aes key")?;
                 let mut appearance_upk = match open_upk(
                     appearance.package.path(&exe_path),
                     appearance.package.name(),
-                    &appearance.key,
+                    &appearance_aes,
                 ) {
                     Ok(u) => u,
                     Err(error) => {
                         bail!("Loading appearance file: {error:?}");
                     }
                 };
+
+                let replaced_aes =
+                    RlAesKey::from_base64(&replaced.key).context("parsing replaced upk aes key")?;
                 let replaced_upk = match open_upk(
                     replaced.package.path(&exe_path),
                     replaced.package.name(),
-                    &replaced.key,
+                    &replaced_aes,
                 ) {
                     Ok(u) => u,
                     Err(error) => {
