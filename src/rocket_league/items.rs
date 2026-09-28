@@ -1,6 +1,6 @@
 use crate::{
     common::savedata::{load_service_data, save_service_data},
-    rocket_league::RlAesKey,
+    swapper::RlAesKey,
 };
 use anyhow::{Context as _, Result};
 use serde::{Deserialize, Serialize};
@@ -18,11 +18,11 @@ pub struct ItemId(u16);
 pub struct ItemPackageName(String);
 
 impl ItemPackageName {
-    pub fn id(&self) -> &str {
+    pub fn name(&self) -> &str {
         &self.0
     }
     pub fn sf_name(&self) -> String {
-        format!("{}_SF", self.id())
+        format!("{}_SF", self.name())
     }
     pub fn filename(&self) -> String {
         format!("{}.upk", self.sf_name())

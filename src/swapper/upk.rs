@@ -1,11 +1,7 @@
-use crate::rocket_league::{ItemPackageName, RlAesKey};
+use crate::swapper::RlAesKey;
 use anyhow::{Context as _, Result, anyhow, ensure};
 use byteorder::{LittleEndian, ReadBytesExt as _, WriteBytesExt as _};
-use std::{
-    fs,
-    io::{self, Cursor, Read, Seek, SeekFrom, Write},
-    path::Path,
-};
+use std::io::{self, Cursor, Read, Seek, SeekFrom, Write};
 
 trait ReadBytes: Read {
     fn read_bytes(&mut self, n_bytes: usize) -> io::Result<Vec<u8>> {
@@ -580,20 +576,20 @@ impl FHeaderEncryptedRegion {
     }
 }
 
+fn package_sf_name(package_name: &str) -> String {
+    format!("{package_name}_SF")
+}
+
 pub struct Upk<'a> {
     summary: FPackageFileSummary,
     header: FHeaderEncryptedRegion,
     payload: Vec<u8>, // the compressed info
     key: &'a RlAesKey,
-    id: &'a ItemPackageName,
+    package_name: &'a str,
 }
 
 impl<'a> Upk<'a> {
-    pub fn new(
-        reader: &mut (impl Read + Seek),
-        id: &'a ItemPackageName,
-        key: &'a RlAesKey,
-    ) -> Result<Self> {
+    pub fn new(reader: &mut (impl Read + Seek), id: &'a str, key: &'a RlAesKey) -> Result<Self> {
         let summary = FPackageFileSummary::deserialize(reader, false)?;
         ensure!(summary.is_valid(), "package file tag isnt valid");
 
@@ -612,7 +608,7 @@ impl<'a> Upk<'a> {
             header,
             payload,
             key,
-            id,
+            package_name: id,
         })
     }
 
@@ -640,26 +636,17 @@ impl<'a> Upk<'a> {
         Ok(serialized)
     }
 
-    pub fn open<P: AsRef<Path>>(
-        path: P,
-        id: &'a ItemPackageName,
-        key: &'a RlAesKey,
-    ) -> Result<Self> {
-        let mut file = fs::File::open(path)?;
-        Self::new(&mut file, id, key)
-    }
-
     pub fn pretend_to_be(&mut self, other: &'a Upk) {
         self.header.add_swap(NameSwap {
-            from: self.id.id().to_owned(),
-            to: other.id.id().to_owned(),
+            from: self.package_name.to_owned(),
+            to: other.package_name.to_owned(),
         });
         self.header.add_swap(NameSwap {
-            from: self.id.sf_name(),
-            to: other.id.sf_name(),
+            from: package_sf_name(self.package_name),
+            to: package_sf_name(other.package_name),
         });
         self.summary.guid = other.summary.guid.clone();
-        self.id = other.id;
+        self.package_name = other.package_name;
 
         // note: do this BEFORE setting self.key/self.nonce
         if self.summary.extra_encryption() {

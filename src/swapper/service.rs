@@ -6,11 +6,11 @@ use crate::{
     },
     core::app::{Service, ServiceWithUi},
     rocket_league::{Item, ItemId, get_rl_exe_path},
-    swapper::{upk::Upk, widget::SwapperWidget},
+    swapper::{RlAesKey, upk::Upk, widget::SwapperWidget},
 };
 use anyhow::{Context, bail};
 use serde::{Deserialize, Serialize};
-use std::fs;
+use std::{fs, path::Path};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ActiveSwap {
@@ -106,9 +106,9 @@ impl SwapperService {
                     .context("backing up file")?;
                 }
 
-                let mut appearance_upk = match Upk::open(
+                let mut appearance_upk = match open_upk(
                     appearance.package.path(&exe_path),
-                    &appearance.package,
+                    appearance.package.name(),
                     &appearance.key,
                 ) {
                     Ok(u) => u,
@@ -116,9 +116,9 @@ impl SwapperService {
                         bail!("Loading appearance file: {error:?}");
                     }
                 };
-                let replaced_upk = match Upk::open(
+                let replaced_upk = match open_upk(
                     replaced.package.path(&exe_path),
-                    &replaced.package,
+                    replaced.package.name(),
                     &replaced.key,
                 ) {
                     Ok(u) => u,
@@ -152,6 +152,15 @@ impl SwapperService {
 
         Ok(())
     }
+}
+
+fn open_upk<'a, P: AsRef<Path>>(
+    path: P,
+    name: &'a str,
+    key: &'a RlAesKey,
+) -> anyhow::Result<Upk<'a>> {
+    let mut file = fs::File::open(path)?;
+    Upk::new(&mut file, name, key)
 }
 
 impl Service for SwapperService {
