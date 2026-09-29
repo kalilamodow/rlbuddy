@@ -50,6 +50,7 @@ pub enum ItemSlot {
     Body,
     #[default]
     Boost,
+    Decal,
     Explosion,
     PaintFinish,
     Topper,
@@ -62,6 +63,7 @@ impl ItemSlot {
         Some(match slot {
             "Antenna" => Self::Antenna,
             "Body" => Self::Body,
+            "Decal" => Self::Decal,
             "Rocket Boost" => Self::Boost,
             "Goal Explosion" => Self::Explosion,
             "Paint Finish" => Self::PaintFinish,
@@ -77,6 +79,7 @@ impl ItemSlot {
             Self::Antenna => "Antenna",
             Self::Body => "Body",
             Self::Boost => "Boost",
+            Self::Decal => "Decal",
             Self::Explosion => "Goal explosion",
             Self::PaintFinish => "Paint finish",
             Self::Topper => "Topper",

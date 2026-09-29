@@ -171,6 +171,7 @@ impl SwapperWidget {
                             ItemSlot::Antenna,
                             ItemSlot::Body,
                             ItemSlot::Boost,
+                            ItemSlot::Decal,
                             ItemSlot::Explosion,
                             ItemSlot::PaintFinish,
                             ItemSlot::Topper,
