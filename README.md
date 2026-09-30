@@ -36,8 +36,16 @@ wherever you want and it'll work.
 
 > You can disable it loading/saving data by running with the `--disable-persistence` flag if you want. It's mainly for testing.
 
-If you've never turned on the stats api before, on first run, make sure to enable it with the Stats API Setup widget.
-It's open by default.
+If you've never turned on the stats api before, on first run, make sure to enable it with the Stats API Setup widget. It's open by default.
+
+Make sure your screen is in **windowed/borderless** mode - as any overlay, you'll experience a lot of issues in fullscreen mode.
+
+<details>
+    <summary>"Why can't it work with fullscreen?"</summary>
+
+Exclusive fullscreen basically means your operating system (probably Windows) gives the entire display straight to the game, which means it can't really put rlbuddy's window on top. *Borderless* is basically windowed mode but it hides the window decorations, so if you make the game window the same size as the screen it looks the same as fullscreen.
+
+</details>
 
 ## Features
 
