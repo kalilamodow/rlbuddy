@@ -555,18 +555,17 @@ impl Panel for AppSettingsWidget {
 
             {
                 ui.horizontal(|ui| {
-                    let items = &*get_items();
+                    let items = get_items();
                     if ui
                         .add_enabled(
-                            matches!(items, ItemsLoadStatus::Loaded(_, _)),
+                            matches!(&*items, ItemsLoadStatus::Loaded(_, _)),
                             egui::Button::new("Clear items cache"),
                         )
                         .clicked()
                     {
+                        drop(items);
                         reset_items();
-                    }
-
-                    if let ItemsLoadStatus::Loaded(_, time) = items
+                    } else if let ItemsLoadStatus::Loaded(_, time) = &*items
                         && let Ok(elapsed) = time.elapsed()
                     {
                         ui.small(format!(
