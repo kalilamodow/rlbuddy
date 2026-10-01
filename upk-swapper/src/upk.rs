@@ -589,7 +589,11 @@ pub struct Upk<'a> {
 }
 
 impl<'a> Upk<'a> {
-    pub fn new(reader: &mut (impl Read + Seek), id: &'a str, key: &'a RlAesKey) -> Result<Self> {
+    pub fn new(
+        reader: &mut (impl Read + Seek),
+        package_name: &'a str,
+        key: &'a RlAesKey,
+    ) -> Result<Self> {
         let summary = FPackageFileSummary::deserialize(reader, false)?;
         ensure!(summary.is_valid(), "package file tag isnt valid");
 
@@ -608,7 +612,7 @@ impl<'a> Upk<'a> {
             header,
             payload,
             key,
-            package_name: id,
+            package_name,
         })
     }
 
