@@ -107,6 +107,8 @@ lot faster this way as well.
 rlbuddy can replace the "identity" of one asset with another, while leaving its actual data the same. This lets you any
 item you want, similar to Alphaconsole!
 
+There's also a standalone web-based version if this is all that you're looking for. [Tutorial link](https://www.youtube.com/watch?v=hZpFCGWrJN4)
+
 ### Custom map loader
 
 <img src="readme-images/custom-map-loader.gif" alt="Custom map loader demo" />
