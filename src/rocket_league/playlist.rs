@@ -14,13 +14,22 @@ use std::{
     time::SystemTime,
 };
 
-#[derive(Debug, Deserialize)]
+use crate::common::savedata::{load_service_data, save_service_data};
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct PsynetPlaylist {
     #[serde(rename = "PlaylistID")]
     id: u8,
     #[serde(rename = "Title")]
     name: String,
 }
+
+#[derive(Debug, Default, Serialize, Deserialize)]
+struct ExtraPlaylistsCache {
+    cache: Option<Vec<PsynetPlaylist>>,
+}
+
+const DATA_ID: &str = "external-playlists";
 
 fn find_latest_cache_file<P: AsRef<Path>>(webcache_folder: P) -> anyhow::Result<OsString> {
     let files = fs::read_dir(webcache_folder).context("reading webcache directory")?;
@@ -82,11 +91,22 @@ fn load_playlists_from_game() -> Option<Vec<PsynetPlaylist>> {
 
 static PLAYLISTS_FROM_GAME: LazyLock<Arc<Mutex<Option<Vec<PsynetPlaylist>>>>> =
     LazyLock::new(|| {
-        let handle = Arc::<Mutex<Option<Vec<PsynetPlaylist>>>>::default();
+        let handle = Arc::new(Mutex::new(
+            load_service_data::<ExtraPlaylistsCache>(DATA_ID).cache,
+        ));
 
         let thread_handle = Arc::clone(&handle);
         thread::spawn(move || {
             let playlists = load_playlists_from_game();
+            if let Some(save_playlists) = playlists.clone() {
+                save_service_data(
+                    DATA_ID,
+                    &ExtraPlaylistsCache {
+                        cache: Some(save_playlists),
+                    },
+                );
+            }
+
             let mut guard = thread_handle.lock().unwrap();
             *guard = playlists;
         });
