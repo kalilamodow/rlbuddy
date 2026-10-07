@@ -139,6 +139,10 @@ impl MatchesService {
                     state
                         .prev_matches
                         .push(MatchType::Session(Cow::Owned(current_match)));
+
+                    drop(state);
+                    self.save();
+
                     self.ctx.request_repaint();
                 }
                 RLEvent::Update(ref update) => {
