@@ -135,6 +135,7 @@ impl MapLoaderService {
                     if let Err(error) = result {
                         let mut state = state_handle.write();
                         state.current_error = Some(error.to_string());
+                        state.import_progress = None;
                     }
                 });
             }
@@ -154,7 +155,8 @@ impl MapLoaderService {
 
                     if let Err(error) = result {
                         let mut state = state_handle.write();
-                        state.current_error = Some(error.to_string());
+                        state.current_error = Some(format!("{error:?}"));
+                        state.import_progress = None;
                     }
                 });
             }
@@ -346,6 +348,11 @@ where
 
     let custom_map_dir =
         get_custom_map_directory(&info.id).context("getting directory to put imported map in")?;
+
+    if custom_map_dir.exists() {
+        bail!("map seems to already exist");
+    }
+
     fs::create_dir_all(&custom_map_dir)
         .context("ensuring directory to put imported map in exists")?;
 
