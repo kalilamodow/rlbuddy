@@ -107,31 +107,43 @@ impl SwapperService {
                     .context("backing up file")?;
                 }
 
+                let appearance_path = {
+                    let backup_path = appearance.package.backup_path(&exe_path);
+                    if backup_path.exists() {
+                        backup_path
+                    } else {
+                        appearance.package.path(&exe_path)
+                    }
+                };
+
                 let appearance_aes = RlAesKey::from_base64(&appearance.key)
                     .context("parsing appearance upk aes key")?;
-                let mut appearance_upk = match open_upk(
-                    appearance.package.path(&exe_path),
-                    appearance.package.name(),
-                    &appearance_aes,
-                ) {
-                    Ok(u) => u,
-                    Err(error) => {
-                        bail!("Loading appearance file: {error:?}");
+                let mut appearance_upk =
+                    match open_upk(appearance_path, appearance.package.name(), &appearance_aes) {
+                        Ok(u) => u,
+                        Err(error) => {
+                            bail!("Loading appearance file: {error:?}");
+                        }
+                    };
+
+                let replaced_path = {
+                    let backup_path = replaced.package.backup_path(&exe_path);
+                    if backup_path.exists() {
+                        backup_path
+                    } else {
+                        replaced.package.path(&exe_path)
                     }
                 };
 
                 let replaced_aes =
                     RlAesKey::from_base64(&replaced.key).context("parsing replaced upk aes key")?;
-                let replaced_upk = match open_upk(
-                    replaced.package.path(&exe_path),
-                    replaced.package.name(),
-                    &replaced_aes,
-                ) {
-                    Ok(u) => u,
-                    Err(error) => {
-                        bail!("Loading replaced file: {error:?}");
-                    }
-                };
+                let replaced_upk =
+                    match open_upk(replaced_path, replaced.package.name(), &replaced_aes) {
+                        Ok(u) => u,
+                        Err(error) => {
+                            bail!("Loading replaced file: {error:?}");
+                        }
+                    };
 
                 appearance_upk.pretend_to_be(&replaced_upk);
                 let serialized = match appearance_upk.serialize() {
