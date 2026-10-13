@@ -1,3 +1,4 @@
+mod service;
 mod widget;
 
-pub use widget::*;
+pub use service::MyStatsService;

@@ -1,137 +1,91 @@
+use crate::common::channel::Sender;
+use crate::common::{ReadonlyStateHandle, timefmt::format_seconds};
 use crate::core::app::Panel;
-use crate::matches::{MatchInfo, MatchesService};
-use crate::{
-    common::{ReadonlyStateHandle, timefmt::format_seconds},
-    matches::{MatchType, MatchesServiceState},
-    rocket_league::Playlist,
+use crate::my_stats::MyStatsService;
+use crate::my_stats::service::{
+    MmrGraphState, MyStatsServiceCommand, MyStatsServiceState, StreakType,
 };
 use eframe::egui;
-use egui_plot::{Line, Plot, PlotPoint, PlotPoints};
+use egui_plot::{Line, Plot, PlotPoints};
 use std::borrow::Cow;
-use std::{
-    collections::HashSet,
-    time::{SystemTime, UNIX_EPOCH},
-};
-
-#[derive(Debug, Default)]
-pub struct PlayerLongtimeStats {
-    games: u64,
-    goals: u64,
-    assists: u64,
-    saves: u64,
-    shots: u64,
-    demos: u64,
-}
+use std::time::{SystemTime, UNIX_EPOCH};
 
 pub struct MyStatsWidget {
-    matches_state: ReadonlyStateHandle<MatchesServiceState>,
-    selected_graph_playlist: Option<Playlist>,
+    state: ReadonlyStateHandle<MyStatsServiceState>,
+    sender: Sender<MyStatsServiceCommand>,
 }
 
 impl MyStatsWidget {
-    pub fn new(matches_service: &MatchesService) -> Self {
+    pub fn new(service: &MyStatsService) -> Self {
         Self {
-            matches_state: matches_service.state_handle(),
-            selected_graph_playlist: None,
+            state: service.state_handle(),
+            sender: service.sender(),
         }
     }
 
     fn render_streak_header(&self, ui: &mut egui::Ui) {
-        let state = self.matches_state.read();
-        let get_session_matches = || session_matches(&state);
-
-        let count = get_session_matches().count();
+        let state = self.state.read();
         ui.horizontal(|ui| {
-            ui.strong(format!("{count} matches"));
-            if count < 1 {
+            let Some(streak) = &state.streak else {
+                ui.strong("No matches");
                 return;
-            }
-
-            let won_last_match = get_session_matches().next_back().unwrap().is_win();
-            let streak = get_session_matches()
-                .rev()
-                .take_while(|m| m.is_win() == won_last_match)
-                .count();
+            };
 
             ui.label(format!(
-                "{} {streak}",
-                if won_last_match { '🔥' } else { '❄' }
+                "{} {}",
+                match streak.cat {
+                    StreakType::Win => '🔥',
+                    StreakType::Loss => '❄',
+                },
+                streak.count
             ));
 
-            if !won_last_match && streak > 4 {
+            if matches!(streak.cat, StreakType::Loss) && streak.count > 4 {
                 ui.label("<!> Consider taking a break");
             }
         });
     }
 
     fn render_settings_header(&mut self, ui: &mut egui::Ui) {
-        let state = self.matches_state.read();
-        let mut choosable_playlists: Vec<Playlist> = state
-            .prev_matches
-            .iter()
-            .map(MatchType::playlist)
-            .filter_map(Playlist::in_ranked)
-            .collect::<HashSet<_>>()
-            .into_iter()
-            .collect();
-        choosable_playlists.sort();
+        let state = self.state.read();
 
         ui.horizontal(|ui| {
             egui::ComboBox::from_label("Choose playlist")
                 .selected_text(
-                    self.selected_graph_playlist
+                    state
+                        .selected_graph_playlist
                         .map_or(Cow::Borrowed("None"), |p| p.as_str()),
                 )
                 .show_ui(ui, |ui| {
-                    for playlist in choosable_playlists {
-                        ui.selectable_value(
-                            &mut self.selected_graph_playlist,
-                            Some(playlist),
-                            playlist.as_str(),
-                        );
+                    for &playlist in &state.choosable_playlists {
+                        if ui
+                            .selectable_label(
+                                state.selected_graph_playlist == Some(playlist),
+                                playlist.as_str(),
+                            )
+                            .clicked()
+                        {
+                            self.sender
+                                .send(MyStatsServiceCommand::SetSelectedGraphPlaylist(playlist));
+                        }
                     }
                 });
         });
     }
 
     fn render_mmr_graph(&mut self, ui: &mut egui::Ui) {
-        let state = self.matches_state.read();
-        if state.prev_matches.is_empty() {
-            ui.label("No data. Play with rlbuddy open to see your progress!");
-            return;
-        }
-
-        let Some(selected_playlist) = self.selected_graph_playlist else {
-            ui.label("Select a playlist");
-            return;
+        let state = self.state.read();
+        let (points, times) = match &state.graph {
+            MmrGraphState::NoPlaylist => {
+                ui.label("Select a playlist to graph");
+                return;
+            }
+            MmrGraphState::NotEnoughData => {
+                ui.label("Play a bit more to see data in this playlist!");
+                return;
+            }
+            MmrGraphState::Graph(points) => points,
         };
-
-        let points: Vec<PlotPoint> = state
-            .prev_matches
-            .iter()
-            .filter(|m| m.playlist() == selected_playlist)
-            .filter_map(|m| match m {
-                MatchType::Old(_) => None,
-                MatchType::Session(s) => s
-                    .players
-                    .iter()
-                    .find(|p| p.is_local_player)
-                    .and_then(|p| p.skill.as_ref())
-                    .and_then(|sk| sk.get_playlist(s.playlist.in_ranked().unwrap_or(s.playlist)))
-                    .map(|skill| PlotPoint {
-                        x: m.started_at()
-                            .duration_since(UNIX_EPOCH)
-                            .expect("its before 1970")
-                            .as_secs_f64(),
-                        y: skill.mmr.into(),
-                    }),
-            })
-            .collect();
-
-        if points.len() <= 1 {
-            ui.label("No points to graph");
-            return;
-        }
 
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -145,88 +99,77 @@ impl MyStatsWidget {
             .allow_boxed_zoom(false)
             .allow_scroll(false)
             .allow_drag(false)
-            .view_aspect(1f32)
+            .view_aspect(1.0)
             .cursor_color(egui::Color32::TRANSPARENT)
             .show_crosshair(false)
             .clamp_grid(true)
-            // space on actual points
-            .x_grid_spacer(|_| {
-                points
-                    .iter()
-                    .zip(points.iter().skip(1))
-                    .map(|p| egui_plot::GridMark {
-                        value: p.0.x,
-                        step_size: p.1.x - p.0.x,
-                    })
-                    .collect()
-            })
             .x_axis_formatter(|point, _| {
-                format_seconds((now - point.value) as u64, true).into_owned()
+                let x = point.value as usize;
+                let Some(time) = times[x] else {
+                    return "".into();
+                };
+
+                format_seconds(
+                    (now - time.duration_since(UNIX_EPOCH).unwrap().as_secs_f64()) as u64,
+                    true,
+                )
+                .into_owned()
             })
             .show(ui, |ui| {
-                ui.line(Line::new("MMR", PlotPoints::Borrowed(&points)));
+                ui.line(Line::new("MMR", PlotPoints::Borrowed(points)));
             });
     }
 
     fn render_win_loss(&mut self, ui: &mut egui::Ui) {
-        let state = self.matches_state.read();
-        let get_session_matches = || session_matches(&state);
-
-        let total_games = get_session_matches().count();
-        let wins = get_session_matches()
-            .filter(|s| s.finish.as_ref().and_then(|f| f.winner) == Some(s.our_team))
-            .count();
+        let state = self.state.read();
 
         ui.horizontal(|ui| {
-            ui.label("W/L");
-            if total_games == 0 {
-                ui.label("-");
+            let Some(wl) = &state.wl else {
                 return;
-            }
+            };
+            ui.label("W/L");
+
+            let percent = {
+                let ratio = wl.wins as f32 * 100.0 / (wl.wins + wl.losses) as f32;
+                let pct = (ratio * 100.0).round() / 100.0;
+
+                if pct.is_nan() {
+                    None
+                } else {
+                    Some(pct.to_string())
+                }
+            };
+
             ui.label(format!(
-                "{wins}/{} ({}%)",
-                total_games - wins,
-                wins * 100 / total_games
+                "{}/{} ({}%)",
+                wl.wins,
+                wl.losses,
+                percent.as_deref().unwrap_or("-")
             ));
         });
     }
 
     fn render_stats(&mut self, ui: &mut egui::Ui) {
-        let state = self.matches_state.read();
-        let all_stats = state.prev_matches.iter().filter_map(|m| match m {
-            MatchType::Session(s) => s
-                .players
-                .iter()
-                .find_map(|p| p.is_local_player.then_some(&p.stats)),
-            MatchType::Old(_) => None,
-        });
-
-        let totals: PlayerLongtimeStats =
-            all_stats.fold(PlayerLongtimeStats::default(), |mut total, stats| {
-                total.games += 1;
-                total.goals += u64::from(stats.goals);
-                total.shots += u64::from(stats.shots);
-                total.assists += u64::from(stats.assists);
-                total.saves += u64::from(stats.saves);
-                total.demos += u64::from(stats.demos);
-                total
-            });
+        let state = self.state.read();
 
         #[allow(clippy::cast_precision_loss)]
         let stat_text = |text: &str, val: u64| {
-            format!("{text}: {val} ({:.2}pg)", val as f32 / totals.games as f32)
+            format!(
+                "{text}: {val} ({:.2}pg)",
+                val as f32 / state.number_of.games as f32
+            )
         };
 
         ui.horizontal(|ui| {
             // also prevents a div by 0 error in stat_text()
-            if totals.games == 0 {
+            if state.number_of.games == 0 {
                 return;
             }
 
-            ui.label(stat_text("Goals", totals.goals));
-            ui.label(stat_text("Assists", totals.assists));
-            ui.label(stat_text("Shots", totals.shots));
-            ui.label(stat_text("Saves", totals.saves));
+            ui.label(stat_text("Goals", state.number_of.goals));
+            ui.label(stat_text("Assists", state.number_of.assists));
+            ui.label(stat_text("Shots", state.number_of.shots));
+            ui.label(stat_text("Saves", state.number_of.saves));
         });
     }
 }
@@ -239,10 +182,8 @@ impl Panel for MyStatsWidget {
     fn ui(&mut self, ui: &mut egui::Ui) -> egui::Response {
         ui.vertical(|ui| {
             self.render_streak_header(ui);
-            ui.horizontal(|ui| {
-                self.render_stats(ui);
-                self.render_win_loss(ui);
-            });
+            self.render_stats(ui);
+            self.render_win_loss(ui);
 
             ui.separator();
 
@@ -251,13 +192,4 @@ impl Panel for MyStatsWidget {
         })
         .response
     }
-}
-
-fn session_matches(
-    state: &MatchesServiceState,
-) -> impl DoubleEndedIterator<Item = &Cow<'_, MatchInfo>> {
-    state.prev_matches.iter().filter_map(|m| match m {
-        MatchType::Session(s) => Some(s),
-        MatchType::Old(_) => None,
-    })
 }
