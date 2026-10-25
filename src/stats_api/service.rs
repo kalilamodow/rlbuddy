@@ -108,6 +108,8 @@ impl StatsApiGameData {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 struct UpdateStateEventData {
+    // docs says "only set if its online" but what they mean by not set is an empty string -_-
+    match_guid: String,
     players: Vec<StatsApiPlayerData>,
     game: StatsApiGameData,
 }
@@ -188,6 +190,7 @@ impl fmt::Display for PlayerData {
 
 #[derive(Debug, Clone)]
 pub struct MatchUpdate {
+    pub is_online: bool,
     pub score: TeamScores,
     pub players: Vec<PlayerData>,
     pub arena: &'static str,
@@ -197,8 +200,8 @@ pub struct MatchUpdate {
 
 pub enum RLEvent {
     Update(MatchUpdate),
-    MatchCreated,
-    MatchStart,
+    MatchCreated(MatchUpdate),
+    MatchStart(MatchUpdate),
     MatchOver(Team), // winner
     MatchLeft,
 
@@ -230,7 +233,7 @@ enum ApiUpdate {
 
 enum StatsApiEvent {
     UpdateState(UpdateStateEventData),
-    MatchCreated,
+    MatchCreated, // match guid is always None here
     MatchEnded(MatchEndedEventData),
     MatchDestroyed,
     CountdownBegin,
@@ -264,10 +267,18 @@ impl TryFrom<RawStatsApiEvent> for StatsApiEvent {
     }
 }
 
+// start here = first countdown
+enum GameInitState {
+    Created,
+    AboutToStart,
+    JustStarted,
+    OutsideOfInit,
+}
+
 pub struct StatsApi {
     event_rx: mpsc::Receiver<ApiUpdate>,
     local_player_shortcut: Option<u8>,
-    match_created_event_happened: bool,
+    init_state: GameInitState,
     publisher: EventSource<RLEvent>,
 }
 
@@ -322,7 +333,7 @@ impl StatsApi {
         StatsApi {
             event_rx,
             local_player_shortcut: None,
-            match_created_event_happened: false,
+            init_state: GameInitState::OutsideOfInit,
             publisher: EventSource::new(),
         }
     }
@@ -371,7 +382,8 @@ impl StatsApi {
                     }
                 }
 
-                RLEvent::Update(MatchUpdate {
+                let update = MatchUpdate {
+                    is_online: !data.match_guid.is_empty(),
                     state: match_state,
                     score: data.game.scores(),
                     arena: asset_to_arena(&data.game.arena).unwrap_or("Unknown"),
@@ -381,15 +393,30 @@ impl StatsApi {
                         .filter_map(parse_stats_api_player)
                         .collect(),
                     playlist: Playlist::from_primitive(data.game.playlist_id),
-                })
+                };
+
+                match &mut self.init_state {
+                    GameInitState::OutsideOfInit => RLEvent::Update(update),
+                    GameInitState::AboutToStart => RLEvent::Update(update),
+                    GameInitState::JustStarted => {
+                        self.init_state = GameInitState::OutsideOfInit;
+                        RLEvent::MatchStart(update)
+                    }
+                    GameInitState::Created => {
+                        self.init_state = GameInitState::AboutToStart;
+                        RLEvent::MatchCreated(update)
+                    }
+                }
             }
             StatsApiEvent::MatchCreated => {
-                self.match_created_event_happened = true;
-                RLEvent::MatchCreated
+                self.init_state = GameInitState::Created;
+                return None;
             }
-            StatsApiEvent::CountdownBegin if self.match_created_event_happened => {
-                self.match_created_event_happened = false;
-                RLEvent::MatchStart
+            StatsApiEvent::CountdownBegin => {
+                if matches!(self.init_state, GameInitState::AboutToStart) {
+                    self.init_state = GameInitState::JustStarted;
+                }
+                return None;
             }
             StatsApiEvent::MatchEnded(data) => RLEvent::MatchOver(Team::from(data.winner_team_num)),
             StatsApiEvent::MatchDestroyed => RLEvent::MatchLeft,
@@ -405,7 +432,6 @@ impl StatsApi {
                 release_speed: data.ball_last_touch.speed,
                 is_ours: Some(data.scorer.shortcut) == self.local_player_shortcut,
             },
-            _ => return None,
         })
     }
 }

@@ -90,7 +90,7 @@ impl Service for ReplaySaverService {
 
         while let Some(event) = self.stats_api.try_recv() {
             match &*event {
-                RLEvent::MatchStart => {
+                RLEvent::MatchStart(data) if data.is_online => {
                     thread::spawn(|| {
                         if rdev::simulate(&EventType::KeyPress(Key::BackSlash)).is_err() {
                             return;

@@ -356,7 +356,7 @@ impl eframe::App for RlBuddyApp {
         self.update_services();
 
         while let Some(event) = self.stats_api_events.try_recv() {
-            match *event {
+            match &*event {
                 RLEvent::Connected => {
                     ctx.send_viewport_cmd(ViewportCommand::Title(
                         "rlbuddy (connected)".to_string(),
@@ -365,14 +365,14 @@ impl eframe::App for RlBuddyApp {
                 RLEvent::Disconnected => ctx.send_viewport_cmd(ViewportCommand::Title(
                     "rlbuddy (not connected)".to_string(),
                 )),
-                RLEvent::MatchCreated => {
+                RLEvent::MatchCreated(data) if data.is_online => {
                     let settings = self.app_settings.read();
                     if matches!(settings.popup_mode, AutoPopupMode::MatchCreated) {
                         drop(settings);
                         self.show(ctx);
                     }
                 }
-                RLEvent::MatchStart => {
+                RLEvent::MatchStart(data) if data.is_online => {
                     let settings = self.app_settings.read();
                     match settings.popup_mode {
                         AutoPopupMode::FirstCountdown => self.pop_up(),
