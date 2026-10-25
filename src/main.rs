@@ -11,6 +11,7 @@ mod matches;
 mod music_control;
 mod my_stats;
 mod player_info;
+mod replay_saver;
 mod rocket_league;
 mod stats_api;
 mod swapper;

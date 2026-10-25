@@ -7,6 +7,7 @@ use crate::gamepad::overlay::GamepadOverlayService;
 use crate::hotkey::HotkeyService;
 use crate::music_control::MusicControlService;
 use crate::my_stats::MyStatsService;
+use crate::replay_saver::ReplaySaverService;
 use crate::rocket_league::{ItemsLoadStatus, get_items, reset_items, set_rl_exe_path};
 use crate::swapper::SwapperService;
 use crate::{
@@ -218,6 +219,7 @@ impl RlBuddyApp {
         let player_info_service = PlayerInfoService::default();
         let hotkey_service = HotkeyService::new(&mut gamepad_service, &overlay_tx);
         let music_service = MusicControlService::new(&mut stats_api_service);
+        let replay_saver_service = ReplaySaverService::new(&mut stats_api_service);
         let swapper_service = SwapperService::new();
 
         let panels = vec![
@@ -235,6 +237,7 @@ impl RlBuddyApp {
             AppPanel::new(AutoSetupWidget::new()),
             AppPanel::new(map_loader_service.panel()),
             AppPanel::new(swapper_service.panel()),
+            AppPanel::new(replay_saver_service.panel()),
             AppPanel::new(gamepad_overlay_service.panel()),
             AppPanel::new(match_notificator_service.panel()),
             AppPanel::new(hotkey_service.panel()),
@@ -270,6 +273,7 @@ impl RlBuddyApp {
                 Box::new(gamepad_service),
                 Box::new(gamepad_overlay_service),
                 Box::new(map_loader_service),
+                Box::new(replay_saver_service),
                 Box::new(swapper_service),
             ],
 
