@@ -376,7 +376,14 @@ impl eframe::App for RlBuddyApp {
                     let settings = self.app_settings.read();
                     match settings.popup_mode {
                         AutoPopupMode::FirstCountdown => self.pop_up(),
-                        AutoPopupMode::MatchCreated => self.hide(ctx),
+                        AutoPopupMode::MatchCreated => {
+                            let tx = self.overlay_tx.clone();
+
+                            thread::spawn(move || {
+                                thread::sleep(Duration::from_secs(3));
+                                tx.send(false).unwrap();
+                            });
+                        }
                         AutoPopupMode::Disabled => {}
                     }
                 }
