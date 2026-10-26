@@ -39,6 +39,18 @@ impl ChoosableKey {
         ChoosableKey::Enter,
     ];
 
+    pub fn as_key(self) -> Key {
+        match self {
+            ChoosableKey::Alt => Key::Alt,
+            ChoosableKey::Shift => Key::ShiftLeft,
+            ChoosableKey::Ctrl => Key::ControlLeft,
+            ChoosableKey::Backtick => Key::BackQuote,
+            ChoosableKey::Backslash => Key::BackSlash,
+            ChoosableKey::Insert => Key::Insert,
+            ChoosableKey::Enter => Key::Return,
+        }
+    }
+
     pub fn as_str(self) -> &'static str {
         match self {
             ChoosableKey::Alt => "alt",
@@ -85,11 +97,11 @@ impl ReplaySaverService {
 impl Service for ReplaySaverService {
     fn update(&mut self) {
         let settings = self.settings.read();
-        if settings.chosen_key.is_none() {
+        let Some(key) = settings.chosen_key else {
             // disabled
             self.stats_api.drain();
             return;
-        }
+        };
 
         while let Some(event) = self.stats_api.try_recv() {
             match &*event {
@@ -97,13 +109,13 @@ impl Service for ReplaySaverService {
                     if data.is_online && (settings.save_non_comp || data.playlist.is_comp()) =>
                 {
                     self.next_match_end_should_save = true;
-                    thread::spawn(|| {
-                        if rdev::simulate(&EventType::KeyPress(Key::BackSlash)).is_err() {
+                    thread::spawn(move || {
+                        if rdev::simulate(&EventType::KeyPress(key.as_key())).is_err() {
                             return;
                         }
 
                         thread::sleep(Duration::from_millis(1500));
-                        let _ = rdev::simulate(&EventType::KeyRelease(Key::BackSlash));
+                        let _ = rdev::simulate(&EventType::KeyRelease(key.as_key()));
                     });
                 }
                 RLEvent::MatchOver(_) if self.next_match_end_should_save => {
