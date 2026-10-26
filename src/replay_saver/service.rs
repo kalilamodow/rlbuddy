@@ -55,6 +55,7 @@ impl ChoosableKey {
 #[derive(Default, Serialize, Deserialize)]
 pub struct ReplaySaverSettings {
     pub chosen_key: Option<ChoosableKey>,
+    pub save_non_comp: bool,
 }
 
 pub type ReplaySaverSettingsHandle = ReadWriteStateHandle<ReplaySaverSettings>;
@@ -62,6 +63,7 @@ pub type ReplaySaverSettingsHandle = ReadWriteStateHandle<ReplaySaverSettings>;
 pub struct ReplaySaverService {
     stats_api: Receiver<Rc<RLEvent>>,
     settings: ReplaySaverSettingsHandle,
+    next_match_end_should_save: bool,
 }
 
 static DATA_ID: &str = "replay-saver";
@@ -71,6 +73,7 @@ impl ReplaySaverService {
         Self {
             stats_api: stats_api.subscribe(),
             settings: ReadWriteStateHandle::new(load_service_config(DATA_ID)),
+            next_match_end_should_save: false,
         }
     }
 
@@ -90,7 +93,10 @@ impl Service for ReplaySaverService {
 
         while let Some(event) = self.stats_api.try_recv() {
             match &*event {
-                RLEvent::MatchStart(data) if data.is_online => {
+                RLEvent::MatchStart(data)
+                    if data.is_online && (settings.save_non_comp || data.playlist.is_comp()) =>
+                {
+                    self.next_match_end_should_save = true;
                     thread::spawn(|| {
                         if rdev::simulate(&EventType::KeyPress(Key::BackSlash)).is_err() {
                             return;
@@ -100,7 +106,8 @@ impl Service for ReplaySaverService {
                         let _ = rdev::simulate(&EventType::KeyRelease(Key::BackSlash));
                     });
                 }
-                RLEvent::MatchOver(_) => {
+                RLEvent::MatchOver(_) if self.next_match_end_should_save => {
+                    self.next_match_end_should_save = false;
                     thread::spawn(|| {
                         thread::sleep(Duration::from_millis(8_500));
                         let _ = rdev::simulate(&EventType::KeyPress(Key::Return));

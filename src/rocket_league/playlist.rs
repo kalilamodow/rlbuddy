@@ -238,6 +238,10 @@ impl Playlist {
         })
     }
 
+    pub fn is_comp(self) -> bool {
+        Some(self) == self.in_ranked()
+    }
+
     pub fn in_ranked(self) -> Option<Self> {
         Some(match self {
             Self::Duel | Self::RankedSoloDuel => Self::RankedSoloDuel,
