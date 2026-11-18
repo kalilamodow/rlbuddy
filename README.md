@@ -22,6 +22,7 @@ Each feature has its own widget, so you can customize it to your heart's desire 
     - [Custom map loader](#custom-map-loader)
     - [Gamepad overlay](#gamepad-overlay)
     - [Discord rich presence](#discord-rich-presence)
+    - [Replay saver](#replay-saver)
     - [Hotkey](#hotkey)
     - [Match toasts](#match-toasts)
     - [Automatic setup](#automatic-setup)
@@ -43,7 +44,7 @@ Make sure your screen is in **windowed/borderless** mode - as any overlay, you'l
 <details>
     <summary>"Why can't it work with fullscreen?"</summary>
 
-Exclusive fullscreen basically means your operating system (probably Windows) gives the entire display straight to the game, which means it can't really put rlbuddy's window on top. *Borderless* is basically windowed mode but it hides the window decorations, so if you make the game window the same size as the screen it looks the same as fullscreen.
+Exclusive fullscreen basically means your operating system (probably Windows) gives the entire display straight to the game, which means it can't really put rlbuddy's window on top. _Borderless_ is basically windowed mode but it hides the window decorations, so if you make the game window the same size as the screen it looks the same as fullscreen.
 
 </details>
 
@@ -132,6 +133,13 @@ commonly-used bindings. It'll save its window position, so you don't need to mov
 rlbuddy can now show Rich Presence in Discord, so now all your friends can see you destroying your opponents ;)
 
 Of course, you can disable it or just hide the current score.
+
+### Replay saver
+
+<img src="readme-images/replay-saver.jpg" alt="Replay saver interface">
+
+rlbuddy can automatically hold down the save replay button at the beginning of a match for you! To disable it,
+just set the keybind to Disable.
 
 ### Hotkey
 
