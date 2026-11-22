@@ -98,7 +98,15 @@ impl MyStatsService {
             .collect::<HashSet<_>>()
             .into_iter()
             .collect();
-        choosable_playlists.sort();
+
+        // sorts backwards by latest played
+        choosable_playlists.sort_by_cached_key(|&p| {
+            matches_state
+                .prev_matches
+                .iter()
+                .rposition(|m| m.playlist() == p)
+        });
+        choosable_playlists.reverse();
 
         let mut state = self.state.write();
         state.choosable_playlists = choosable_playlists;
