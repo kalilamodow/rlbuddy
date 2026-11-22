@@ -49,7 +49,7 @@ fn bb_bffs(other_player: &MatchPlayer, matches: &Vec<MatchType<'_>>) -> Option<B
         1..3 => '😎',
         3..6 => '✨',
         6..10 => '🫂',
-        10.. => '🥰',
+        10.. => '⚡',
     };
 
     Some(BuddyBadge {
