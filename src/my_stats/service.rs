@@ -176,11 +176,6 @@ impl MyStatsService {
         };
 
         let matches = self.matches_state.read();
-        // 1 match means its a single point (bad)
-        if matches.prev_matches.len() <= 1 {
-            state.graph = MmrGraphState::NotEnoughData;
-            return;
-        }
 
         let last_match_before_this_session = matches
             .prev_matches
@@ -232,7 +227,14 @@ impl MyStatsService {
             .into_iter()
             .chain(session_points);
 
-        state.graph = MmrGraphState::Graph(points.unzip());
+        let unzipped: (Vec<PlotPoint>, Vec<Option<SystemTime>>) = points.unzip();
+        // 1 match means its a single point (bad)
+        if unzipped.0.len() <= 1 {
+            state.graph = MmrGraphState::NotEnoughData;
+            return;
+        }
+
+        state.graph = MmrGraphState::Graph(unzipped);
     }
 
     pub fn sender(&self) -> Sender<MyStatsServiceCommand> {

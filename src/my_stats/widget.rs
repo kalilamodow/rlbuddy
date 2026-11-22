@@ -81,7 +81,7 @@ impl MyStatsWidget {
                 return;
             }
             MmrGraphState::NotEnoughData => {
-                ui.label("Play a bit more to see data in this playlist!");
+                ui.label("Not enough data for this session!");
                 return;
             }
             MmrGraphState::Graph(points) => points,
