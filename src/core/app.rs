@@ -422,7 +422,7 @@ impl eframe::App for RlBuddyApp {
 
         egui::Panel::bottom("bottom_panel").show_inside(ui, |ui| {
             ui.horizontal(|ui| {
-                egui::ComboBox::from_label("")
+                egui::ComboBox::from_id_salt("widget selector")
                     .selected_text("Widgets")
                     .show_ui(ui, |ui| {
                         for panel in &mut self.panels {
